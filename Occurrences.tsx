@@ -1,16 +1,19 @@
 import React, { useState } from 'react';
-import { Occurrence, OccurrenceType, OccurrenceStatus } from './types';
+import { Occurrence, OccurrenceType, OccurrenceStatus, Student, ClassRoom } from './types';
 import { StorageService } from './services/storageService';
+import { SupabaseService } from './services/supabaseService';
 import { AlertTriangle, Plus, X, Search, Heart, Shield, AlertCircle, ThumbsUp, Camera, Save, Filter, RefreshCw } from 'lucide-react';
+import { useEffect } from 'react';
 
 interface OccurrencesProps {
     onShowToast: (msg: string) => void;
 }
 
 export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
-    const [occurrences, setOccurrences] = useState<Occurrence[]>(StorageService.getOccurrences());
+    const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
+    const [students, setStudents] = useState<Student[]>([]);
+    const [loading, setLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
-    const students = StorageService.getStudents();
 
     // Form State
     const [newType, setNewType] = useState<OccurrenceType>(OccurrenceType.DISCIPLINE);
@@ -18,7 +21,27 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
     const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
     const [status, setStatus] = useState<OccurrenceStatus>(OccurrenceStatus.OPEN);
 
-    const handleCreate = () => {
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [obs, sts] = await Promise.all([
+                    SupabaseService.getOccurrences(),
+                    SupabaseService.getStudents()
+                ]);
+                setOccurrences(obs);
+                setStudents(sts);
+            } catch (error) {
+                console.error("Error fetching occurrences:", error);
+                onShowToast("Erro ao carregar ocorrências.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const handleCreate = async () => {
         if (!newDesc || selectedStudentIds.length === 0) return;
 
         const newOccurrence: Occurrence = {
@@ -31,12 +54,19 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
             reportedBy: 'Usuário Atual'
         };
 
-        StorageService.saveOccurrence(newOccurrence);
-        setOccurrences(StorageService.getOccurrences());
-        setIsFormOpen(false);
-        setNewDesc('');
-        setSelectedStudentIds([]);
-        onShowToast("Ocorrência registrada!");
+        const success = await SupabaseService.saveOccurrence(newOccurrence);
+        if (success) {
+            const updated = await SupabaseService.getOccurrences();
+            setOccurrences(updated);
+            setIsFormOpen(false);
+            setNewDesc('');
+            setSelectedStudentIds([]);
+            onShowToast("Ocorrência registrada no banco de dados!");
+        } else {
+            onShowToast("Erro ao salvar no banco. Tentando localmente...");
+            StorageService.saveOccurrence(newOccurrence);
+            setOccurrences(StorageService.getOccurrences());
+        }
     };
 
     const getTypeIcon = (type: OccurrenceType) => {
@@ -56,6 +86,8 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
             case OccurrenceType.PRAISE: return 'Elogio';
         }
     }
+
+    if (loading) return <div className="text-white p-6">Carregando ocorrências...</div>;
 
     return (
         <div className="max-w-[1600px] mx-auto">

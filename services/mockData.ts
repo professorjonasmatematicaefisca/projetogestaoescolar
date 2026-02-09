@@ -1,4 +1,4 @@
-import { Student, Occurrence, OccurrenceType, OccurrenceStatus, ClassSession, Teacher, ClassRoom, Discipline } from '../types';
+import { Student, Occurrence, OccurrenceType, OccurrenceStatus, ClassSession, Teacher, ClassRoom, Discipline, UserRole } from '../types';
 
 export const SEED_DISCIPLINES: Discipline[] = [
   { id: 'disc-mat', name: 'Matemática' },
@@ -18,20 +18,22 @@ export const SEED_CLASSES: ClassRoom[] = [
 ];
 
 export const SEED_TEACHERS: Teacher[] = [
-  { 
-    id: 'prof-1', 
-    name: 'Prof. Anderson', 
-    email: 'prof@edu.com', 
+  {
+    id: 'prof-1',
+    name: 'Prof. Anderson',
+    email: 'prof@edu.com',
+    role: UserRole.TEACHER,
     subject: 'Biologia',
     assignments: [
       { classId: '1º AEM', subject: 'Biologia' },
       { classId: '9º Ano A', subject: 'Biologia' }
     ]
   },
-  { 
-    id: 'prof-2', 
-    name: 'Prof. Silva', 
-    email: 'silva@edu.com', 
+  {
+    id: 'prof-2',
+    name: 'Prof. Silva',
+    email: 'silva@edu.com',
+    role: UserRole.TEACHER,
     subject: 'Matemática',
     assignments: [
       { classId: '1º AEM', subject: 'Matemática' },
@@ -76,7 +78,7 @@ const studentNames = [
 export const SEED_STUDENTS: Student[] = studentNames.map((name, index) => ({
   id: `std-aem-${index + 1}`,
   name: name,
-  photoUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff`, 
+  photoUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff`,
   parentEmail: `pais.${name.split(' ')[0].toLowerCase()}@exemplo.com`,
   className: "1º AEM"
 }));

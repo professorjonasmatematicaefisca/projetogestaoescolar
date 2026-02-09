@@ -24,21 +24,32 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
     const [students, setStudents] = useState<Student[]>([]);
     const [sessions, setSessions] = useState<ClassSession[]>([]);
     const [classes, setClasses] = useState<ClassRoom[]>([]);
+    const [loading, setLoading] = useState<boolean>(true);
 
     useEffect(() => {
         const fetchData = async () => {
+            setLoading(true);
             try {
                 const [fetchedStudents, fetchedSessions, fetchedClasses] = await Promise.all([
                     SupabaseService.getStudents(),
                     SupabaseService.getSessions(),
                     SupabaseService.getClasses()
                 ]);
+                console.log('📊 Dados carregados do Supabase:');
+                console.log('  - Alunos:', fetchedStudents.length);
+                console.log('  - Sessões:', fetchedSessions.length);
+                console.log('  - Turmas:', fetchedClasses.length);
+                if (fetchedSessions.length > 0) {
+                    console.log('  - Primeira sessão:', fetchedSessions[0]);
+                }
                 setStudents(fetchedStudents);
                 setSessions(fetchedSessions);
                 setClasses(fetchedClasses);
             } catch (error) {
                 console.error("Error fetching data:", error);
                 onShowToast("Erro ao carregar dados do servidor.");
+            } finally {
+                setLoading(false);
             }
         };
         fetchData();
@@ -500,6 +511,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                 <thead className="bg-[#1e293b] text-xs font-bold text-gray-400 uppercase">
                                     <tr>
                                         <th className="px-4 py-3 rounded-tl-lg">Data</th>
+                                        <th className="px-4 py-3">Professor</th>
                                         <th className="px-4 py-3">Presença</th>
                                         <th className="px-4 py-3">Ocorrências (Deduções)</th>
                                         <th className="px-4 py-3 text-right rounded-tr-lg">Nota Final</th>
@@ -532,6 +544,9 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                                         {format(new Date(d.fullDate), "dd 'de' MMMM", { locale: ptBR })}
                                                         {d.blocksCount > 1 && <span className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">{d.blocksCount} aulas</span>}
                                                     </div>
+                                                </td>
+                                                <td className="px-4 py-3 text-gray-400 text-xs">
+                                                    {d.teacherName || '---'}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {r.present
@@ -733,11 +748,29 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
         <div className="max-w-[1400px] mx-auto space-y-6">
             {renderHeader()}
 
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {reportType === 'STUDENT' && renderStudentReport()}
-                {reportType === 'CLASS' && renderClassReport()}
-                {reportType === 'COMPARE' && renderComparativeReport()}
-            </div>
+            {loading ? (
+                <div className="flex items-center justify-center p-12 bg-[#0f172a] rounded-xl border border-gray-800">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+                        <p className="text-gray-400">Carregando dados...</p>
+                    </div>
+                </div>
+            ) : sessions.length === 0 ? (
+                <div className="flex items-center justify-center p-12 bg-[#0f172a] rounded-xl border border-gray-800 border-dashed">
+                    <div className="text-center">
+                        <AlertCircle size={48} className="text-yellow-500 mx-auto mb-4" />
+                        <h3 className="text-xl font-bold text-white mb-2">Nenhuma aula registrada</h3>
+                        <p className="text-gray-400 mb-4">Não há sessões de aula cadastradas no sistema.</p>
+                        <p className="text-sm text-gray-500">Registre aulas na seção "Monitoramento de Sala" para visualizar relatórios.</p>
+                    </div>
+                </div>
+            ) : (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {reportType === 'STUDENT' && renderStudentReport()}
+                    {reportType === 'CLASS' && renderClassReport()}
+                    {reportType === 'COMPARE' && renderComparativeReport()}
+                </div>
+            )}
         </div>
     );
 };

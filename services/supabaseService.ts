@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { Student, ClassRoom, Teacher, Occurrence, ClassSession, SessionRecord } from '../types';
+import { Student, ClassRoom, Teacher, Occurrence, ClassSession, SessionRecord, UserRole } from '../types';
 import { SEED_STUDENTS, SEED_CLASSES, SEED_TEACHERS, SEED_OCCURRENCES } from './mockData';
 
 export const SupabaseService = {
@@ -117,15 +117,20 @@ export const SupabaseService = {
     },
 
     async getTeachers(): Promise<Teacher[]> {
-        const { data, error } = await supabase.from('users').select('*').eq('role', 'TEACHER');
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .in('role', [UserRole.TEACHER, UserRole.COORDINATOR, UserRole.MONITOR]);
+
         if (error) {
-            console.error("Error fetching teachers:", error);
-            return SEED_TEACHERS;
+            console.error("Error fetching staff:", error);
+            return SEED_TEACHERS.map(t => ({ ...t, role: UserRole.TEACHER }));
         }
         return data.map((t: any) => ({
             id: t.id,
             name: t.name,
             email: t.email,
+            role: t.role as UserRole,
             subject: t.subject || '',
             assignments: t.assignments,
             photoUrl: t.photo_url
@@ -143,41 +148,69 @@ export const SupabaseService = {
     async saveSession(session: ClassSession, userEmail?: string): Promise<boolean> {
         let teacherId = session.teacherId;
 
-        // Try to resolve teacher ID from email if not provided or if it's a mock ID
+        // Try to resolve teacher ID from email if it's a mock ID or missing
         if ((!teacherId || teacherId.startsWith('prof-')) && userEmail) {
             const resolvedId = await this.getTeacherIdByEmail(userEmail);
             if (resolvedId) teacherId = resolvedId;
         }
 
-        // 1. Insert Session
-        const { data: sessionData, error: sessionError } = await supabase
-            .from('sessions')
-            .insert({
-                date: session.date,
-                teacher_id: teacherId && !teacherId.startsWith('prof-') ? teacherId : null, // Only use valid UUIDs
-                subject: session.subject,
-                class_name: session.className,
-                block: session.block,
-                blocks_count: session.blocksCount || 1,
-                general_notes: session.generalNotes,
-                homework: session.homework,
-                photos: session.photos
-            })
-            .select()
-            .single();
+        const { date, subject, className, block, blocksCount, generalNotes, homework, photos } = session;
+        const sessionPayload = {
+            date,
+            teacher_id: teacherId && !teacherId.startsWith('prof-') ? teacherId : null,
+            subject,
+            class_name: className,
+            block,
+            blocks_count: blocksCount || 1,
+            general_notes: generalNotes,
+            homework,
+            photos
+        };
 
-        if (sessionError || !sessionData) {
-            console.error("Error saving session:", sessionError);
-            return false;
+        let sessionId: string;
+
+        // Check if it's an existing session from Supabase (UUID)
+        const isExistingUUID = session.id.length > 20 && !session.id.startsWith('sess-');
+
+        if (isExistingUUID) {
+            // Update
+            const { error } = await supabase
+                .from('sessions')
+                .update(sessionPayload)
+                .eq('id', session.id);
+
+            if (error) {
+                console.error("Error updating session:", error);
+                return false;
+            }
+            sessionId = session.id;
+
+            // Delete existing records to replace them
+            const { error: deleteError } = await supabase
+                .from('session_records')
+                .delete()
+                .eq('session_id', sessionId);
+
+            if (deleteError) {
+                console.error("Error clearing old records:", deleteError);
+                return false;
+            }
+        } else {
+            // Insert
+            const { data: sessionData, error: sessionError } = await supabase
+                .from('sessions')
+                .insert(sessionPayload)
+                .select()
+                .single();
+
+            if (sessionError || !sessionData) {
+                console.error("Error inserting session:", sessionError);
+                return false;
+            }
+            sessionId = sessionData.id;
         }
 
-        const sessionId = sessionData.id;
-
-        // 2. Insert Records
-        // Need to map student IDs if they are mock IDs. 
-        // Strategy: We assume the App has already fetched students FROM SUPABASE, so they have UUIDs.
-        // If not, this might fail. We rely on the app switching to Supabase for student list first.
-
+        // Insert Records
         const recordsToInsert = session.records.map(r => ({
             session_id: sessionId,
             student_id: r.studentId,
@@ -204,6 +237,7 @@ export const SupabaseService = {
             .from('sessions')
             .select(`
                 *,
+                teacher:teacher_id (name),
                 session_records (*)
             `)
             .order('date', { ascending: false });
@@ -217,6 +251,7 @@ export const SupabaseService = {
             id: s.id,
             date: s.date,
             teacherId: s.teacher_id || 'unknown',
+            teacherName: s.teacher?.name || 'Professor Desconhecido',
             subject: s.subject,
             className: s.class_name,
             block: s.block,
@@ -234,5 +269,223 @@ export const SupabaseService = {
                 photos: r.photos
             }))
         }));
+    },
+
+    async getOccurrences(): Promise<Occurrence[]> {
+        const { data, error } = await supabase
+            .from('occurrences')
+            .select('*')
+            .order('date', { ascending: false });
+
+        if (error) {
+            console.error("Error fetching occurrences:", error);
+            return [];
+        }
+        return data as Occurrence[];
+    },
+
+    async saveOccurrence(occurrence: Occurrence): Promise<boolean> {
+        const { error } = await supabase
+            .from('occurrences')
+            .upsert(occurrence);
+
+        if (error) {
+            console.error("Error saving occurrence:", error);
+            return false;
+        }
+        return true;
+    },
+
+    // --- STUDENT CRUD ---
+    async updateStudent(student: Student): Promise<boolean> {
+        const { error } = await supabase
+            .from('students')
+            .update({
+                name: student.name,
+                photo_url: student.photoUrl,
+                parent_email: student.parentEmail,
+                class_name: student.className
+            })
+            .eq('id', student.id);
+
+        if (error) {
+            console.error("Error updating student:", error);
+            return false;
+        }
+        return true;
+    },
+
+    async deleteStudent(id: string): Promise<boolean> {
+        const { error } = await supabase
+            .from('students')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error("Error deleting student:", error);
+            return false;
+        }
+        return true;
+    },
+
+    // --- TEACHER/USER CRUD ---
+    async createTeacher(teacher: Omit<Teacher, 'id'>, password: string = 'mudar123'): Promise<boolean> {
+        const { error } = await supabase.from('users').insert({
+            name: teacher.name,
+            email: teacher.email,
+            password: password,
+            role: 'TEACHER',
+            subject: teacher.subject || '',
+            assignments: teacher.assignments || [],
+            photo_url: teacher.photoUrl
+        });
+
+        if (error) {
+            console.error("Error creating teacher:", error);
+            return false;
+        }
+        return true;
+    },
+
+    async updateTeacher(teacher: Teacher): Promise<boolean> {
+        const { error } = await supabase
+            .from('users')
+            .update({
+                name: teacher.name,
+                email: teacher.email,
+                subject: teacher.subject || '',
+                assignments: teacher.assignments || [],
+                photo_url: teacher.photoUrl
+            })
+            .eq('id', teacher.id);
+
+        if (error) {
+            console.error("Error updating teacher:", error);
+            return false;
+        }
+        return true;
+    },
+
+    async deleteTeacher(id: string): Promise<boolean> {
+        const { error } = await supabase
+            .from('users')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error("Error deleting teacher:", error);
+            return false;
+        }
+        return true;
+    },
+
+    // --- CLASS CRUD ---
+    async createClass(classRoom: Omit<ClassRoom, 'id'>): Promise<boolean> {
+        const { error } = await supabase.from('classes').insert({
+            name: classRoom.name,
+            period: classRoom.period
+        });
+
+        if (error) {
+            console.error("Error creating class:", error);
+            return false;
+        }
+        return true;
+    },
+
+    async updateClass(classRoom: ClassRoom): Promise<boolean> {
+        const { error } = await supabase
+            .from('classes')
+            .update({
+                name: classRoom.name,
+                period: classRoom.period
+            })
+            .eq('id', classRoom.id);
+
+        if (error) {
+            console.error("Error updating class:", error);
+            return false;
+        }
+        return true;
+    },
+
+    async deleteClass(id: string): Promise<boolean> {
+        const { error } = await supabase
+            .from('classes')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error("Error deleting class:", error);
+            return false;
+        }
+        return true;
+    },
+
+    // --- DISCIPLINE CRUD ---
+    async getDisciplines(): Promise<any[]> {
+        // Note: You may need to create a 'disciplines' table in Supabase
+        // For now, returning a hardcoded list as fallback
+        const { data, error } = await supabase.from('disciplines').select('*');
+
+        if (error) {
+            console.error("Error fetching disciplines:", error);
+            // Return common disciplines as fallback
+            return [
+                { id: 'disc-mat', name: 'Matemática' },
+                { id: 'disc-port', name: 'Português' },
+                { id: 'disc-hist', name: 'História' },
+                { id: 'disc-geo', name: 'Geografia' },
+                { id: 'disc-bio', name: 'Biologia' },
+                { id: 'disc-fis', name: 'Física' },
+                { id: 'disc-quim', name: 'Química' },
+                { id: 'disc-ing', name: 'Inglês' }
+            ];
+        }
+
+        return data.map((d: any) => ({
+            id: d.id,
+            name: d.name
+        }));
+    },
+
+    async createDiscipline(discipline: Omit<any, 'id'>): Promise<boolean> {
+        const { error } = await supabase.from('disciplines').insert({
+            name: discipline.name
+        });
+
+        if (error) {
+            console.error("Error creating discipline:", error);
+            return false;
+        }
+        return true;
+    },
+
+    async updateDiscipline(discipline: any): Promise<boolean> {
+        const { error } = await supabase
+            .from('disciplines')
+            .update({
+                name: discipline.name
+            })
+            .eq('id', discipline.id);
+
+        if (error) {
+            console.error("Error updating discipline:", error);
+            return false;
+        }
+        return true;
+    },
+
+    async deleteDiscipline(id: string): Promise<boolean> {
+        const { error } = await supabase
+            .from('disciplines')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error("Error deleting discipline:", error);
+            return false;
+        }
+        return true;
     }
 };

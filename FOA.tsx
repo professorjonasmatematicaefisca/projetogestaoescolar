@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { StorageService } from './services/storageService';
-import { Student, ClassRoom, Teacher, SessionRecord } from './types';
+import { SupabaseService } from './services/supabaseService';
+import { Student, ClassRoom, Teacher, SessionRecord, ClassSession, Occurrence } from './types';
 import { FileText, Printer, Filter, User, MessageSquare, Edit3, Calendar, Info, Camera } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -37,10 +38,12 @@ interface ObservationLog {
 
 export const FOA: React.FC<FOAProps> = ({ onShowToast }) => {
     const currentYear = new Date().getFullYear();
-    const [classes, setClasses] = useState<ClassRoom[]>(StorageService.getClasses());
-    const [students, setStudents] = useState<Student[]>(StorageService.getStudents());
-    const [sessions, setSessions] = useState(StorageService.getSessions());
-    const [teachers, setTeachers] = useState<Teacher[]>(StorageService.getTeachers());
+    const [classes, setClasses] = useState<ClassRoom[]>([]);
+    const [students, setStudents] = useState<Student[]>([]);
+    const [sessions, setSessions] = useState<ClassSession[]>([]);
+    const [teachers, setTeachers] = useState<Teacher[]>([]);
+    const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
+    const [loading, setLoading] = useState<boolean>(true);
 
     const [selectedClassId, setSelectedClassId] = useState<string>('');
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
@@ -55,8 +58,32 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast }) => {
 
     // Load Data
     useEffect(() => {
-        if (classes.length > 0 && !selectedClassId) setSelectedClassId(classes[0].name);
-    }, [classes]);
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const [sc, ss, sl, st, so] = await Promise.all([
+                    SupabaseService.getClasses(),
+                    SupabaseService.getStudents(),
+                    SupabaseService.getSessions(),
+                    SupabaseService.getTeachers(),
+                    SupabaseService.getOccurrences()
+                ]);
+                setClasses(sc);
+                setStudents(ss);
+                setSessions(sl);
+                setTeachers(st);
+                setOccurrences(so);
+
+                if (sc.length > 0 && !selectedClassId) setSelectedClassId(sc[0].name);
+            } catch (error) {
+                console.error("Error fetching FOA data:", error);
+                onShowToast("Erro ao carregar dados do servidor.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
 
     useEffect(() => {
         const filtered = students.filter(s => s.className === selectedClassId);
@@ -145,6 +172,19 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast }) => {
         const uniqueCurriculum = Array.from(new Map(classCurriculum.map(item => [item.subject, item])).values());
         uniqueCurriculum.sort((a, b) => a.subject.localeCompare(b.subject));
 
+        // 1.5. Add formal occurrences to observations
+        occurrences.forEach(occ => {
+            if (occ.studentIds.includes(selectedStudentId) && new Date(occ.date).getFullYear() === selectedYear) {
+                observations.push({
+                    date: occ.date,
+                    subject: 'OCORRÊNCIA',
+                    teacher: occ.reportedBy,
+                    note: `[${occ.type}] ${occ.description}`,
+                    hasPhotos: !!(occ.photos && occ.photos.length > 0)
+                });
+            }
+        });
+
         // 2. Process Stats per Subject
         uniqueCurriculum.forEach(curr => {
             // Filter sessions for this subject, student AND SELECTED YEAR
@@ -175,7 +215,7 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast }) => {
                         observations.push({
                             date: sess.date,
                             subject: curr.subject,
-                            teacher: curr.teacherName.split(' ')[0],
+                            teacher: sess.teacherName || curr.teacherName.split(' ')[0],
                             note: rec.notes || 'Registro de imagem sem observação escrita.',
                             hasPhotos: !!(rec.photos && rec.photos.length > 0)
                         });
@@ -308,215 +348,224 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast }) => {
                 </div>
             </div>
 
-            {/* The Sheet - Designed for Print / PDF */}
-            <div className="bg-white text-black p-6 md:p-8 min-h-[1000px] shadow-2xl print:shadow-none print:p-0 print:m-0 print:w-full max-w-[210mm] mx-auto">
+            {loading ? (
+                <div className="flex items-center justify-center p-12 bg-[#0f172a] rounded-xl border border-gray-800">
+                    <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+                        <p className="text-gray-400">Carregando dados...</p>
+                    </div>
+                </div>
+            ) : (
+                /* The Sheet - Designed for Print / PDF */
+                <div className="bg-white text-black p-6 md:p-8 min-h-[1000px] shadow-2xl print:shadow-none print:p-0 print:m-0 print:w-full max-w-[210mm] mx-auto">
 
-                {/* Header Info */}
-                <div className="flex justify-between items-end border-b-2 border-emerald-800 pb-2 mb-4">
-                    <div>
-                        <h1 className="text-3xl font-bold uppercase text-emerald-900 tracking-tight">Ficha de Observação do Aluno</h1>
-                        <div className="flex flex-col md:flex-row md:gap-8 mt-2 text-sm text-gray-800">
-                            <p><strong className="text-emerald-800">ALUNO:</strong> {selectedStudent?.name.toUpperCase()}</p>
-                            <p><strong className="text-emerald-800">TURMA:</strong> {selectedStudent?.className}</p>
+                    {/* Header Info */}
+                    <div className="flex justify-between items-end border-b-2 border-emerald-800 pb-2 mb-4">
+                        <div>
+                            <h1 className="text-3xl font-bold uppercase text-emerald-900 tracking-tight">Ficha de Observação do Aluno</h1>
+                            <div className="flex flex-col md:flex-row md:gap-8 mt-2 text-sm text-gray-800">
+                                <p><strong className="text-emerald-800">ALUNO:</strong> {selectedStudent?.name.toUpperCase()}</p>
+                                <p><strong className="text-emerald-800">TURMA:</strong> {selectedStudent?.className}</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="font-bold text-xl text-emerald-900">{selectedYear}</p>
+                            <p className="text-xs text-gray-600">EduControl PRO</p>
                         </div>
                     </div>
-                    <div className="text-right">
-                        <p className="font-bold text-xl text-emerald-900">{selectedYear}</p>
-                        <p className="text-xs text-gray-600">EduControl PRO</p>
-                    </div>
-                </div>
 
-                {/* Legend */}
-                <div className="mb-4 flex justify-end">
-                    <table className="text-[10px] border-collapse shadow-sm">
-                        <thead>
-                            <tr>
-                                <td className="border border-gray-400 bg-gray-100 p-1 px-2 font-bold text-gray-700">Legenda:</td>
-                                <td className="border border-gray-400 bg-[#00ff00] p-1 px-3 font-bold text-center">Ótimo (O)</td>
-                                <td className="border border-gray-400 bg-[#92d050] p-1 px-3 font-bold text-center">Bom (B)</td>
-                                <td className="border border-gray-400 bg-[#ffff00] p-1 px-3 font-bold text-center">Satisfatório (S)</td>
-                                <td className="border border-gray-400 bg-[#ff9900] p-1 px-3 font-bold text-center">Insatisfatório (I)</td>
-                            </tr>
-                        </thead>
-                    </table>
-                </div>
-
-                {/* Main Table */}
-                <div className="overflow-hidden rounded-t-lg border border-gray-900">
-                    <table className="w-full text-xs border-collapse table-fixed">
-                        <colgroup>
-                            <col style={{ width: '100px' }} /> {/* Disciplina - Reduced from 150px */}
-                            <col style={{ width: '100px' }} /> {/* Professor - Reduced from 120px */}
-                            <col style={{ width: '40px' }} /> {/* Comp */}
-                            <col style={{ width: '40px' }} /> {/* Atenção */}
-                            <col style={{ width: '40px' }} /> {/* Tarefas */}
-                            <col style={{ width: '40px' }} /> {/* Ativ */}
-                            <col style={{ width: '40px' }} /> {/* Material */}
-                            <col style={{ width: '40px' }} /> {/* Engaja */}
-                            <col style={{ width: '40px' }} /> {/* Auto */}
-                            <col style={{ width: '40px' }} /> {/* Part */}
-                            <col style={{ width: '40px' }} /> {/* Abert */}
-                        </colgroup>
-                        <thead>
-                            {/* Group Headers */}
-                            <tr className="bg-emerald-50">
-                                <th className="bg-white border border-gray-900 text-left pl-2 py-2 text-sm" rowSpan={2}>Disciplina</th>
-                                <th className="bg-white border border-gray-900 text-left pl-2 py-2 text-sm" rowSpan={2}>Professor(a)</th>
-                                <th colSpan={2} className="bg-white border border-gray-900 font-bold border-l-2 text-center py-1 bg-gray-50 uppercase tracking-tight text-[10px]">Aspectos Comportamentais</th>
-                                <th colSpan={3} className="bg-white border border-gray-900 font-bold border-l-2 text-center py-1 bg-gray-50 uppercase tracking-tight text-[10px]">Tarefas/Materiais</th>
-                                <th colSpan={4} className="bg-white border border-gray-900 font-bold border-l-2 text-center py-1 bg-gray-50 uppercase tracking-tight text-[10px]">Competências Socioemocionais</th>
-                            </tr>
-                            {/* Vertical Headers */}
-                            <tr className="bg-gray-50">
-                                <VerticalHeader text="Comportamento" />
-                                <VerticalHeader text="Falta de Atenção" subtext="(Foco)" />
-
-                                <VerticalHeader text="Tarefas" subtext="(Portal)" />
-                                <VerticalHeader text="Ativ. de Classe" />
-                                <VerticalHeader text="Material" />
-
-                                <VerticalHeader text="Engajamento" />
-                                <VerticalHeader text="Falta Autogestão" />
-                                <VerticalHeader text="Participação" />
-                                <VerticalHeader text="Abertura ao Novo" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {foaRows.length === 0 ? (
+                    {/* Legend */}
+                    <div className="mb-4 flex justify-end">
+                        <table className="text-[10px] border-collapse shadow-sm">
+                            <thead>
                                 <tr>
-                                    <td colSpan={11} className="p-8 text-center text-gray-500 italic border border-gray-900">
-                                        Nenhuma aula registrada para este ano ({selectedYear}).
-                                    </td>
+                                    <td className="border border-gray-400 bg-gray-100 p-1 px-2 font-bold text-gray-700">Legenda:</td>
+                                    <td className="border border-gray-400 bg-[#00ff00] p-1 px-3 font-bold text-center">Ótimo (O)</td>
+                                    <td className="border border-gray-400 bg-[#92d050] p-1 px-3 font-bold text-center">Bom (B)</td>
+                                    <td className="border border-gray-400 bg-[#ffff00] p-1 px-3 font-bold text-center">Satisfatório (S)</td>
+                                    <td className="border border-gray-400 bg-[#ff9900] p-1 px-3 font-bold text-center">Insatisfatório (I)</td>
                                 </tr>
-                            ) : (
-                                foaRows.map((row, index) => (
-                                    <tr key={index}>
-                                        <td className="border border-gray-900 p-2 pl-3 bg-white font-bold text-gray-800 text-[11px] truncate uppercase">
-                                            {row.subject}
+                            </thead>
+                        </table>
+                    </div>
+
+                    {/* Main Table */}
+                    <div className="overflow-hidden rounded-t-lg border border-gray-900">
+                        <table className="w-full text-xs border-collapse table-fixed">
+                            <colgroup>
+                                <col style={{ width: '100px' }} /> {/* Disciplina - Reduced from 150px */}
+                                <col style={{ width: '100px' }} /> {/* Professor - Reduced from 120px */}
+                                <col style={{ width: '40px' }} /> {/* Comp */}
+                                <col style={{ width: '40px' }} /> {/* Atenção */}
+                                <col style={{ width: '40px' }} /> {/* Tarefas */}
+                                <col style={{ width: '40px' }} /> {/* Ativ */}
+                                <col style={{ width: '40px' }} /> {/* Material */}
+                                <col style={{ width: '40px' }} /> {/* Engaja */}
+                                <col style={{ width: '40px' }} /> {/* Auto */}
+                                <col style={{ width: '40px' }} /> {/* Part */}
+                                <col style={{ width: '40px' }} /> {/* Abert */}
+                            </colgroup>
+                            <thead>
+                                {/* Group Headers */}
+                                <tr className="bg-emerald-50">
+                                    <th className="bg-white border border-gray-900 text-left pl-2 py-2 text-sm" rowSpan={2}>Disciplina</th>
+                                    <th className="bg-white border border-gray-900 text-left pl-2 py-2 text-sm" rowSpan={2}>Professor(a)</th>
+                                    <th colSpan={2} className="bg-white border border-gray-900 font-bold border-l-2 text-center py-1 bg-gray-50 uppercase tracking-tight text-[10px]">Aspectos Comportamentais</th>
+                                    <th colSpan={3} className="bg-white border border-gray-900 font-bold border-l-2 text-center py-1 bg-gray-50 uppercase tracking-tight text-[10px]">Tarefas/Materiais</th>
+                                    <th colSpan={4} className="bg-white border border-gray-900 font-bold border-l-2 text-center py-1 bg-gray-50 uppercase tracking-tight text-[10px]">Competências Socioemocionais</th>
+                                </tr>
+                                {/* Vertical Headers */}
+                                <tr className="bg-gray-50">
+                                    <VerticalHeader text="Comportamento" />
+                                    <VerticalHeader text="Falta de Atenção" subtext="(Foco)" />
+
+                                    <VerticalHeader text="Tarefas" subtext="(Portal)" />
+                                    <VerticalHeader text="Ativ. de Classe" />
+                                    <VerticalHeader text="Material" />
+
+                                    <VerticalHeader text="Engajamento" />
+                                    <VerticalHeader text="Falta Autogestão" />
+                                    <VerticalHeader text="Participação" />
+                                    <VerticalHeader text="Abertura ao Novo" />
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {foaRows.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={11} className="p-8 text-center text-gray-500 italic border border-gray-900">
+                                            Nenhuma aula registrada para este ano ({selectedYear}).
                                         </td>
-                                        <td className="border border-gray-900 p-2 pl-3 bg-white text-gray-700 text-[11px] truncate">
-                                            {row.teacherName}
-                                        </td>
-
-                                        {/* Concepts */}
-                                        <td className={getCellClass(row.comportamento)}>{row.comportamento}</td>
-                                        <td className={getCellClass(row.atencao)}>{row.atencao}</td>
-
-                                        <td className={getCellClass(row.tarefas)}>{row.tarefas}</td>
-                                        <td className={getCellClass(row.atividades)}>{row.atividades}</td>
-                                        <td className={getCellClass(row.material)}>{row.material}</td>
-
-                                        <td className={getCellClass(row.engajamento)}>{row.engajamento}</td>
-                                        <td className={getCellClass(row.autogestao)}>{row.autogestao}</td>
-                                        <td className={getCellClass(row.participacao)}>{row.participacao}</td>
-                                        <td className={getCellClass(row.abertura)}>{row.abertura}</td>
                                     </tr>
-                                ))
+                                ) : (
+                                    foaRows.map((row, index) => (
+                                        <tr key={index}>
+                                            <td className="border border-gray-900 p-2 pl-3 bg-white font-bold text-gray-800 text-[11px] truncate uppercase">
+                                                {row.subject}
+                                            </td>
+                                            <td className="border border-gray-900 p-2 pl-3 bg-white text-gray-700 text-[11px] truncate">
+                                                {row.teacherName}
+                                            </td>
+
+                                            {/* Concepts */}
+                                            <td className={getCellClass(row.comportamento)}>{row.comportamento}</td>
+                                            <td className={getCellClass(row.atencao)}>{row.atencao}</td>
+
+                                            <td className={getCellClass(row.tarefas)}>{row.tarefas}</td>
+                                            <td className={getCellClass(row.atividades)}>{row.atividades}</td>
+                                            <td className={getCellClass(row.material)}>{row.material}</td>
+
+                                            <td className={getCellClass(row.engajamento)}>{row.engajamento}</td>
+                                            <td className={getCellClass(row.autogestao)}>{row.autogestao}</td>
+                                            <td className={getCellClass(row.participacao)}>{row.participacao}</td>
+                                            <td className={getCellClass(row.abertura)}>{row.abertura}</td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Criteria Details Legend */}
+                    <div className="mt-4 border border-gray-900 rounded-lg p-3 bg-gray-50 print:break-inside-avoid">
+                        <h3 className="text-xs font-bold text-emerald-900 uppercase border-b border-gray-300 pb-1 mb-2 flex items-center gap-1">
+                            <Info size={12} /> Critérios de Avaliação (Legenda)
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-[10px] text-gray-700">
+                            <div>
+                                <span className="font-bold text-gray-900">Comportamento:</span>
+                                <span className="ml-1">Média de ocorrências de 'Conversa' e 'Sono'.</span>
+                            </div>
+                            <div>
+                                <span className="font-bold text-gray-900">Falta de Atenção (Foco):</span>
+                                <span className="ml-1">Frequência de saídas (Banheiro) e dispersão.</span>
+                            </div>
+                            <div>
+                                <span className="font-bold text-gray-900">Tarefas (Portal):</span>
+                                <span className="ml-1">Entrega de atividades de casa/portal.</span>
+                            </div>
+                            <div>
+                                <span className="font-bold text-gray-900">Ativ. de Classe:</span>
+                                <span className="ml-1">Desempenho e produtividade em sala.</span>
+                            </div>
+                            <div>
+                                <span className="font-bold text-gray-900">Material:</span>
+                                <span className="ml-1">Registro de porte do material didático.</span>
+                            </div>
+                            <div>
+                                <span className="font-bold text-gray-900">Falta Autogestão:</span>
+                                <span className="ml-1">Registro de uso não autorizado de celular (Nota -1,0).</span>
+                            </div>
+                            <div>
+                                <span className="font-bold text-gray-900">Participação:</span>
+                                <span className="ml-1">Interação positiva em sala (+0,5 na nota).</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Observations Section */}
+                    <div className="mt-6 border border-gray-900 rounded-lg overflow-hidden break-inside-avoid">
+                        <div className="bg-gray-100 p-2 border-b border-gray-900 flex items-center gap-2">
+                            <MessageSquare size={16} className="text-gray-600" />
+                            <h3 className="font-bold text-sm uppercase text-gray-800">Observações de Aula (Registro Diário)</h3>
+                        </div>
+                        <div className="min-h-[100px] bg-white p-4">
+                            {observations.length === 0 ? (
+                                <p className="text-xs text-gray-400 italic">Nenhuma observação registrada em aula até o momento.</p>
+                            ) : (
+                                <ul className="space-y-2">
+                                    {observations.map((obs, i) => (
+                                        <li key={i} className="text-xs text-gray-800 border-b border-gray-100 last:border-0 pb-1 flex flex-wrap gap-2 items-center">
+                                            <span className="font-bold text-emerald-800">{format(new Date(obs.date), "dd/MM", { locale: ptBR })}</span>
+                                            <span className="text-gray-400">|</span>
+                                            <span className="font-bold text-gray-700">{obs.subject} ({obs.teacher}):</span>
+                                            <span className="italic">{obs.note}</span>
+                                            {obs.hasPhotos && (
+                                                <span className="flex items-center gap-1 text-[9px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded border border-gray-300">
+                                                    <Camera size={10} />
+                                                    VER FOTO
+                                                </span>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
                             )}
-                        </tbody>
-                    </table>
-                </div>
+                        </div>
+                    </div>
 
-                {/* Criteria Details Legend */}
-                <div className="mt-4 border border-gray-900 rounded-lg p-3 bg-gray-50 print:break-inside-avoid">
-                    <h3 className="text-xs font-bold text-emerald-900 uppercase border-b border-gray-300 pb-1 mb-2 flex items-center gap-1">
-                        <Info size={12} /> Critérios de Avaliação (Legenda)
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-[10px] text-gray-700">
-                        <div>
-                            <span className="font-bold text-gray-900">Comportamento:</span>
-                            <span className="ml-1">Média de ocorrências de 'Conversa' e 'Sono'.</span>
+                    {/* Considerations (Editable) */}
+                    <div className="mt-6 border border-gray-900 rounded-lg overflow-hidden break-inside-avoid">
+                        <div className="bg-gray-100 p-2 border-b border-gray-900 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Edit3 size={16} className="text-gray-600" />
+                                <h3 className="font-bold text-sm uppercase text-gray-800">Considerações Gerais / SOE</h3>
+                            </div>
+                            <span className="text-[10px] text-gray-500 uppercase print:hidden">Campo Editável</span>
                         </div>
-                        <div>
-                            <span className="font-bold text-gray-900">Falta de Atenção (Foco):</span>
-                            <span className="ml-1">Frequência de saídas (Banheiro) e dispersão.</span>
-                        </div>
-                        <div>
-                            <span className="font-bold text-gray-900">Tarefas (Portal):</span>
-                            <span className="ml-1">Entrega de atividades de casa/portal.</span>
-                        </div>
-                        <div>
-                            <span className="font-bold text-gray-900">Ativ. de Classe:</span>
-                            <span className="ml-1">Desempenho e produtividade em sala.</span>
-                        </div>
-                        <div>
-                            <span className="font-bold text-gray-900">Material:</span>
-                            <span className="ml-1">Registro de porte do material didático.</span>
-                        </div>
-                        <div>
-                            <span className="font-bold text-gray-900">Falta Autogestão:</span>
-                            <span className="ml-1">Registro de uso não autorizado de celular (Nota -1,0).</span>
-                        </div>
-                        <div>
-                            <span className="font-bold text-gray-900">Participação:</span>
-                            <span className="ml-1">Interação positiva em sala (+0,5 na nota).</span>
-                        </div>
+                        <textarea
+                            className="w-full h-32 p-4 text-sm text-gray-800 outline-none resize-none bg-white placeholder-gray-300"
+                            placeholder="Digite aqui as considerações finais, orientações pedagógicas ou observações da coordenação para impressão..."
+                            value={soeConsiderations}
+                            onChange={(e) => setSoeConsiderations(e.target.value)}
+                        />
                     </div>
-                </div>
 
-                {/* Observations Section */}
-                <div className="mt-6 border border-gray-900 rounded-lg overflow-hidden break-inside-avoid">
-                    <div className="bg-gray-100 p-2 border-b border-gray-900 flex items-center gap-2">
-                        <MessageSquare size={16} className="text-gray-600" />
-                        <h3 className="font-bold text-sm uppercase text-gray-800">Observações de Aula (Registro Diário)</h3>
-                    </div>
-                    <div className="min-h-[100px] bg-white p-4">
-                        {observations.length === 0 ? (
-                            <p className="text-xs text-gray-400 italic">Nenhuma observação registrada em aula até o momento.</p>
-                        ) : (
-                            <ul className="space-y-2">
-                                {observations.map((obs, i) => (
-                                    <li key={i} className="text-xs text-gray-800 border-b border-gray-100 last:border-0 pb-1 flex flex-wrap gap-2 items-center">
-                                        <span className="font-bold text-emerald-800">{format(new Date(obs.date), "dd/MM", { locale: ptBR })}</span>
-                                        <span className="text-gray-400">|</span>
-                                        <span className="font-bold text-gray-700">{obs.subject} ({obs.teacher}):</span>
-                                        <span className="italic">{obs.note}</span>
-                                        {obs.hasPhotos && (
-                                            <span className="flex items-center gap-1 text-[9px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded border border-gray-300">
-                                                <Camera size={10} />
-                                                VER FOTO
-                                            </span>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </div>
-                </div>
-
-                {/* Considerations (Editable) */}
-                <div className="mt-6 border border-gray-900 rounded-lg overflow-hidden break-inside-avoid">
-                    <div className="bg-gray-100 p-2 border-b border-gray-900 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Edit3 size={16} className="text-gray-600" />
-                            <h3 className="font-bold text-sm uppercase text-gray-800">Considerações Gerais / SOE</h3>
+                    {/* Signature Lines */}
+                    <div className="mt-12 flex justify-around items-end pt-8 pb-4 break-inside-avoid">
+                        <div className="text-center">
+                            <div className="w-64 border-t border-gray-900 mb-2"></div>
+                            <p className="text-xs font-bold text-gray-600 uppercase">Coordenação Pedagógica</p>
                         </div>
-                        <span className="text-[10px] text-gray-500 uppercase print:hidden">Campo Editável</span>
+                        <div className="text-center">
+                            <div className="w-64 border-t border-gray-900 mb-2"></div>
+                            <p className="text-xs font-bold text-gray-600 uppercase">Responsável</p>
+                        </div>
                     </div>
-                    <textarea
-                        className="w-full h-32 p-4 text-sm text-gray-800 outline-none resize-none bg-white placeholder-gray-300"
-                        placeholder="Digite aqui as considerações finais, orientações pedagógicas ou observações da coordenação para impressão..."
-                        value={soeConsiderations}
-                        onChange={(e) => setSoeConsiderations(e.target.value)}
-                    />
-                </div>
 
-                {/* Signature Lines */}
-                <div className="mt-12 flex justify-around items-end pt-8 pb-4 break-inside-avoid">
-                    <div className="text-center">
-                        <div className="w-64 border-t border-gray-900 mb-2"></div>
-                        <p className="text-xs font-bold text-gray-600 uppercase">Coordenação Pedagógica</p>
-                    </div>
-                    <div className="text-center">
-                        <div className="w-64 border-t border-gray-900 mb-2"></div>
-                        <p className="text-xs font-bold text-gray-600 uppercase">Responsável</p>
+                    <div className="text-[10px] text-gray-400 mt-4 text-center border-t pt-2">
+                        Documento gerado em {format(new Date(), "dd/MM/yyyy 'às' HH:mm")} pelo sistema EduControl PRO
                     </div>
                 </div>
-
-                <div className="text-[10px] text-gray-400 mt-4 text-center border-t pt-2">
-                    Documento gerado em {format(new Date(), "dd/MM/yyyy 'às' HH:mm")} pelo sistema EduControl PRO
-                </div>
-            </div>
+            )}
         </div>
     );
 };

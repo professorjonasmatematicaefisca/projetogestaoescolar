@@ -25,6 +25,7 @@ export interface Teacher {
   id: string;
   name: string;
   email: string;
+  role: UserRole;
   subject: string; // Legacy: Primary subject or "Multiple"
   assignments?: TeacherClassAssignment[];
   photoUrl?: string;
@@ -73,6 +74,7 @@ export interface ClassSession {
   id: string;
   date: string; // ISO String
   teacherId: string;
+  teacherName?: string;
   subject: string;
   className: string;
   block: string;

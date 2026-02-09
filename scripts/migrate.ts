@@ -101,6 +101,33 @@ async function migrate() {
         console.log("All students already exist.");
     }
 
+    // 4. Migrate Occurrences
+    console.log("Migrating Occurrences...");
+    const { data: existingOccurrences } = await supabase.from('occurrences').select('id');
+    const existingOccIds = new Set(existingOccurrences?.map((o: any) => o.id));
+
+    // We don't have SEED_OCCURRENCES imported yet, let's check mockData
+    const { SEED_OCCURRENCES } = await import('../services/mockData');
+
+    const occurrencesToInsert = SEED_OCCURRENCES.filter(o => !existingOccIds.has(o.id)).map(o => ({
+        id: o.id,
+        type: o.type,
+        description: o.description,
+        student_ids: o.studentIds,
+        date: o.date,
+        status: o.status,
+        photos: o.photos,
+        reported_by: o.reportedBy
+    }));
+
+    if (occurrencesToInsert.length > 0) {
+        const { error } = await supabase.from('occurrences').insert(occurrencesToInsert);
+        if (error) console.error("Error migrating occurrences:", error);
+        else console.log(`Migrated ${occurrencesToInsert.length} occurrences.`);
+    } else {
+        console.log("All occurrences already exist.");
+    }
+
     console.log("Migration finished.");
 }
 

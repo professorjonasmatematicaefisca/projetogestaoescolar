@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Student, ClassSession, SessionRecord, Counters, Teacher, ClassRoom } from './types';
+import { Student, ClassSession, SessionRecord, Counters, Teacher, ClassRoom, UserRole } from './types';
 import { StorageService } from './services/storageService';
+import { SupabaseService } from './services/supabaseService';
 import {
     MessageSquare, Moon, Smartphone, Book,
     Zap, Save, RefreshCw, Check, X,
@@ -96,30 +97,39 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     // Load initial data
     useEffect(() => {
-        const loadedStudents = StorageService.getStudents();
-        const loadedTeachers = StorageService.getTeachers();
-        const loadedClasses = StorageService.getClasses();
+        const loadInitialData = async () => {
+            try {
+                const [loadedStudents, loadedTeachers, loadedClasses] = await Promise.all([
+                    SupabaseService.getStudents(),
+                    SupabaseService.getTeachers(),
+                    SupabaseService.getClasses()
+                ]);
 
-        setAllStudents(loadedStudents);
-        setTeachers(loadedTeachers);
-        setAllClasses(loadedClasses);
+                setAllStudents(loadedStudents);
+                setTeachers(loadedTeachers);
+                setAllClasses(loadedClasses);
 
-        // Initial Defaults
-        if (loadedTeachers.length > 0) {
-            const firstTeacher = loadedTeachers[0];
-            setSelectedTeacherId(firstTeacher.id);
+                if (loadedTeachers.length > 0) {
+                    const firstTeacher = loadedTeachers[0];
+                    setSelectedTeacherId(firstTeacher.id);
 
-            let availCls = loadedClasses;
-            if (firstTeacher.assignments && firstTeacher.assignments.length > 0) {
-                const assignedClassNames = firstTeacher.assignments.map(a => a.classId);
-                availCls = loadedClasses.filter(c => assignedClassNames.includes(c.name));
+                    let availCls = loadedClasses;
+                    if (firstTeacher.assignments && firstTeacher.assignments.length > 0) {
+                        const assignedClassNames = firstTeacher.assignments.map(a => a.classId);
+                        availCls = loadedClasses.filter(c => assignedClassNames.includes(c.name));
+                    }
+                    setAvailableClasses(availCls);
+
+                    if (availCls.length > 0) {
+                        setSelectedClassId(availCls[0].name);
+                    }
+                }
+            } catch (error) {
+                onShowToast("Erro ao carregar dados do Supabase.");
+                console.error(error);
             }
-            setAvailableClasses(availCls);
-
-            if (availCls.length > 0) {
-                setSelectedClassId(availCls[0].name);
-            }
-        }
+        };
+        loadInitialData();
     }, []);
 
     // Effect: When TEACHER changes -> Update Available Classes
@@ -191,28 +201,26 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             const filtered = allStudents.filter(s => s.className === selectedClassId);
             setFilteredStudents(filtered);
 
-            // Check Storage for existing session for this Day/Class/Teacher/Subject combo
-            const allSessions = StorageService.getSessions();
-            const existingSession = allSessions.find(s =>
-                s.date.startsWith(selectedDate) && // Compare YYYY-MM-DD
-                s.className === selectedClassId &&
-                s.teacherId === selectedTeacherId &&
-                s.subject === selectedSubject
-            );
+            // Check Supabase for existing session for this Day/Class/Teacher/Subject combo
+            const fetchExistingSession = async () => {
+                const allSessions = await SupabaseService.getSessions();
+                const existingSession = allSessions.find(s =>
+                    s.date.startsWith(selectedDate) &&
+                    s.className === selectedClassId &&
+                    s.teacherId === selectedTeacherId &&
+                    s.subject === selectedSubject
+                );
 
-            if (existingSession) {
-                // Load existing session (Edit Mode)
-                setSession(existingSession);
-                // Also sync block selection if possible
-                if (existingSession.block && availableBlocks.includes(existingSession.block)) {
-                    setSelectedBlocks([existingSession.block]);
-                } else if (existingSession.block && existingSession.block.includes(' - ')) {
-                    // Try to reverse engineer composite blocks if needed, or just leave current selection
+                if (existingSession) {
+                    setSession(existingSession);
+                    if (existingSession.block && availableBlocks.includes(existingSession.block)) {
+                        setSelectedBlocks([existingSession.block]);
+                    }
+                } else {
+                    initializeSession(filtered);
                 }
-            } else {
-                // New Session
-                initializeSession(filtered);
-            }
+            };
+            fetchExistingSession();
         }
     }, [selectedClassId, allStudents, selectedTeacherId, selectedSubject, selectedDate]); // Removed selectedBlocks dependency to avoid reset loop
 
@@ -370,7 +378,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     // --- Class Register Modal Logic ---
 
-    const handleSaveClassInfo = () => {
+    const handleSaveClassInfo = async () => {
         if (session) {
             const updatedSession = {
                 ...session,
@@ -379,11 +387,16 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 photos: classPhotos
             };
             setSession(updatedSession);
-            // Auto-save the session as well so data isn't lost if they don't click main save
-            StorageService.saveSession(updatedSession);
+            const success = await SupabaseService.saveSession(updatedSession, userEmail);
+            if (success) {
+                onShowToast("Conteúdo de aula salvo no Supabase!");
+            } else {
+                onShowToast("Aviso: Falha ao salvar no servidor. Verifique sua conexão.");
+                // Backup save to Storage anyway
+                StorageService.saveSession(updatedSession);
+            }
             setClassModalOpen(false);
-            stopCamera(); // Ensure camera is off
-            onShowToast("Conteúdo de aula salvo!");
+            stopCamera();
         }
     };
 
@@ -465,9 +478,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     // --- Load Previous (History) Logic ---
 
-    const handleOpenHistory = () => {
-        const all = StorageService.getSessions();
-        // Filter by current teacher to show relevant history
+    const handleOpenHistory = async () => {
+        const all = await SupabaseService.getSessions();
         const history = all.filter(s => s.teacherId === selectedTeacherId)
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setHistorySessions(history);
@@ -499,10 +511,15 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     // --- Main Save ---
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (session) {
-            StorageService.saveSession(session);
-            onShowToast("Aula salva com sucesso!");
+            const success = await SupabaseService.saveSession(session, userEmail);
+            if (success) {
+                onShowToast("Aula salva no Supabase com sucesso!");
+            } else {
+                onShowToast("Erro ao salvar no Supabase. Salvando localmente como backup.");
+                StorageService.saveSession(session);
+            }
         }
     };
 

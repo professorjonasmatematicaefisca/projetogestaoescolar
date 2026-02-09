@@ -3,12 +3,35 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     LineChart, Line
 } from 'recharts';
-import { Sparkles, TrendingUp, AlertTriangle, Users, ArrowRight, Download, School } from 'lucide-react';
+import { Sparkles, TrendingUp, AlertTriangle, Users, Download, School } from 'lucide-react';
+import { SupabaseService } from './services/supabaseService';
 import { StorageService } from './services/storageService';
+import { ClassSession, ClassRoom } from './types';
 
 export const Dashboard: React.FC = () => {
-    const sessions = StorageService.getSessions();
-    const classes = StorageService.getClasses();
+    const [sessions, setSessions] = React.useState<ClassSession[]>([]);
+    const [classes, setClasses] = React.useState<ClassRoom[]>([]);
+    const [loading, setLoading] = React.useState(true);
+
+    React.useEffect(() => {
+        const loadData = async () => {
+            try {
+                const [s, c] = await Promise.all([
+                    SupabaseService.getSessions(),
+                    SupabaseService.getClasses()
+                ]);
+                setSessions(s);
+                setClasses(c);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadData();
+    }, []);
+
+    if (loading) return <div className="text-white p-6">Carregando painel...</div>;
 
     // --- DATA CALCULATION ---
 
@@ -104,8 +127,40 @@ export const Dashboard: React.FC = () => {
         return insights;
     };
 
+    const handleDownloadPDF = async () => {
+        // Find the main container to print
+        const element = document.querySelector('.dashboard-container');
+        if (!element) return;
+
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const jsPDF = (await import('jspdf')).default;
+
+            const canvas = await html2canvas(element as HTMLElement, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#0f172a'
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const imgWidth = 297;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+            pdf.save(`Dashboard_Analitico_${new Date().toISOString().split('T')[0]}.pdf`);
+        } catch (error) {
+            console.error("PDF Error:", error);
+        }
+    };
+
     return (
-        <div className="max-w-[1600px] mx-auto space-y-6">
+        <div className="max-w-[1600px] mx-auto space-y-6 dashboard-container">
             <div className="flex flex-col md:flex-row justify-between items-end mb-4">
                 <div>
                     <h2 className="text-2xl font-bold text-white">Desempenho Analítico</h2>
@@ -207,7 +262,10 @@ export const Dashboard: React.FC = () => {
 
             {/* Bottom Actions */}
             <div className="flex justify-start">
-                <button className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-[#0f172a] font-bold rounded-lg shadow-lg shadow-emerald-500/20 transition-all">
+                <button
+                    onClick={handleDownloadPDF}
+                    className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-[#0f172a] font-bold rounded-lg shadow-lg shadow-emerald-500/20 transition-all"
+                >
                     <Download size={18} />
                     Exportar Relatório Geral (PDF)
                 </button>
