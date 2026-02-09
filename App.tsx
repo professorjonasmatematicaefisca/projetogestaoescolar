@@ -54,14 +54,14 @@ function App() {
 
   const renderView = () => {
     switch (currentView) {
-      case 'MONITORING': return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} />;
+      case 'MONITORING': return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole} />;
       case 'DASHBOARD': return <Dashboard />;
       case 'REPORTS': return <StudentReport onShowToast={showToast} currentUserRole={userRole} />;
-      case 'FOA': return <FOA onShowToast={showToast} />;
+      case 'FOA': return <FOA onShowToast={showToast} currentUserRole={userRole} />;
       case 'OCCURRENCES': return <Occurrences onShowToast={showToast} />;
       case 'ADMIN': return <AdminPanel onShowToast={showToast} />;
       case 'SETTINGS': return <ChangePassword userEmail={userEmail} onShowToast={showToast} />;
-      default: return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} />;
+      default: return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole} />;
     }
   };
 

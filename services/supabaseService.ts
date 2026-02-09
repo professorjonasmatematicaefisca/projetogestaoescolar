@@ -352,24 +352,41 @@ export const SupabaseService = {
 
     // --- STORAGE ---
     async uploadPhoto(file: File, path: string): Promise<string | null> {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${path}/${fileName}`;
+        try {
+            console.log('Iniciando upload de foto:', file.name, 'para:', path);
 
-        const { error: uploadError } = await supabase.storage
-            .from('avatars')
-            .upload(filePath, file);
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+            const filePath = `${path}/${fileName}`;
 
-        if (uploadError) {
-            console.error("Upload error:", uploadError);
+            console.log('Caminho completo do arquivo:', filePath);
+
+            const { error: uploadError, data: uploadData } = await supabase.storage
+                .from('avatars')
+                .upload(filePath, file, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
+
+            if (uploadError) {
+                console.error("Erro detalhado no upload:", uploadError);
+                console.error("Mensagem:", uploadError.message);
+                console.error("Status:", uploadError.statusCode);
+                return null;
+            }
+
+            console.log('Upload bem-sucedido:', uploadData);
+
+            const { data } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(filePath);
+
+            console.log('URL pública gerada:', data.publicUrl);
+            return data.publicUrl;
+        } catch (error) {
+            console.error("Erro inesperado no upload:", error);
             return null;
         }
-
-        const { data } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(filePath);
-
-        return data.publicUrl;
     },
 
     // --- TEACHER/USER CRUD ---
@@ -528,6 +545,38 @@ export const SupabaseService = {
 
         if (error) {
             console.error("Error deleting discipline:", error);
+            return false;
+        }
+        return true;
+    },
+
+    // --- SOE NOTES (FOA) ---
+    async getStudentSOENote(studentId: string, year: number): Promise<string> {
+        const { data, error } = await supabase
+            .from('student_soe_notes')
+            .select('note')
+            .eq('student_id', studentId)
+            .eq('year', year)
+            .single();
+
+        if (error || !data) return '';
+        return data.note;
+    },
+
+    async saveStudentSOENote(studentId: string, year: number, note: string): Promise<boolean> {
+        const { error } = await supabase
+            .from('student_soe_notes')
+            .upsert({
+                student_id: studentId,
+                year: year,
+                note: note,
+                updated_at: new Date().toISOString()
+            }, {
+                onConflict: 'student_id,year'
+            });
+
+        if (error) {
+            console.error("Error saving SOE note:", error);
             return false;
         }
         return true;

@@ -2,13 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { StorageService } from './services/storageService';
 import { SupabaseService } from './services/supabaseService';
-import { Student, ClassRoom, Teacher, SessionRecord, ClassSession, Occurrence } from './types';
+import { Student, ClassRoom, Teacher, SessionRecord, ClassSession, Occurrence, UserRole } from './types';
 import { FileText, Printer, Filter, User, MessageSquare, Edit3, Calendar, Info, Camera } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface FOAProps {
     onShowToast: (msg: string) => void;
+    currentUserRole?: UserRole;
 }
 
 // Concept Types
@@ -36,7 +37,7 @@ interface ObservationLog {
     hasPhotos: boolean;
 }
 
-export const FOA: React.FC<FOAProps> = ({ onShowToast }) => {
+export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole }) => {
     const currentYear = new Date().getFullYear();
     const [classes, setClasses] = useState<ClassRoom[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
@@ -49,6 +50,7 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast }) => {
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [selectedYear, setSelectedYear] = useState<number>(currentYear);
     const [soeConsiderations, setSoeConsiderations] = useState<string>('');
+    const [saving, setSaving] = useState(false);
 
     // Generate available years based on session history + current year
     const availableYears = Array.from(new Set([
@@ -89,8 +91,32 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast }) => {
         const filtered = students.filter(s => s.className === selectedClassId);
         if (filtered.length > 0) setSelectedStudentId(filtered[0].id);
         else setSelectedStudentId('');
-        setSoeConsiderations(''); // Reset notes on student change
     }, [selectedClassId, students]);
+
+    // Load SOE Note when student or year changes
+    useEffect(() => {
+        if (selectedStudentId) {
+            const loadNote = async () => {
+                const note = await SupabaseService.getStudentSOENote(selectedStudentId, selectedYear);
+                setSoeConsiderations(note);
+            };
+            loadNote();
+        } else {
+            setSoeConsiderations('');
+        }
+    }, [selectedStudentId, selectedYear]);
+
+    const handleSaveConsiderations = async () => {
+        if (!selectedStudentId) return;
+        setSaving(true);
+        const success = await SupabaseService.saveStudentSOENote(selectedStudentId, selectedYear, soeConsiderations);
+        if (success) {
+            onShowToast("Considerações salvas com sucesso!");
+        } else {
+            onShowToast("Erro ao salvar considerações.");
+        }
+        setSaving(false);
+    };
 
     const handlePrint = () => {
         window.print();
@@ -539,7 +565,16 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast }) => {
                                 <Edit3 size={16} className="text-gray-600" />
                                 <h3 className="font-bold text-sm uppercase text-gray-800">Considerações Gerais / SOE</h3>
                             </div>
-                            <span className="text-[10px] text-gray-500 uppercase print:hidden">Campo Editável</span>
+                            <div className="flex items-center gap-2 print:hidden">
+                                <span className="text-[10px] text-gray-500 uppercase mr-2">Campo Editável</span>
+                                <button
+                                    onClick={handleSaveConsiderations}
+                                    disabled={saving || !selectedStudentId}
+                                    className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold px-3 py-1 rounded transition-colors flex items-center gap-1"
+                                >
+                                    {saving ? 'SALVANDO...' : 'SALVAR NOTA'}
+                                </button>
+                            </div>
                         </div>
                         <textarea
                             className="w-full h-32 p-4 text-sm text-gray-800 outline-none resize-none bg-white placeholder-gray-300"

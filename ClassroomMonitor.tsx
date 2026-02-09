@@ -14,6 +14,7 @@ import { ptBR } from 'date-fns/locale';
 interface ClassroomMonitorProps {
     onShowToast: (msg: string) => void;
     userEmail?: string;
+    userRole?: UserRole;
 }
 
 const MORNING_BLOCKS = [
@@ -37,7 +38,7 @@ const AFTERNOON_BLOCKS = [
     '18h00 - 18h45'
 ];
 
-export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast, userEmail }) => {
+export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast, userEmail, userRole }) => {
     const [allStudents, setAllStudents] = useState<Student[]>([]);
     const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
 
@@ -110,12 +111,19 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 setAllClasses(loadedClasses);
 
                 if (loadedTeachers.length > 0) {
-                    const firstTeacher = loadedTeachers[0];
-                    setSelectedTeacherId(firstTeacher.id);
+                    let initialTeacher = loadedTeachers[0];
+
+                    // Se o usuário for um professor, forçar a seleção dele
+                    if (userRole === UserRole.TEACHER && userEmail) {
+                        const loggedTeacher = loadedTeachers.find(t => t.email === userEmail);
+                        if (loggedTeacher) initialTeacher = loggedTeacher;
+                    }
+
+                    setSelectedTeacherId(initialTeacher.id);
 
                     let availCls = loadedClasses;
-                    if (firstTeacher.assignments && firstTeacher.assignments.length > 0) {
-                        const assignedClassNames = firstTeacher.assignments.map(a => a.classId);
+                    if (initialTeacher.assignments && initialTeacher.assignments.length > 0) {
+                        const assignedClassNames = initialTeacher.assignments.map(a => a.classId);
                         availCls = loadedClasses.filter(c => assignedClassNames.includes(c.name));
                     }
                     setAvailableClasses(availCls);
@@ -547,7 +555,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                         <select
                             value={selectedTeacherId}
                             onChange={(e) => setSelectedTeacherId(e.target.value)}
-                            className="bg-[#1e293b] text-white text-sm border border-gray-700 rounded-lg p-2 outline-none focus:border-emerald-500 min-w-[150px]"
+                            disabled={userRole === UserRole.TEACHER}
+                            className={`bg-[#1e293b] text-white text-sm border border-gray-700 rounded-lg p-2 outline-none focus:border-emerald-500 min-w-[150px] ${userRole === UserRole.TEACHER ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
                             {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
