@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Student, ClassSession, SessionRecord, Counters, Teacher, ClassRoom } from './types';
-import { StorageService } from '../services/storageService';
+import { StorageService } from './services/storageService';
 import {
     MessageSquare, Moon, Smartphone, Book,
     Zap, Save, RefreshCw, Check, X,

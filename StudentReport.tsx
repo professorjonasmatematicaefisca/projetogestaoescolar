@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { StorageService } from '../services/storageService';
-import { SupabaseService } from '../services/supabaseService';
+import { StorageService } from './services/storageService';
+import { SupabaseService } from './services/supabaseService';
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar
 } from 'recharts';

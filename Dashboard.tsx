@@ -1,17 +1,17 @@
 import React from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  LineChart, Line
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+    LineChart, Line
 } from 'recharts';
 import { Sparkles, TrendingUp, AlertTriangle, Users, ArrowRight, Download, School } from 'lucide-react';
-import { StorageService } from '../services/storageService';
+import { StorageService } from './services/storageService';
 
 export const Dashboard: React.FC = () => {
     const sessions = StorageService.getSessions();
     const classes = StorageService.getClasses();
-    
+
     // --- DATA CALCULATION ---
-    
+
     // 1. School-wide Summary
     let totalGradeSum = 0;
     let totalGradeCount = 0;
@@ -64,37 +64,37 @@ export const Dashboard: React.FC = () => {
             if (c.avg < 7) {
                 insights.push(
                     <div key={c.name} className="border-l-4 border-red-500 bg-red-500/5 p-3 rounded-r mb-3">
-                         <div className="flex items-center gap-2 text-red-400 mb-1">
-                             <AlertTriangle size={14} />
-                             <span className="text-xs font-bold uppercase">Crítico: {c.name}</span>
-                         </div>
-                         <p className="text-sm text-gray-300">
-                             Média da turma é <span className="font-bold text-white">{c.avg.toFixed(1)}</span> (Abaixo de 7). Necessária intervenção pedagógica imediata.
-                         </p>
+                        <div className="flex items-center gap-2 text-red-400 mb-1">
+                            <AlertTriangle size={14} />
+                            <span className="text-xs font-bold uppercase">Crítico: {c.name}</span>
+                        </div>
+                        <p className="text-sm text-gray-300">
+                            Média da turma é <span className="font-bold text-white">{c.avg.toFixed(1)}</span> (Abaixo de 7). Necessária intervenção pedagógica imediata.
+                        </p>
                     </div>
                 );
             } else if (c.avg < 8) {
                 insights.push(
-                     <div key={c.name} className="border-l-4 border-orange-500 bg-orange-500/5 p-3 rounded-r mb-3">
-                         <div className="flex items-center gap-2 text-orange-400 mb-1">
-                             <TrendingUp size={14} />
-                             <span className="text-xs font-bold uppercase">Atenção: {c.name}</span>
-                         </div>
-                         <p className="text-sm text-gray-300">
-                             Média da turma é <span className="font-bold text-white">{c.avg.toFixed(1)}</span> (Abaixo de 8). Recomenda-se monitoramento de focos de indisciplina.
-                         </p>
+                    <div key={c.name} className="border-l-4 border-orange-500 bg-orange-500/5 p-3 rounded-r mb-3">
+                        <div className="flex items-center gap-2 text-orange-400 mb-1">
+                            <TrendingUp size={14} />
+                            <span className="text-xs font-bold uppercase">Atenção: {c.name}</span>
+                        </div>
+                        <p className="text-sm text-gray-300">
+                            Média da turma é <span className="font-bold text-white">{c.avg.toFixed(1)}</span> (Abaixo de 8). Recomenda-se monitoramento de focos de indisciplina.
+                        </p>
                     </div>
                 );
             } else {
-                 insights.push(
-                     <div key={c.name} className="border-l-4 border-emerald-500 bg-emerald-500/5 p-3 rounded-r mb-3">
-                         <div className="flex items-center gap-2 text-emerald-400 mb-1">
-                             <Sparkles size={14} />
-                             <span className="text-xs font-bold uppercase">Destaque: {c.name}</span>
-                         </div>
-                         <p className="text-sm text-gray-300">
-                             Excelente desempenho com média <span className="font-bold text-white">{c.avg.toFixed(1)}</span>. Próximo à meta de excelência.
-                         </p>
+                insights.push(
+                    <div key={c.name} className="border-l-4 border-emerald-500 bg-emerald-500/5 p-3 rounded-r mb-3">
+                        <div className="flex items-center gap-2 text-emerald-400 mb-1">
+                            <Sparkles size={14} />
+                            <span className="text-xs font-bold uppercase">Destaque: {c.name}</span>
+                        </div>
+                        <p className="text-sm text-gray-300">
+                            Excelente desempenho com média <span className="font-bold text-white">{c.avg.toFixed(1)}</span>. Próximo à meta de excelência.
+                        </p>
                     </div>
                 );
             }
@@ -120,32 +120,32 @@ export const Dashboard: React.FC = () => {
 
             {/* KPI Cards (Global School Stats) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <KPICard 
-                    icon={Users} 
-                    label="Presença Geral (Escola)" 
-                    value={`${schoolAttendanceRate}%`} 
-                    trend="+0.5%" 
+                <KPICard
+                    icon={Users}
+                    label="Presença Geral (Escola)"
+                    value={`${schoolAttendanceRate}%`}
+                    trend="+0.5%"
                     trendPositive={true}
                     color="text-emerald-400"
                     bgColor="bg-emerald-500/10"
                     borderColor="border-emerald-500/20"
                 />
-                <KPICard 
-                    icon={School} 
-                    label="Média Geral (Escola)" 
+                <KPICard
+                    icon={School}
+                    label="Média Geral (Escola)"
                     value={schoolAvgGrade}
-                    trend={Number(schoolAvgGrade) >= 8 ? "Meta Atingida" : "Abaixo da Meta"} 
+                    trend={Number(schoolAvgGrade) >= 8 ? "Meta Atingida" : "Abaixo da Meta"}
                     trendPositive={Number(schoolAvgGrade) >= 8}
                     color="text-blue-400"
                     bgColor="bg-blue-500/10"
                     borderColor="border-blue-500/20"
                 />
-                <KPICard 
-                    icon={AlertTriangle} 
-                    label="Turmas Críticas (<7.0)" 
+                <KPICard
+                    icon={AlertTriangle}
+                    label="Turmas Críticas (<7.0)"
                     value={classStats.filter(c => c.avg < 7).length.toString()}
-                    trend="Ação Necessária" 
-                    trendPositive={false} 
+                    trend="Ação Necessária"
+                    trendPositive={false}
                     color="text-red-400"
                     bgColor="bg-red-500/10"
                     borderColor="border-red-500/20"
@@ -157,8 +157,8 @@ export const Dashboard: React.FC = () => {
                 <div className="lg:col-span-2 bg-[#0f172a] p-6 rounded-xl border border-gray-800 shadow-lg min-h-[400px]">
                     <div className="flex justify-between items-center mb-6">
                         <div>
-                             <h3 className="font-bold text-lg text-white">Presença vs. Dispersão (Global)</h3>
-                             <p className="text-xs text-gray-500">Tendência média de todas as turmas</p>
+                            <h3 className="font-bold text-lg text-white">Presença vs. Dispersão (Global)</h3>
+                            <p className="text-xs text-gray-500">Tendência média de todas as turmas</p>
                         </div>
                         <div className="flex gap-4">
                             <div className="flex items-center gap-2">
@@ -177,11 +177,11 @@ export const Dashboard: React.FC = () => {
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
                                 <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} dy={10} />
                                 <YAxis stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} dx={-10} />
-                                <Tooltip 
+                                <Tooltip
                                     contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#fff' }}
                                     itemStyle={{ color: '#fff' }}
                                 />
-                                <Line type="monotone" dataKey="presenca" stroke="#10b981" strokeWidth={3} dot={{r: 4, fill: '#10b981'}} activeDot={{r: 6}} />
+                                <Line type="monotone" dataKey="presenca" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} activeDot={{ r: 6 }} />
                                 <Line type="monotone" dataKey="dispersao" stroke="#475569" strokeWidth={3} dot={false} />
                             </LineChart>
                         </ResponsiveContainer>
@@ -193,7 +193,7 @@ export const Dashboard: React.FC = () => {
                     <div className="absolute top-0 right-0 p-4 opacity-10">
                         <Sparkles size={100} className="text-emerald-500" />
                     </div>
-                    
+
                     <div className="flex items-center gap-2 mb-6 z-10">
                         <Sparkles className="text-emerald-400" size={20} />
                         <h3 className="font-bold text-white text-lg">Insights por Turma</h3>
@@ -206,7 +206,7 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {/* Bottom Actions */}
-             <div className="flex justify-start">
+            <div className="flex justify-start">
                 <button className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-[#0f172a] font-bold rounded-lg shadow-lg shadow-emerald-500/20 transition-all">
                     <Download size={18} />
                     Exportar Relatório Geral (PDF)

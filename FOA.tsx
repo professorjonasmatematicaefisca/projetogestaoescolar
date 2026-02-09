@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { StorageService } from '../services/storageService';
+import { StorageService } from './services/storageService';
 import { Student, ClassRoom, Teacher, SessionRecord } from './types';
 import { FileText, Printer, Filter, User, MessageSquare, Edit3, Calendar, Info, Camera } from 'lucide-react';
 import { format } from 'date-fns';

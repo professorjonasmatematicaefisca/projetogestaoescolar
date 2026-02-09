@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Occurrence, OccurrenceType, OccurrenceStatus } from './types';
-import { StorageService } from '../services/storageService';
+import { StorageService } from './services/storageService';
 import { AlertTriangle, Plus, X, Search, Heart, Shield, AlertCircle, ThumbsUp, Camera, Save, Filter, RefreshCw } from 'lucide-react';
 
 interface OccurrencesProps {
@@ -104,8 +104,8 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                         key={t}
                                         onClick={() => setNewType(t)}
                                         className={`flex flex-col items-center justify-center gap-2 py-4 rounded-xl border transition-all ${newType === t
-                                                ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
-                                                : 'bg-[#1e293b] border-gray-700 text-gray-500 hover:bg-gray-800'
+                                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400'
+                                            : 'bg-[#1e293b] border-gray-700 text-gray-500 hover:bg-gray-800'
                                             }`}
                                     >
                                         {getTypeIcon(t)}
@@ -168,8 +168,8 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                         }
                                     }}
                                     className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer border transition-colors ${selectedStudentIds.includes(s.id)
-                                            ? 'bg-emerald-500/20 border-emerald-500/50'
-                                            : 'bg-[#1e293b] border-transparent hover:bg-gray-800'
+                                        ? 'bg-emerald-500/20 border-emerald-500/50'
+                                        : 'bg-[#1e293b] border-transparent hover:bg-gray-800'
                                         }`}
                                 >
                                     <img src={s.photoUrl} className="w-8 h-8 rounded-full" />
@@ -194,8 +194,8 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                     key={s}
                                     onClick={() => setStatus(s)}
                                     className={`flex-1 py-2 text-[10px] font-bold rounded uppercase transition-colors ${status === s
-                                            ? 'bg-emerald-500 text-[#0f172a]'
-                                            : 'text-gray-400 hover:text-white'
+                                        ? 'bg-emerald-500 text-[#0f172a]'
+                                        : 'text-gray-400 hover:text-white'
                                         }`}
                                 >
                                     {s === 'OPEN' ? 'Aberta' : s === 'ANALYZING' ? 'Em Análise' : 'Resolvida'}
@@ -254,7 +254,7 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                     </td>
                                     <td className="py-4">
                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${occ.type === OccurrenceType.DISCIPLINE ? 'bg-red-500/20 text-red-400' :
-                                                occ.type === OccurrenceType.PRAISE ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'
+                                            occ.type === OccurrenceType.PRAISE ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'
                                             }`}>
                                             {getTypeLabel(occ.type)}
                                         </span>

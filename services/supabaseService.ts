@@ -88,11 +88,9 @@ export const SupabaseService = {
         const { data, error } = await supabase.from('students').select('*');
         if (error) {
             console.error("Error fetching students:", error);
-
-            // Try migration if empty? Or just return seed
-            // console.log("Attempting migration due to empty/error...");
-            // await this.migrateMockData();
-            return SEED_STUDENTS; // Fallback
+            // Return empty array or throw error instead of silent fallback to SEED
+            // helping user realize connection issues.
+            return [];
         }
         return data.map((s: any) => ({
             id: s.id,
@@ -101,6 +99,21 @@ export const SupabaseService = {
             parentEmail: s.parent_email,
             className: s.class_name
         }));
+    },
+
+    async createStudent(student: Omit<Student, 'id'>): Promise<boolean> {
+        const { error } = await supabase.from('students').insert({
+            name: student.name,
+            photo_url: student.photoUrl,
+            parent_email: student.parentEmail,
+            class_name: student.className
+        });
+
+        if (error) {
+            console.error("Error creating student:", error);
+            return false;
+        }
+        return true;
     },
 
     async getTeachers(): Promise<Teacher[]> {

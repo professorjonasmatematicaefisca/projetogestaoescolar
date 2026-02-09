@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Layout } from './components/Layout';
-import { Login } from './components/Login';
-import { ClassroomMonitor } from './components/ClassroomMonitor';
-import { Dashboard } from './components/Dashboard';
-import { StudentReport } from './components/StudentReport';
-import { Occurrences } from './components/Occurrences';
-import { AdminPanel } from './components/AdminPanel';
-import { ChangePassword } from './components/ChangePassword';
-import { FOA } from './components/FOA';
+import { Layout } from './Layout';
+import { Login } from './Login';
+import { ClassroomMonitor } from './ClassroomMonitor';
+import { Dashboard } from './Dashboard';
+import { StudentReport } from './StudentReport';
+import { Occurrences } from './Occurrences';
+import { AdminPanel } from './AdminPanel';
+import { ChangePassword } from './ChangePassword';
+import { FOA } from './FOA';
 import { UserRole, ViewState } from './types';
 
 import { supabase } from './supabaseClient';

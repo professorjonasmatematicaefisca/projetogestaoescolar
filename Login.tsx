@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserRole } from './types';
-import { StorageService } from '../services/storageService';
+import { StorageService } from './services/storageService';
 import { GraduationCap, Lock, Mail, ArrowRight } from 'lucide-react';
 
 interface LoginProps {

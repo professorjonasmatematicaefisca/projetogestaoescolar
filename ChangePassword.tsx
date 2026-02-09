@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StorageService } from '../services/storageService';
+import { StorageService } from './services/storageService';
 import { Lock, Save, CheckCircle2 } from 'lucide-react';
 
 interface ChangePasswordProps {
@@ -14,7 +14,7 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ userEmail, onSho
 
     const handleChange = (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         // Basic validation
         if (newPass !== confirmPass) {
             onShowToast("As novas senhas não coincidem!");
@@ -60,21 +60,21 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ userEmail, onSho
                 <form onSubmit={handleChange} className="space-y-4">
                     <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Senha Atual</label>
-                        <input 
-                            type="password" 
+                        <input
+                            type="password"
                             value={currentPass}
                             onChange={e => setCurrentPass(e.target.value)}
                             className="w-full bg-[#1e293b] border border-gray-700 rounded-lg p-3 text-white outline-none focus:border-emerald-500 transition-colors"
                             placeholder="••••••••"
                         />
                     </div>
-                    
+
                     <div className="border-t border-gray-800 pt-2"></div>
 
                     <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Nova Senha</label>
-                        <input 
-                            type="password" 
+                        <input
+                            type="password"
                             value={newPass}
                             onChange={e => setNewPass(e.target.value)}
                             className="w-full bg-[#1e293b] border border-gray-700 rounded-lg p-3 text-white outline-none focus:border-emerald-500 transition-colors"
@@ -84,8 +84,8 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ userEmail, onSho
 
                     <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Confirmar Nova Senha</label>
-                        <input 
-                            type="password" 
+                        <input
+                            type="password"
                             value={confirmPass}
                             onChange={e => setConfirmPass(e.target.value)}
                             className="w-full bg-[#1e293b] border border-gray-700 rounded-lg p-3 text-white outline-none focus:border-emerald-500 transition-colors"
@@ -93,7 +93,7 @@ export const ChangePassword: React.FC<ChangePasswordProps> = ({ userEmail, onSho
                         />
                     </div>
 
-                    <button 
+                    <button
                         type="submit"
                         className="w-full mt-4 bg-emerald-500 hover:bg-emerald-600 text-[#0f172a] font-bold py-3 rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-500/20"
                     >
