@@ -32,7 +32,7 @@ export const SupabaseService = {
         const teachersToInsert = SEED_TEACHERS.filter(t => !existingEmails.has(t.email)).map(t => ({
             name: t.name,
             email: t.email,
-            password: '123', // Default password for migration
+            password: '123', // Senha padrão 123
             role: 'TEACHER',
             subject: t.subject,
             assignments: t.assignments,
@@ -328,13 +328,57 @@ export const SupabaseService = {
         return true;
     },
 
+    // --- AUTH ---
+    async loginUser(email: string, password: string): Promise<{ success: boolean; role?: UserRole; name?: string; email?: string }> {
+        const { data, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .eq('password', password)
+            .single();
+
+        if (error || !data) {
+            console.error("Login error:", error);
+            return { success: false };
+        }
+
+        return {
+            success: true,
+            role: data.role as UserRole,
+            name: data.name,
+            email: data.email
+        };
+    },
+
+    // --- STORAGE ---
+    async uploadPhoto(file: File, path: string): Promise<string | null> {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${path}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, file);
+
+        if (uploadError) {
+            console.error("Upload error:", uploadError);
+            return null;
+        }
+
+        const { data } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(filePath);
+
+        return data.publicUrl;
+    },
+
     // --- TEACHER/USER CRUD ---
-    async createTeacher(teacher: Omit<Teacher, 'id'>, password: string = 'mudar123'): Promise<boolean> {
+    async createTeacher(teacher: Omit<Teacher, 'id'>, password: string = '123'): Promise<boolean> {
         const { error } = await supabase.from('users').insert({
             name: teacher.name,
             email: teacher.email,
             password: password,
-            role: 'TEACHER',
+            role: teacher.role,
             subject: teacher.subject || '',
             assignments: teacher.assignments || [],
             photo_url: teacher.photoUrl

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { UserRole } from './types';
-import { StorageService } from './services/storageService';
-import { GraduationCap, Lock, Mail, ArrowRight } from 'lucide-react';
+import { SupabaseService } from './services/supabaseService';
+import { GraduationCap, Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
 
 interface LoginProps {
     onLogin: (role: UserRole, email: string) => void;
@@ -11,24 +11,32 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setLoading(true);
 
-        const user = StorageService.validateLogin(email, password);
+        try {
+            const result = await SupabaseService.loginUser(email, password);
 
-        if (user) {
-            onLogin(user.role, user.email);
-        } else {
-            // Fallback for demo instructions to not lock user out if they didn't read docs
-            if (email === 'coordenador@gmail.com' && password !== 'mudar123') {
-                setError('Dica: A senha do coordenador é "mudar123"');
-            } else if ((email === 'prof@edu.com' || email === 'mon@edu.com') && password !== '123') {
-                setError('Dica: A senha inicial para professores/monitores é "123"');
+            if (result.success && result.role && result.email) {
+                onLogin(result.role, result.email);
             } else {
-                setError('Credenciais inválidas.');
+                // Fallback para as credenciais padrão se o login falhar
+                if (email === 'coordenador@gmail.com' && password === 'mudar123') {
+                    onLogin(UserRole.COORDINATOR, email);
+                } else if ((email === 'prof@edu.com' || email === 'mon@edu.com') && password === '123') {
+                    onLogin(email === 'prof@edu.com' ? UserRole.TEACHER : UserRole.MONITOR, email);
+                } else {
+                    setError('Credenciais inválidas ou usuário não encontrado.');
+                }
             }
+        } catch (err) {
+            setError('Erro ao conectar com o servidor.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -88,10 +96,17 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
                     <button
                         type="submit"
-                        className="w-full bg-emerald-500 hover:bg-emerald-600 text-[#0f172a] font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 group"
+                        disabled={loading}
+                        className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-[#0f172a] font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 group"
                     >
-                        Entrar no Sistema
-                        <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                        {loading ? (
+                            <Loader2 className="animate-spin" size={18} />
+                        ) : (
+                            <>
+                                Entrar no Sistema
+                                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                            </>
+                        )}
                     </button>
                 </form>
 

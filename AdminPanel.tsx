@@ -45,6 +45,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
     const [classForm, setClassForm] = useState({ name: '', period: 'Matutino' });
     const [disciplineForm, setDisciplineForm] = useState({ name: '' });
 
+    // File Input Refs
+    const studentFileRef = React.useRef<HTMLInputElement>(null);
+    const staffFileRef = React.useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
+
     useEffect(() => {
         loadData();
     }, []);
@@ -129,6 +134,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
         }
     };
 
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'student' | 'staff') => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setUploading(true);
+        const path = type === 'student' ? 'students' : 'staff';
+        const publicUrl = await SupabaseService.uploadPhoto(file, path);
+
+        if (publicUrl) {
+            if (type === 'student') {
+                setStudentForm({ ...studentForm, photoUrl: publicUrl });
+            } else {
+                setStaffForm({ ...staffForm, photoUrl: publicUrl });
+            }
+            onShowToast('Foto carregada com sucesso!');
+        } else {
+            onShowToast('Erro ao carregar foto');
+        }
+        setUploading(false);
+    };
+
     // Staff Handlers
     const handleStaffSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -156,7 +182,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                 subject: staffForm.assignments.length > 0 ? staffForm.assignments[0].subject : 'Múltiplas',
                 assignments: staffForm.assignments,
                 photoUrl: staffForm.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(staffForm.name)}&background=random`
-            }, 'mudar123');
+            }, '123'); // Senha padrão agora é 123
         }
 
         if (success) {
@@ -609,13 +635,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
 
                         <form onSubmit={handleStudentSubmit} className="space-y-4">
                             <div className="flex justify-center mb-4">
-                                <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center relative group cursor-pointer">
-                                    <Camera size={32} className="text-gray-500" />
-                                    <div className="absolute inset-0 flex items-end justify-end">
-                                        <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
-                                            <Plus size={16} className="text-white" />
-                                        </div>
+                                <input
+                                    type="file"
+                                    ref={studentFileRef}
+                                    onChange={(e) => handleFileChange(e, 'student')}
+                                    className="hidden"
+                                    accept="image/*"
+                                />
+                                <div
+                                    onClick={() => studentFileRef.current?.click()}
+                                    className="w-24 h-24 rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center relative group cursor-pointer overflow-hidden bg-[#0f172a]"
+                                >
+                                    {studentForm.photoUrl ? (
+                                        <img src={studentForm.photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Camera size={32} className="text-gray-500" />
+                                    )}
+                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                                        <Plus size={20} className="text-white" />
                                     </div>
+                                    {uploading && (
+                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500"></div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -678,13 +721,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
 
                         <form onSubmit={handleStaffSubmit} className="space-y-4">
                             <div className="flex justify-center mb-4">
-                                <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center relative group cursor-pointer">
-                                    <Camera size={32} className="text-gray-500" />
-                                    <div className="absolute inset-0 flex items-end justify-end">
-                                        <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
-                                            <Plus size={16} className="text-white" />
-                                        </div>
+                                <input
+                                    type="file"
+                                    ref={staffFileRef}
+                                    onChange={(e) => handleFileChange(e, 'staff')}
+                                    className="hidden"
+                                    accept="image/*"
+                                />
+                                <div
+                                    onClick={() => staffFileRef.current?.click()}
+                                    className="w-24 h-24 rounded-full border-2 border-dashed border-gray-600 flex items-center justify-center relative group cursor-pointer overflow-hidden bg-[#0f172a]"
+                                >
+                                    {staffForm.photoUrl ? (
+                                        <img src={staffForm.photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Camera size={32} className="text-gray-500" />
+                                    )}
+                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                                        <Plus size={20} className="text-white" />
                                     </div>
+                                    {uploading && (
+                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500"></div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -773,7 +833,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
 
                             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-2">
                                 <Lock size={16} className="text-yellow-500 mt-0.5" />
-                                <p className="text-xs text-yellow-400">Senha padrão será definida como: <strong>mudar123</strong></p>
+                                <p className="text-xs text-yellow-400">Senha padrão será definida como: <strong>123</strong></p>
                             </div>
 
                             <button
