@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Users, School, BookOpen, X, Plus, Camera, Lock, Trash2, GraduationCap } from 'lucide-react';
+import { UserPlus, Users, School, BookOpen, X, Plus, Camera, Lock, Trash2, GraduationCap, Edit2 } from 'lucide-react';
 import { SupabaseService } from './services/supabaseService';
 import { Student, Teacher, ClassRoom, Discipline, UserRole, TeacherClassAssignment } from './types';
 
@@ -19,11 +19,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
     const [classes, setClasses] = useState<ClassRoom[]>([]);
     const [disciplines, setDisciplines] = useState<Discipline[]>([]);
 
-    // Modal State
+    // Modal & Editing State
     const [showStudentModal, setShowStudentModal] = useState(false);
     const [showStaffModal, setShowStaffModal] = useState(false);
     const [showClassModal, setShowClassModal] = useState(false);
     const [showDisciplineModal, setShowDisciplineModal] = useState(false);
+
+    const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+    const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+    const [editingClassId, setEditingClassId] = useState<string | null>(null);
+    const [editingDisciplineId, setEditingDisciplineId] = useState<string | null>(null);
 
     // Filter State
     const [filterClass, setFilterClass] = useState<string>('');
@@ -73,21 +78,44 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
             return;
         }
 
-        const success = await SupabaseService.createStudent({
-            name: studentForm.name,
-            parentEmail: studentForm.parentEmail,
-            className: studentForm.className,
-            photoUrl: studentForm.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(studentForm.name)}&background=random`
-        });
+        let success = false;
+        if (editingStudentId) {
+            success = await SupabaseService.updateStudent({
+                id: editingStudentId,
+                name: studentForm.name,
+                parentEmail: studentForm.parentEmail,
+                className: studentForm.className,
+                photoUrl: studentForm.photoUrl
+            });
+        } else {
+            success = await SupabaseService.createStudent({
+                name: studentForm.name,
+                parentEmail: studentForm.parentEmail,
+                className: studentForm.className,
+                photoUrl: studentForm.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(studentForm.name)}&background=random`
+            });
+        }
 
         if (success) {
-            onShowToast('Aluno cadastrado com sucesso!');
+            onShowToast(editingStudentId ? 'Aluno atualizado com sucesso!' : 'Aluno cadastrado com sucesso!');
             setShowStudentModal(false);
+            setEditingStudentId(null);
             setStudentForm({ name: '', parentEmail: '', className: '', photoUrl: '' });
             loadData();
         } else {
-            onShowToast('Erro ao cadastrar aluno');
+            onShowToast(editingStudentId ? 'Erro ao atualizar aluno' : 'Erro ao cadastrar aluno');
         }
+    };
+
+    const startEditStudent = (student: Student) => {
+        setEditingStudentId(student.id);
+        setStudentForm({
+            name: student.name,
+            parentEmail: student.parentEmail,
+            className: student.className,
+            photoUrl: student.photoUrl
+        });
+        setShowStudentModal(true);
     };
 
     const handleDeleteStudent = async (id: string) => {
@@ -109,23 +137,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
             return;
         }
 
-        const success = await SupabaseService.createTeacher({
-            name: staffForm.name,
-            email: staffForm.email,
-            role: staffForm.role,
-            subject: staffForm.assignments.length > 0 ? staffForm.assignments[0].subject : 'Múltiplas',
-            assignments: staffForm.assignments,
-            photoUrl: staffForm.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(staffForm.name)}&background=random`
-        }, 'mudar123');
+        let success = false;
+        if (editingStaffId) {
+            success = await SupabaseService.updateTeacher({
+                id: editingStaffId,
+                name: staffForm.name,
+                email: staffForm.email,
+                role: staffForm.role,
+                subject: staffForm.assignments.length > 0 ? staffForm.assignments[0].subject : 'Múltiplas',
+                assignments: staffForm.assignments,
+                photoUrl: staffForm.photoUrl
+            });
+        } else {
+            success = await SupabaseService.createTeacher({
+                name: staffForm.name,
+                email: staffForm.email,
+                role: staffForm.role,
+                subject: staffForm.assignments.length > 0 ? staffForm.assignments[0].subject : 'Múltiplas',
+                assignments: staffForm.assignments,
+                photoUrl: staffForm.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(staffForm.name)}&background=random`
+            }, 'mudar123');
+        }
 
         if (success) {
-            onShowToast('Membro cadastrado com sucesso!');
+            onShowToast(editingStaffId ? 'Membro atualizado com sucesso!' : 'Membro cadastrado com sucesso!');
             setShowStaffModal(false);
+            setEditingStaffId(null);
             setStaffForm({ role: UserRole.TEACHER, name: '', email: '', photoUrl: '', assignments: [] });
             loadData();
         } else {
-            onShowToast('Erro ao cadastrar membro');
+            onShowToast(editingStaffId ? 'Erro ao atualizar membro' : 'Erro ao cadastrar membro');
         }
+    };
+
+    const startEditStaff = (member: Teacher) => {
+        setEditingStaffId(member.id);
+        setStaffForm({
+            name: member.name,
+            email: member.email,
+            role: member.role,
+            photoUrl: member.photoUrl || '',
+            assignments: member.assignments || []
+        });
+        setShowStaffModal(true);
     };
 
     const handleDeleteStaff = async (id: string) => {
@@ -171,19 +225,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
             return;
         }
 
-        const success = await SupabaseService.createClass({
-            name: classForm.name,
-            period: classForm.period
-        });
+        let success = false;
+        if (editingClassId) {
+            success = await SupabaseService.updateClass({
+                id: editingClassId,
+                name: classForm.name,
+                period: classForm.period
+            });
+        } else {
+            success = await SupabaseService.createClass({
+                name: classForm.name,
+                period: classForm.period
+            });
+        }
 
         if (success) {
-            onShowToast('Turma cadastrada com sucesso!');
+            onShowToast(editingClassId ? 'Turma atualizada com sucesso!' : 'Turma cadastrada com sucesso!');
             setShowClassModal(false);
+            setEditingClassId(null);
             setClassForm({ name: '', period: 'Matutino' });
             loadData();
         } else {
-            onShowToast('Erro ao cadastrar turma');
+            onShowToast(editingClassId ? 'Erro ao atualizar turma' : 'Erro ao cadastrar turma');
         }
+    };
+
+    const startEditClass = (cls: ClassRoom) => {
+        setEditingClassId(cls.id);
+        setClassForm({
+            name: cls.name,
+            period: cls.period
+        });
+        setShowClassModal(true);
     };
 
     const handleDeleteClass = async (id: string) => {
@@ -205,18 +278,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
             return;
         }
 
-        const success = await SupabaseService.createDiscipline({
-            name: disciplineForm.name
-        });
+        let success = false;
+        if (editingDisciplineId) {
+            success = await SupabaseService.updateDiscipline({
+                id: editingDisciplineId,
+                name: disciplineForm.name
+            });
+        } else {
+            success = await SupabaseService.createDiscipline({
+                name: disciplineForm.name
+            });
+        }
 
         if (success) {
-            onShowToast('Disciplina cadastrada com sucesso!');
+            onShowToast(editingDisciplineId ? 'Disciplina atualizada com sucesso!' : 'Disciplina cadastrada com sucesso!');
             setShowDisciplineModal(false);
+            setEditingDisciplineId(null);
             setDisciplineForm({ name: '' });
             loadData();
         } else {
-            onShowToast('Erro ao cadastrar disciplina');
+            onShowToast(editingDisciplineId ? 'Erro ao atualizar disciplina' : 'Erro ao cadastrar disciplina');
         }
+    };
+
+    const startEditDiscipline = (disc: Discipline) => {
+        setEditingDisciplineId(disc.id);
+        setDisciplineForm({
+            name: disc.name
+        });
+        setShowDisciplineModal(true);
     };
 
     const handleDeleteDiscipline = async (id: string) => {
@@ -378,12 +468,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                             </div>
                         </div>
 
-                        <button
-                            onClick={() => handleDeleteStudent(student.id)}
-                            className="absolute bottom-3 right-3 p-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded transition-all opacity-0 group-hover:opacity-100"
-                        >
-                            <Trash2 size={14} />
-                        </button>
+                        <div className="absolute bottom-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                            <button
+                                onClick={() => startEditStudent(student)}
+                                className="p-1.5 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white rounded transition-all"
+                            >
+                                <Edit2 size={14} />
+                            </button>
+                            <button
+                                onClick={() => handleDeleteStudent(student.id)}
+                                className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded transition-all"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
                     </div>
                 ))}
 
@@ -422,12 +520,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                             )}
                         </div>
 
-                        <button
-                            onClick={() => handleDeleteStaff(member.id)}
-                            className="absolute bottom-3 right-3 p-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded transition-all opacity-0 group-hover:opacity-100"
-                        >
-                            <Trash2 size={14} />
-                        </button>
+                        <div className="absolute bottom-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                            <button
+                                onClick={() => startEditStaff(member)}
+                                className="p-1.5 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white rounded transition-all"
+                            >
+                                <Edit2 size={14} />
+                            </button>
+                            <button
+                                onClick={() => handleDeleteStaff(member.id)}
+                                className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded transition-all"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
                     </div>
                 ))}
 
@@ -443,12 +549,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                             <p className="text-sm text-gray-400">Período: {classRoom.period}</p>
                         </div>
 
-                        <button
-                            onClick={() => handleDeleteClass(classRoom.id)}
-                            className="absolute bottom-3 right-3 p-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded transition-all opacity-0 group-hover:opacity-100"
-                        >
-                            <Trash2 size={14} />
-                        </button>
+                        <div className="absolute bottom-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                            <button
+                                onClick={() => startEditClass(classRoom)}
+                                className="p-1.5 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white rounded transition-all"
+                            >
+                                <Edit2 size={14} />
+                            </button>
+                            <button
+                                onClick={() => handleDeleteClass(classRoom.id)}
+                                className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded transition-all"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
                     </div>
                 ))}
 
@@ -464,12 +578,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                             <p className="text-xs text-gray-500">ID: {discipline.id.substring(0, 8)}</p>
                         </div>
 
-                        <button
-                            onClick={() => handleDeleteDiscipline(discipline.id)}
-                            className="absolute bottom-3 right-3 p-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded transition-all opacity-0 group-hover:opacity-100"
-                        >
-                            <Trash2 size={14} />
-                        </button>
+                        <div className="absolute bottom-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                            <button
+                                onClick={() => startEditDiscipline(discipline)}
+                                className="p-1.5 bg-blue-600/20 hover:bg-blue-600 text-blue-400 hover:text-white rounded transition-all"
+                            >
+                                <Edit2 size={14} />
+                            </button>
+                            <button
+                                onClick={() => handleDeleteDiscipline(discipline.id)}
+                                className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded transition-all"
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
                     </div>
                 ))}
             </div>
@@ -479,8 +601,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-[#1e293b] rounded-xl border border-gray-700 p-6 max-w-md w-full">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-white">Cadastrar Aluno</h2>
-                            <button onClick={() => setShowStudentModal(false)} className="text-gray-400 hover:text-white">
+                            <h2 className="text-xl font-bold text-white">{editingStudentId ? 'Editar Aluno' : 'Cadastrar Aluno'}</h2>
+                            <button onClick={() => { setShowStudentModal(false); setEditingStudentId(null); setStudentForm({ name: '', parentEmail: '', className: '', photoUrl: '' }); }} className="text-gray-400 hover:text-white">
                                 <X size={24} />
                             </button>
                         </div>
@@ -548,8 +670,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
                     <div className="bg-[#1e293b] rounded-xl border border-gray-700 p-6 max-w-md w-full my-8">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-white">Cadastrar Membro</h2>
-                            <button onClick={() => setShowStaffModal(false)} className="text-gray-400 hover:text-white">
+                            <h2 className="text-xl font-bold text-white">{editingStaffId ? 'Editar Membro' : 'Cadastrar Membro'}</h2>
+                            <button onClick={() => { setShowStaffModal(false); setEditingStaffId(null); setStaffForm({ role: UserRole.TEACHER, name: '', email: '', photoUrl: '', assignments: [] }); }} className="text-gray-400 hover:text-white">
                                 <X size={24} />
                             </button>
                         </div>
@@ -671,8 +793,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-[#1e293b] rounded-xl border border-gray-700 p-6 max-w-md w-full">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-white">Cadastrar Turma</h2>
-                            <button onClick={() => setShowClassModal(false)} className="text-gray-400 hover:text-white">
+                            <h2 className="text-xl font-bold text-white">{editingClassId ? 'Editar Turma' : 'Cadastrar Turma'}</h2>
+                            <button onClick={() => { setShowClassModal(false); setEditingClassId(null); setClassForm({ name: '', period: 'Matutino' }); }} className="text-gray-400 hover:text-white">
                                 <X size={24} />
                             </button>
                         </div>
@@ -719,8 +841,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                     <div className="bg-[#1e293b] rounded-xl border border-gray-700 p-6 max-w-md w-full">
                         <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-white">Cadastrar Disciplina</h2>
-                            <button onClick={() => setShowDisciplineModal(false)} className="text-gray-400 hover:text-white">
+                            <h2 className="text-xl font-bold text-white">{editingDisciplineId ? 'Editar Disciplina' : 'Cadastrar Disciplina'}</h2>
+                            <button onClick={() => { setShowDisciplineModal(false); setEditingDisciplineId(null); setDisciplineForm({ name: '' }); }} className="text-gray-400 hover:text-white">
                                 <X size={24} />
                             </button>
                         </div>

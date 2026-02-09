@@ -212,13 +212,14 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 ...s,
                 avg: parseFloat(avg),
                 attendance: attendance,
-                talk: count ? sumTalk / count : 0,
-                sleep: count ? sumSleep / count : 0,
-                bathroom: count ? sumBathroom / count : 0,
-                material: count ? sumMaterial / count : 0,
-                activity: count ? sumActivity / count : 0,
-                phone: count ? sumPhone / count : 0,
-                participation: count ? sumParticipation / count : 0
+                // Show as deductions/bonuses
+                talk: count ? -(Math.min(3.0, (sumTalk / count) * 1.0)) : 0,
+                sleep: count ? -(Math.min(3.0, (sumSleep / count) * 1.0)) : 0,
+                bathroom: count ? -(Math.min(1.5, (sumBathroom / count) * 0.5)) : 0,
+                material: count ? -(((count - sumMaterial) / count) * 1.5) : 0,
+                activity: count ? -(((count * 3 - sumActivity) / count) * 1.0) : 0,
+                phone: count ? -(sumPhone / count * 1.0) : 0,
+                participation: count ? (sumParticipation / count * 0.5) : 0
             };
         });
 
@@ -712,13 +713,13 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                             <td className="px-2 py-3">
                                                 <span className="text-gray-300">{s.attendance.toFixed(0)}%</span>
                                             </td>
-                                            <td className="px-2 py-3 text-gray-400">{s.talk.toFixed(1)}</td>
-                                            <td className="px-2 py-3 text-gray-400">{s.sleep.toFixed(1)}</td>
-                                            <td className="px-2 py-3 text-gray-400">{s.bathroom.toFixed(1)}</td>
-                                            <td className="px-2 py-3 text-gray-400">{s.material.toFixed(1)}</td>
-                                            <td className="px-2 py-3 text-gray-400">{s.activity.toFixed(1)}</td>
-                                            <td className="px-2 py-3 text-gray-400">{s.phone.toFixed(1)}</td>
-                                            <td className="px-2 py-3 text-gray-400">{s.participation.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.talk < 0 ? 'text-red-400' : 'text-gray-500'}`}>{s.talk === 0 ? '0.0' : s.talk.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.sleep < 0 ? 'text-red-400' : 'text-gray-500'}`}>{s.sleep === 0 ? '0.0' : s.sleep.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.bathroom < 0 ? 'text-red-400' : 'text-gray-500'}`}>{s.bathroom === 0 ? '0.0' : s.bathroom.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.material < 0 ? 'text-red-400' : 'text-gray-500'}`}>{s.material === 0 ? '0.0' : s.material.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.activity < 0 ? 'text-red-400' : 'text-gray-500'}`}>{s.activity === 0 ? '0.0' : s.activity.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.phone < 0 ? 'text-red-400' : 'text-gray-500'}`}>{s.phone === 0 ? '0.0' : s.phone.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.participation > 0 ? 'text-emerald-400' : 'text-gray-500'}`}>{s.participation === 0 ? '0.0' : `+${s.participation.toFixed(1)}`}</td>
                                         </tr>
                                     ))
                                 )}
