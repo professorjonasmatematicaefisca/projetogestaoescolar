@@ -66,7 +66,15 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
 
     // -- CLASS REPORT STATE --
-    const [selectedClassName, setSelectedClassName] = useState<string>(classes[0]?.name || '');
+    const [selectedClassName, setSelectedClassName] = useState<string>('');
+
+    // Initialize Class Selections when classes load
+    useEffect(() => {
+        if (classes.length > 0) {
+            if (!selectedClassName) setSelectedClassName(classes[0].name);
+            if (!studentFilterClass) setStudentFilterClass(classes[0].name);
+        }
+    }, [classes]);
 
     // Init Student Selection based on filter
     useEffect(() => {
@@ -119,6 +127,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                     fullDate: session.date,
                     aluno: studentGrade,
                     mediaTurma: parseFloat(classAvg.toFixed(1)),
+                    teacherName: session.teacherName,
                     sessionObj: session,
                     record: studentRecord,
                     blocksCount: session.blocksCount || 1
