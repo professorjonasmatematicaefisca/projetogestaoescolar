@@ -67,6 +67,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
 
     // -- CLASS REPORT STATE --
     const [selectedClassName, setSelectedClassName] = useState<string>('');
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'avg', direction: 'desc' });
 
     // Initialize Class Selections when classes load
     useEffect(() => {
@@ -175,6 +176,15 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             let presentCount = 0;
             let totalClassWeight = 0;
 
+            // NEW: Criteria sums
+            let sumTalk = 0;
+            let sumSleep = 0;
+            let sumBathroom = 0;
+            let sumMaterial = 0;
+            let sumActivity = 0;
+            let sumPhone = 0;
+            let sumParticipation = 0;
+
             classSessions.forEach(cs => {
                 const rec = cs.records.find(r => r.studentId === s.id);
                 if (rec) {
@@ -182,17 +192,48 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                     totalClassWeight += weight;
                     gradeSum += StorageService.calculateGrade(rec);
                     count++;
-                    if (rec.present) presentCount += weight;
+                    if (rec.present) {
+                        presentCount += weight;
+                        sumTalk += rec.counters.talk;
+                        sumSleep += rec.counters.sleep;
+                        sumBathroom += rec.counters.bathroom;
+                        sumMaterial += rec.counters.material;
+                        sumActivity += rec.counters.activity;
+                        sumPhone += (rec.phoneConfiscated ? 1 : 0);
+                        sumParticipation += (rec.counters.participation || 0);
+                    }
                 }
             });
 
             const avg = count ? (gradeSum / count).toFixed(1) : '0.0';
             const attendance = totalClassWeight ? (presentCount / totalClassWeight) * 100 : 0;
 
-            return { ...s, avg: parseFloat(avg), attendance: attendance };
-        }).sort((a, b) => b.avg - a.avg);
+            return {
+                ...s,
+                avg: parseFloat(avg),
+                attendance: attendance,
+                talk: count ? sumTalk / count : 0,
+                sleep: count ? sumSleep / count : 0,
+                bathroom: count ? sumBathroom / count : 0,
+                material: count ? sumMaterial / count : 0,
+                activity: count ? sumActivity / count : 0,
+                phone: count ? sumPhone / count : 0,
+                participation: count ? sumParticipation / count : 0
+            };
+        });
 
-        return { dailyAvgData, globalAvg, studentPerformances, totalSessions: classSessions.length };
+        // Apply Sorting
+        const sortedPerformances = [...studentPerformances].sort((a: any, b: any) => {
+            if (a[sortConfig.key] < b[sortConfig.key]) {
+                return sortConfig.direction === 'asc' ? -1 : 1;
+            }
+            if (a[sortConfig.key] > b[sortConfig.key]) {
+                return sortConfig.direction === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+
+        return { dailyAvgData, globalAvg, studentPerformances: sortedPerformances, totalSessions: classSessions.length };
     };
 
     // 3. Comparative Data (Detailed)
@@ -632,38 +673,52 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
 
                 {/* Right Column: Student List */}
                 <div className="lg:col-span-2 bg-[#0f172a] rounded-xl border border-gray-800 p-6 shadow-lg">
-                    <h3 className="text-lg font-bold text-white mb-4">Desempenho Individual</h3>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold text-white">Desempenho Individual</h3>
+                        <div className="text-[10px] text-gray-500 italic">Clique nos cabeçalhos para ordenar</div>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead className="bg-[#1e293b] text-xs font-bold text-gray-400 uppercase">
+                            <thead className="bg-[#1e293b] text-[10px] font-bold text-gray-400 uppercase">
                                 <tr>
-                                    <th className="px-4 py-3 rounded-tl-lg">Aluno</th>
-                                    <th className="px-4 py-3">Presença (Período)</th>
-                                    <th className="px-4 py-3 text-right rounded-tr-lg">Média (Período)</th>
+                                    <th className="px-2 py-3 rounded-tl-lg">Aluno</th>
+                                    <SortableHeader label="Nota" sortKey="avg" currentSort={sortConfig} onSort={setSortConfig} />
+                                    <SortableHeader label="Pres." sortKey="attendance" currentSort={sortConfig} onSort={setSortConfig} />
+                                    <SortableHeader label="Conv." sortKey="talk" currentSort={sortConfig} onSort={setSortConfig} />
+                                    <SortableHeader label="Sono" sortKey="sleep" currentSort={sortConfig} onSort={setSortConfig} />
+                                    <SortableHeader label="Banh." sortKey="bathroom" currentSort={sortConfig} onSort={setSortConfig} />
+                                    <SortableHeader label="Mat." sortKey="material" currentSort={sortConfig} onSort={setSortConfig} />
+                                    <SortableHeader label="Ativ." sortKey="activity" currentSort={sortConfig} onSort={setSortConfig} />
+                                    <SortableHeader label="Cel." sortKey="phone" currentSort={sortConfig} onSort={setSortConfig} />
+                                    <SortableHeader label="Part." sortKey="participation" currentSort={sortConfig} onSort={setSortConfig} rounded />
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-800 text-sm">
+                            <tbody className="divide-y divide-gray-800 text-xs">
                                 {studentPerformances.length === 0 ? (
-                                    <tr><td colSpan={3} className="p-4 text-center text-gray-500">Sem dados neste período.</td></tr>
+                                    <tr><td colSpan={10} className="p-4 text-center text-gray-500">Sem dados neste período.</td></tr>
                                 ) : (
                                     studentPerformances.map((s, idx) => (
-                                        <tr key={s.id} className="hover:bg-[#1e293b]/50">
-                                            <td className="px-4 py-3 flex items-center gap-3">
-                                                <span className="text-gray-500 text-xs w-4">{idx + 1}.</span>
-                                                <img src={s.photoUrl} className="w-8 h-8 rounded-full" />
-                                                <span className="text-gray-200">{s.name}</span>
+                                        <tr key={s.id} className="hover:bg-[#1e293b]/50 transition-colors">
+                                            <td className="px-2 py-3 flex items-center gap-2 min-w-[150px]">
+                                                <span className="text-gray-600 text-[10px] w-4">{idx + 1}.</span>
+                                                <img src={s.photoUrl} className="w-6 h-6 rounded-full" />
+                                                <span className="text-gray-200 font-medium truncate">{s.name}</span>
                                             </td>
-                                            <td className="px-4 py-3">
-                                                <div className="w-full bg-gray-700 h-1.5 rounded-full max-w-[100px] overflow-hidden">
-                                                    <div className="bg-emerald-500 h-full" style={{ width: `${s.attendance}%` }}></div>
-                                                </div>
-                                                <span className="text-[10px] text-gray-400">{s.attendance.toFixed(0)}%</span>
-                                            </td>
-                                            <td className="px-4 py-3 text-right">
+                                            <td className="px-2 py-3">
                                                 <span className={`font-bold ${s.avg >= 7 ? 'text-emerald-400' : 'text-red-400'}`}>
                                                     {s.avg.toFixed(1)}
                                                 </span>
                                             </td>
+                                            <td className="px-2 py-3">
+                                                <span className="text-gray-300">{s.attendance.toFixed(0)}%</span>
+                                            </td>
+                                            <td className="px-2 py-3 text-gray-400">{s.talk.toFixed(1)}</td>
+                                            <td className="px-2 py-3 text-gray-400">{s.sleep.toFixed(1)}</td>
+                                            <td className="px-2 py-3 text-gray-400">{s.bathroom.toFixed(1)}</td>
+                                            <td className="px-2 py-3 text-gray-400">{s.material.toFixed(1)}</td>
+                                            <td className="px-2 py-3 text-gray-400">{s.activity.toFixed(1)}</td>
+                                            <td className="px-2 py-3 text-gray-400">{s.phone.toFixed(1)}</td>
+                                            <td className="px-2 py-3 text-gray-400">{s.participation.toFixed(1)}</td>
                                         </tr>
                                     ))
                                 )}
@@ -781,6 +836,24 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 </div>
             )}
         </div>
+    );
+};
+
+const SortableHeader = ({ label, sortKey, currentSort, onSort, rounded }: { label: string, sortKey: string, currentSort: any, onSort: any, rounded?: boolean }) => {
+    const isActive = currentSort.key === sortKey;
+    return (
+        <th
+            className={`px-2 py-3 cursor-pointer hover:bg-gray-700 transition-colors ${rounded ? 'rounded-tr-lg' : ''}`}
+            onClick={() => onSort({ key: sortKey, direction: isActive && currentSort.direction === 'desc' ? 'asc' : 'desc' })}
+        >
+            <div className="flex items-center gap-1">
+                {label}
+                <div className="flex flex-col">
+                    <span className={`text-[6px] ${isActive && currentSort.direction === 'asc' ? 'text-emerald-400' : 'text-gray-600'}`}>▲</span>
+                    <span className={`text-[6px] ${isActive && currentSort.direction === 'desc' ? 'text-emerald-400' : 'text-gray-600'}`}>▼</span>
+                </div>
+            </div>
+        </th>
     );
 };
 
