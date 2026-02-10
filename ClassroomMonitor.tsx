@@ -85,6 +85,9 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
     const [historyModalOpen, setHistoryModalOpen] = useState(false);
     const [historySessions, setHistorySessions] = useState<ClassSession[]>([]);
 
+    // --- Unsaved Changes State ---
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
     // Close time dropdown on click outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -307,6 +310,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             r.studentId === studentId ? updater({ ...r }) : r
         );
         setSession({ ...session, records: newRecords });
+        setHasUnsavedChanges(true); // Mark as dirty
     };
 
     const handleCounter = (studentId: string, type: keyof Counters, delta: number) => {
@@ -398,10 +402,12 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             const success = await SupabaseService.saveSession(updatedSession, userEmail);
             if (success) {
                 onShowToast("Conteúdo de aula salvo no Supabase!");
+                setHasUnsavedChanges(false); // Saved successfully
             } else {
                 onShowToast("Aviso: Falha ao salvar no servidor. Verifique sua conexão.");
                 // Backup save to Storage anyway
                 StorageService.saveSession(updatedSession);
+                setHasUnsavedChanges(false); // Consider saved locally
             }
             setClassModalOpen(false);
             stopCamera();
@@ -500,21 +506,39 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         setSelectedClassId(sess.className);
         setSelectedSubject(sess.subject);
         setHistoryModalOpen(false);
+        setHasUnsavedChanges(false); // Loading a session resets dirty state
         onShowToast(`Aula de ${format(new Date(sess.date), "dd/MM")} carregada.`);
+    };
+
+    // --- Confirmation Helper ---
+    const checkUnsavedAndProceed = async (callback: () => void) => {
+        if (hasUnsavedChanges) {
+            const shouldSave = window.confirm("Você tem alterações não salvas nesta turma. Deseja SALVAR antes de prosseguir?");
+            if (shouldSave) {
+                await handleSave();
+            } else {
+                const proceedAnyway = window.confirm("Deseja realmente prosseguir SEM SALVAR as alterações atuais?");
+                if (!proceedAnyway) return;
+            }
+        }
+        setHasUnsavedChanges(false);
+        callback();
     };
 
     // --- New Class Logic ---
 
     const handleNewClass = () => {
-        if (session) {
-            StorageService.saveSession(session);
-            onShowToast("Aula anterior salva. Iniciando novo registro...");
+        checkUnsavedAndProceed(() => {
+            if (session) {
+                StorageService.saveSession(session);
+                onShowToast("Iniciando novo registro...");
 
-            // Reset Class Selection to force user to pick a new one, triggering initialization
-            setSelectedClassId('');
-            // Optional: Reset date to today if it was set to past
-            setSelectedDate(new Date().toISOString().split('T')[0]);
-        }
+                // Reset Class Selection to force user to pick a new one, triggering initialization
+                setSelectedClassId('');
+                // Optional: Reset date to today if it was set to past
+                setSelectedDate(new Date().toISOString().split('T')[0]);
+            }
+        });
     };
 
     // --- Main Save ---
@@ -524,9 +548,11 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             const success = await SupabaseService.saveSession(session, userEmail);
             if (success) {
                 onShowToast("Aula salva no Supabase com sucesso!");
+                setHasUnsavedChanges(false);
             } else {
                 onShowToast("Erro ao salvar no Supabase. Salvando localmente como backup.");
                 StorageService.saveSession(session);
+                setHasUnsavedChanges(false);
             }
         }
     };
@@ -534,7 +560,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
     if (!session) return <div className="text-white p-6">Carregando dados... Certifique-se de que há turmas e alunos cadastrados.</div>;
 
     return (
-        <div className="max-w-[1600px] mx-auto space-y-6 pb-24">
+        <div className="max-w-[1600px] mx-auto space-y-6 pb-40 lg:pb-24">
             {/* Top Header Filter Bar */}
             <div className="sticky top-0 z-20 bg-[#0f172a] p-4 rounded-xl border border-gray-800 flex flex-col xl:flex-row justify-between items-center gap-4 shadow-lg">
                 <div className="flex flex-wrap gap-4 items-center w-full xl:w-auto">
@@ -544,7 +570,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                             <input
                                 type="date"
                                 value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
+                                onChange={(e) => checkUnsavedAndProceed(() => setSelectedDate(e.target.value))}
                                 className="bg-[#1e293b] text-white text-sm border border-gray-700 rounded-lg p-2 pl-8 outline-none focus:border-emerald-500"
                             />
                             <Calendar size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -554,7 +580,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                         <label className="text-[10px] text-gray-500 font-bold uppercase mb-1">Professor</label>
                         <select
                             value={selectedTeacherId}
-                            onChange={(e) => setSelectedTeacherId(e.target.value)}
+                            onChange={(e) => checkUnsavedAndProceed(() => setSelectedTeacherId(e.target.value))}
                             disabled={userRole === UserRole.TEACHER}
                             className={`bg-[#1e293b] text-white text-sm border border-gray-700 rounded-lg p-2 outline-none focus:border-emerald-500 min-w-[150px] ${userRole === UserRole.TEACHER ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
@@ -565,7 +591,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                         <label className="text-[10px] text-gray-500 font-bold uppercase mb-1">Turma</label>
                         <select
                             value={selectedClassId}
-                            onChange={(e) => setSelectedClassId(e.target.value)}
+                            onChange={(e) => checkUnsavedAndProceed(() => setSelectedClassId(e.target.value))}
                             className="bg-[#1e293b] text-white text-sm border border-gray-700 rounded-lg p-2 outline-none focus:border-emerald-500 w-[120px]"
                         >
                             {availableClasses.length === 0 && <option value="">Sem turmas</option>}
@@ -576,7 +602,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                         <label className="text-[10px] text-gray-500 font-bold uppercase mb-1">Disciplina</label>
                         <select
                             value={selectedSubject}
-                            onChange={(e) => setSelectedSubject(e.target.value)}
+                            onChange={(e) => checkUnsavedAndProceed(() => setSelectedSubject(e.target.value))}
                             className="bg-[#1e293b] text-white text-sm border border-gray-700 rounded-lg p-2 outline-none focus:border-emerald-500 w-[130px]"
                         >
                             {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
@@ -805,9 +831,9 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             )}
 
             {/* Floating Action Bar */}
-            <div className="fixed bottom-0 left-0 lg:left-72 right-0 bg-[#0f172a] border-t border-gray-800 p-4 z-30 px-6">
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-4 max-w-[1600px] mx-auto">
-                    <div className="flex gap-3 w-full sm:w-auto">
+            <div className="fixed bottom-0 left-0 lg:left-72 right-0 bg-[#0f172a]/95 backdrop-blur-md border-t border-gray-800 p-4 z-30 px-4 sm:px-6">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 max-w-[1600px] mx-auto">
+                    <div className="flex flex-wrap gap-2 w-full md:w-auto justify-center sm:justify-start">
                         <button
                             onClick={handleOpenHistory}
                             className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800 hover:text-white transition-colors font-medium text-sm"
@@ -828,11 +854,11 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                         </button>
                     </div>
 
-                    <div className="flex gap-3 w-full sm:w-auto">
+                    <div className="flex flex-wrap gap-2 w-full md:w-auto justify-center sm:justify-end">
                         {/* New Class Register Button */}
                         <button
                             onClick={() => setClassModalOpen(true)}
-                            className="flex-1 sm:flex-none px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
+                            className="flex-1 sm:flex-none min-w-[140px] px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm"
                         >
                             <Plus size={18} />
                             Registrar Conteúdo
@@ -840,14 +866,14 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
                         <button
                             onClick={handleNewClass}
-                            className="flex-1 sm:flex-none px-6 py-2.5 bg-transparent border border-emerald-500 text-emerald-500 hover:bg-emerald-500/10 rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
+                            className="flex-1 sm:flex-none min-w-[140px] px-4 py-2.5 bg-transparent border border-emerald-500 text-emerald-500 hover:bg-emerald-500/10 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm"
                         >
                             <RefreshCw size={18} />
                             Nova Aula
                         </button>
                         <button
                             onClick={handleSave}
-                            className="flex-1 sm:flex-none px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-[#0f172a] rounded-lg font-bold shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all flex items-center justify-center gap-2"
+                            className="flex-1 sm:flex-none min-w-[120px] px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-[#0f172a] rounded-lg font-bold shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all flex items-center justify-center gap-2"
                         >
                             <Save size={18} />
                             Salvar

@@ -36,11 +36,13 @@ function App() {
     const storedRole = localStorage.getItem('educontrol_role');
     const storedEmail = localStorage.getItem('educontrol_email');
     const storedName = localStorage.getItem('educontrol_name');
+    const storedPhoto = localStorage.getItem('educontrol_photo');
 
     if (storedRole && storedEmail) {
       setUserRole(storedRole as UserRole);
       setUserEmail(storedEmail);
       if (storedName) setUserName(storedName);
+      if (storedPhoto) setUserPhoto(storedPhoto);
       setIsAuthenticated(true);
       // Only set default view if not already set (though re-render might reset state, view persistence is optional)
       if (storedRole === UserRole.COORDINATOR) setCurrentView('DASHBOARD');
@@ -56,16 +58,18 @@ function App() {
     setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
   };
 
-  const handleLogin = (role: UserRole, email: string, name?: string) => {
+  const handleLogin = (role: UserRole, email: string, name?: string, photoUrl?: string) => {
     setUserRole(role);
     setUserEmail(email);
     if (name) setUserName(name);
+    if (photoUrl) setUserPhoto(photoUrl);
     setIsAuthenticated(true);
 
     // Persist Session
     localStorage.setItem('educontrol_role', role);
     localStorage.setItem('educontrol_email', email);
     if (name) localStorage.setItem('educontrol_name', name);
+    if (photoUrl) localStorage.setItem('educontrol_photo', photoUrl);
 
     // Set initial view based on role
     if (role === UserRole.COORDINATOR) setCurrentView('DASHBOARD');
@@ -95,6 +99,7 @@ function App() {
     localStorage.removeItem('educontrol_role');
     localStorage.removeItem('educontrol_email');
     localStorage.removeItem('educontrol_name');
+    localStorage.removeItem('educontrol_photo');
   };
 
   const renderView = () => {
