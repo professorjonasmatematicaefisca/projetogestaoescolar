@@ -297,10 +297,10 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
     const getCellClass = (concept: Concept) => {
         const base = "border border-gray-900 text-center font-bold text-gray-800 text-xs py-1 px-1 h-10 align-middle ";
         switch (concept) {
-            case 'O': return base + "bg-[#00ff00]"; // Bright Green
-            case 'B': return base + "bg-[#92d050]"; // Light Green
-            case 'S': return base + "bg-[#ffff00]"; // Yellow
-            case 'I': return base + "bg-[#ff9900]"; // Orange
+            case 'O': return base + "bg-[#00FF00]"; // Bright Green
+            case 'B': return base + "bg-[#92D050]"; // Light Green
+            case 'S': return base + "bg-[#FFFF00]"; // Yellow
+            case 'I': return base + "bg-[#FF9900]"; // Orange
             default: return base + "bg-white";
         }
     };

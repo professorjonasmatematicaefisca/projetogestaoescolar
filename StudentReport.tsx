@@ -311,11 +311,23 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 return;
             }
 
+            // Ensure we are at the top to capture everything correctly
+            window.scrollTo(0, 0);
+
             const canvas = await html2canvas(element as HTMLElement, {
                 scale: 2, // Higher scale for better quality
                 useCORS: true, // For images
                 logging: false,
-                backgroundColor: '#0f172a' // Match background color
+                backgroundColor: '#0f172a', // Match background color
+                allowTaint: true,
+                foreignObjectRendering: false,
+                onclone: (clonedDoc) => {
+                    const clonedElement = clonedDoc.querySelector('.animate-in') as HTMLElement;
+                    if (clonedElement) {
+                        clonedElement.style.padding = '20px';
+                        clonedElement.style.background = '#0f172a';
+                    }
+                }
             });
 
             const imgData = canvas.toDataURL('image/png');
