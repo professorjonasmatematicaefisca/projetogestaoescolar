@@ -4,7 +4,7 @@ import { SupabaseService } from './services/supabaseService';
 import { GraduationCap, User, Lock, ArrowRight, Loader2, Eye, EyeOff, Zap, TrendingUp, Rocket } from 'lucide-react';
 
 interface LoginProps {
-    onLogin: (role: UserRole, email: string) => void;
+    onLogin: (role: UserRole, email: string, name?: string, photoUrl?: string) => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -24,7 +24,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             const result = await SupabaseService.loginUser(email, password);
 
             if (result.success && result.role && result.email) {
-                onLogin(result.role, result.email, result.name);
+                onLogin(result.role, result.email, result.name, result.photoUrl);
             } else {
                 // Fallback para as credenciais padrão se o login falhar
                 if (email === 'coordenador@gmail.com' && password === 'mudar123') {

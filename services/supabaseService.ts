@@ -329,7 +329,7 @@ export const SupabaseService = {
     },
 
     // --- AUTH ---
-    async loginUser(email: string, password: string): Promise<{ success: boolean; role?: UserRole; name?: string; email?: string }> {
+    async loginUser(email: string, password: string): Promise<{ success: boolean; role?: UserRole; name?: string; email?: string; photoUrl?: string }> {
         const { data, error } = await supabase
             .from('users')
             .select('*')
@@ -346,7 +346,8 @@ export const SupabaseService = {
             success: true,
             role: data.role as UserRole,
             name: data.name,
-            email: data.email
+            email: data.email,
+            photoUrl: data.photo_url
         };
     },
 

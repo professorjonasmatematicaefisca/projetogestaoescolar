@@ -20,6 +20,7 @@ function App() {
   const [userRole, setUserRole] = useState<UserRole>(UserRole.COORDINATOR);
   const [userEmail, setUserEmail] = useState<string>('');
   const [userName, setUserName] = useState<string>('');
+  const [userPhoto, setUserPhoto] = useState<string | undefined>(undefined);
   const [targetStudentId, setTargetStudentId] = useState<string | undefined>(undefined);
   const [isDark, setIsDark] = useState(false);
   const [toast, setToast] = useState<{ msg: string, visible: boolean }>({ msg: '', visible: false });
@@ -123,6 +124,7 @@ function App() {
         onLogout={handleLogout}
         isDark={isDark}
         toggleTheme={toggleTheme}
+        userPhoto={userPhoto}
       >
         {renderView()}
       </Layout>
