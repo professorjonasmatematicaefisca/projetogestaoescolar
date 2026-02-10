@@ -69,6 +69,7 @@ export const Layout: React.FC<LayoutProps> = ({
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-50 w-72 bg-[#0f172a] border-r border-gray-800 
         transform transition-transform duration-300 ease-in-out flex flex-col shadow-2xl
+        print:hidden
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         <div className="p-6 flex items-center justify-between border-b border-gray-800">
@@ -183,8 +184,8 @@ export const Layout: React.FC<LayoutProps> = ({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden h-screen bg-gray-900 relative">
-        <header className="lg:hidden h-16 bg-[#0f172a] border-b border-gray-800 flex items-center px-4 justify-between z-30 shrink-0">
+      <main className="flex-1 flex flex-col overflow-hidden h-screen bg-gray-900 relative print:h-auto print:overflow-visible print:bg-white">
+        <header className="lg:hidden h-16 bg-[#0f172a] border-b border-gray-800 flex items-center px-4 justify-between z-30 shrink-0 print:hidden">
           <div className="flex items-center gap-2">
             <GraduationCap className="text-emerald-500" size={24} />
             <h1 className="text-lg font-bold text-white">EduControl PRO</h1>
@@ -194,7 +195,7 @@ export const Layout: React.FC<LayoutProps> = ({
           </button>
         </header>
 
-        <div className="flex-1 overflow-auto p-4 lg:p-6 relative scroll-smooth">
+        <div className="flex-1 overflow-auto p-4 lg:p-6 relative scroll-smooth print:p-0 print:overflow-visible">
           {children}
         </div>
       </main>

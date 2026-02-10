@@ -296,12 +296,16 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
     // Helpers for Cell Styling
     const getCellClass = (concept: Concept) => {
         const base = "border border-gray-900 text-center font-bold text-gray-800 text-xs py-1 px-1 h-10 align-middle ";
+        return base;
+    };
+
+    const getConceptColor = (concept: Concept) => {
         switch (concept) {
-            case 'O': return base + "bg-[#00FF00]"; // Bright Green
-            case 'B': return base + "bg-[#92D050]"; // Light Green
-            case 'S': return base + "bg-[#FFFF00]"; // Yellow
-            case 'I': return base + "bg-[#FF9900]"; // Orange
-            default: return base + "bg-white";
+            case 'O': return "#00FF00"; // Bright Green
+            case 'B': return "#92D050"; // Light Green
+            case 'S': return "#FFFF00"; // Yellow
+            case 'I': return "#FF9900"; // Orange
+            default: return "#FFFFFF";
         }
     };
 
@@ -391,7 +395,7 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                 </div>
             ) : (
                 /* The Sheet - Designed for Print / PDF */
-                <div className="bg-white text-black p-6 md:p-8 min-h-[1000px] shadow-2xl print:shadow-none print:p-0 print:m-0 print:w-full max-w-[210mm] mx-auto">
+                <div className="bg-white text-black p-6 md:p-8 min-h-[1000px] shadow-2xl print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none max-w-[210mm] mx-auto overflow-visible">
 
                     {/* Header Info */}
                     <div className="flex justify-between items-end border-b-2 border-emerald-800 pb-2 mb-4">
@@ -414,10 +418,10 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                             <thead>
                                 <tr>
                                     <td className="border border-gray-400 bg-gray-100 p-1 px-2 font-bold text-gray-700">Legenda:</td>
-                                    <td className="border border-gray-400 bg-[#00ff00] p-1 px-3 font-bold text-center">Ótimo (O)</td>
-                                    <td className="border border-gray-400 bg-[#92d050] p-1 px-3 font-bold text-center">Bom (B)</td>
-                                    <td className="border border-gray-400 bg-[#ffff00] p-1 px-3 font-bold text-center">Satisfatório (S)</td>
-                                    <td className="border border-gray-400 bg-[#ff9900] p-1 px-3 font-bold text-center">Insatisfatório (I)</td>
+                                    <td className="border border-gray-400 p-1 px-3 font-bold text-center" style={{ backgroundColor: '#00FF00', WebkitPrintColorAdjust: 'exact' }}>Ótimo (O)</td>
+                                    <td className="border border-gray-400 p-1 px-3 font-bold text-center" style={{ backgroundColor: '#92D050', WebkitPrintColorAdjust: 'exact' }}>Bom (B)</td>
+                                    <td className="border border-gray-400 p-1 px-3 font-bold text-center" style={{ backgroundColor: '#FFFF00', WebkitPrintColorAdjust: 'exact' }}>Satisfatório (S)</td>
+                                    <td className="border border-gray-400 p-1 px-3 font-bold text-center" style={{ backgroundColor: '#FF9900', WebkitPrintColorAdjust: 'exact' }}>Insatisfatório (I)</td>
                                 </tr>
                             </thead>
                         </table>
@@ -481,17 +485,17 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                                             </td>
 
                                             {/* Concepts */}
-                                            <td className={getCellClass(row.comportamento)}>{row.comportamento}</td>
-                                            <td className={getCellClass(row.atencao)}>{row.atencao}</td>
+                                            <td className={getCellClass(row.comportamento)} style={{ backgroundColor: getConceptColor(row.comportamento), WebkitPrintColorAdjust: 'exact' }}>{row.comportamento}</td>
+                                            <td className={getCellClass(row.atencao)} style={{ backgroundColor: getConceptColor(row.atencao), WebkitPrintColorAdjust: 'exact' }}>{row.atencao}</td>
 
-                                            <td className={getCellClass(row.tarefas)}>{row.tarefas}</td>
-                                            <td className={getCellClass(row.atividades)}>{row.atividades}</td>
-                                            <td className={getCellClass(row.material)}>{row.material}</td>
+                                            <td className={getCellClass(row.tarefas)} style={{ backgroundColor: getConceptColor(row.tarefas), WebkitPrintColorAdjust: 'exact' }}>{row.tarefas}</td>
+                                            <td className={getCellClass(row.atividades)} style={{ backgroundColor: getConceptColor(row.atividades), WebkitPrintColorAdjust: 'exact' }}>{row.atividades}</td>
+                                            <td className={getCellClass(row.material)} style={{ backgroundColor: getConceptColor(row.material), WebkitPrintColorAdjust: 'exact' }}>{row.material}</td>
 
-                                            <td className={getCellClass(row.engajamento)}>{row.engajamento}</td>
-                                            <td className={getCellClass(row.autogestao)}>{row.autogestao}</td>
-                                            <td className={getCellClass(row.participacao)}>{row.participacao}</td>
-                                            <td className={getCellClass(row.abertura)}>{row.abertura}</td>
+                                            <td className={getCellClass(row.engajamento)} style={{ backgroundColor: getConceptColor(row.engajamento), WebkitPrintColorAdjust: 'exact' }}>{row.engajamento}</td>
+                                            <td className={getCellClass(row.autogestao)} style={{ backgroundColor: getConceptColor(row.autogestao), WebkitPrintColorAdjust: 'exact' }}>{row.autogestao}</td>
+                                            <td className={getCellClass(row.participacao)} style={{ backgroundColor: getConceptColor(row.participacao), WebkitPrintColorAdjust: 'exact' }}>{row.participacao}</td>
+                                            <td className={getCellClass(row.abertura)} style={{ backgroundColor: getConceptColor(row.abertura), WebkitPrintColorAdjust: 'exact' }}>{row.abertura}</td>
                                         </tr>
                                     ))
                                 )}
