@@ -26,8 +26,25 @@ function App() {
 
   // Theme Init
   useEffect(() => {
+    // 1. Theme Init
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setIsDark(true);
+    }
+
+    // 2. Session Restore from LocalStorage
+    const storedRole = localStorage.getItem('educontrol_role');
+    const storedEmail = localStorage.getItem('educontrol_email');
+    const storedName = localStorage.getItem('educontrol_name');
+
+    if (storedRole && storedEmail) {
+      setUserRole(storedRole as UserRole);
+      setUserEmail(storedEmail);
+      if (storedName) setUserName(storedName);
+      setIsAuthenticated(true);
+      // Only set default view if not already set (though re-render might reset state, view persistence is optional)
+      if (storedRole === UserRole.COORDINATOR) setCurrentView('DASHBOARD');
+      else if (storedRole === UserRole.TEACHER) setCurrentView('MONITORING');
+      else setCurrentView('OCCURRENCES');
     }
   }, []);
 
@@ -43,6 +60,12 @@ function App() {
     setUserEmail(email);
     if (name) setUserName(name);
     setIsAuthenticated(true);
+
+    // Persist Session
+    localStorage.setItem('educontrol_role', role);
+    localStorage.setItem('educontrol_email', email);
+    if (name) localStorage.setItem('educontrol_name', name);
+
     // Set initial view based on role
     if (role === UserRole.COORDINATOR) setCurrentView('DASHBOARD');
     else if (role === UserRole.TEACHER) setCurrentView('MONITORING');
@@ -66,6 +89,11 @@ function App() {
     setUserRole(UserRole.COORDINATOR); // Reset
     setUserEmail('');
     setUserName('');
+
+    // Clear Session
+    localStorage.removeItem('educontrol_role');
+    localStorage.removeItem('educontrol_email');
+    localStorage.removeItem('educontrol_name');
   };
 
   const renderView = () => {
