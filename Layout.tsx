@@ -23,7 +23,6 @@ interface LayoutProps {
   onLogout: () => void;
   isDark: boolean;
   toggleTheme: () => void;
-  toggleTheme: () => void;
   userPhoto?: string;
   userName?: string;
 }
@@ -33,7 +32,6 @@ export const Layout: React.FC<LayoutProps> = ({
   currentView,
   onViewChange,
   role,
-  onLogout,
   onLogout,
   userPhoto,
   userName
