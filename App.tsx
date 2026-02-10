@@ -125,6 +125,7 @@ function App() {
         isDark={isDark}
         toggleTheme={toggleTheme}
         userPhoto={userPhoto}
+        userName={userName}
       >
         {renderView()}
       </Layout>

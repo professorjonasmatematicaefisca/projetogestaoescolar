@@ -23,7 +23,9 @@ interface LayoutProps {
   onLogout: () => void;
   isDark: boolean;
   toggleTheme: () => void;
+  toggleTheme: () => void;
   userPhoto?: string;
+  userName?: string;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -32,7 +34,9 @@ export const Layout: React.FC<LayoutProps> = ({
   onViewChange,
   role,
   onLogout,
-  userPhoto
+  onLogout,
+  userPhoto,
+  userName
 }) => {
   const [isSidebarOpen, setSidebarOpen] = React.useState(false);
 
@@ -162,10 +166,10 @@ export const Layout: React.FC<LayoutProps> = ({
             )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">
-                {role === UserRole.COORDINATOR ? 'Coordenação' : role === UserRole.TEACHER ? 'Professor(a)' : 'Monitor(a)'}
+                {userName || (role === UserRole.COORDINATOR ? 'Coordenação' : role === UserRole.TEACHER ? 'Professor(a)' : 'Monitor(a)')}
               </p>
               <p className="text-xs text-gray-500 truncate">
-                Online
+                {role === UserRole.COORDINATOR ? 'Coordenador(a)' : role === UserRole.TEACHER ? 'Docente' : 'Monitoria'}
               </p>
             </div>
           </div>
