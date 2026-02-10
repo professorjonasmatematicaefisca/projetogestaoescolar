@@ -551,25 +551,29 @@ export const SupabaseService = {
     },
 
     // --- SOE NOTES (FOA) ---
-    async getStudentSOENote(studentId: string, year: number): Promise<string> {
+    async getStudentSOENote(studentId: string, year: number): Promise<{ note: string, signedBy: string }> {
         const { data, error } = await supabase
             .from('student_soe_notes')
-            .select('note')
+            .select('note, signed_by')
             .eq('student_id', studentId)
             .eq('year', year)
             .single();
 
-        if (error || !data) return '';
-        return data.note;
+        if (error || !data) return { note: '', signedBy: '' };
+        return {
+            note: data.note,
+            signedBy: data.signed_by || ''
+        };
     },
 
-    async saveStudentSOENote(studentId: string, year: number, note: string): Promise<boolean> {
+    async saveStudentSOENote(studentId: string, year: number, note: string, signedBy: string): Promise<boolean> {
         const { error } = await supabase
             .from('student_soe_notes')
             .upsert({
                 student_id: studentId,
                 year: year,
                 note: note,
+                signed_by: signedBy,
                 updated_at: new Date().toISOString()
             }, {
                 onConflict: 'student_id,year'

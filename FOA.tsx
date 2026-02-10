@@ -10,6 +10,8 @@ import { ptBR } from 'date-fns/locale';
 interface FOAProps {
     onShowToast: (msg: string) => void;
     currentUserRole?: UserRole;
+    userEmail?: string;
+    userName?: string;
 }
 
 // Concept Types
@@ -37,7 +39,7 @@ interface ObservationLog {
     hasPhotos: boolean;
 }
 
-export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole }) => {
+export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmail, userName }) => {
     const currentYear = new Date().getFullYear();
     const [classes, setClasses] = useState<ClassRoom[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
@@ -50,6 +52,7 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole }) => {
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [selectedYear, setSelectedYear] = useState<number>(currentYear);
     const [soeConsiderations, setSoeConsiderations] = useState<string>('');
+    const [lastSignedBy, setLastSignedBy] = useState<string>('');
     const [saving, setSaving] = useState(false);
 
     // Generate available years based on session history + current year
@@ -97,21 +100,26 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole }) => {
     useEffect(() => {
         if (selectedStudentId) {
             const loadNote = async () => {
-                const note = await SupabaseService.getStudentSOENote(selectedStudentId, selectedYear);
-                setSoeConsiderations(note);
+                const data = await SupabaseService.getStudentSOENote(selectedStudentId, selectedYear);
+                setSoeConsiderations(data.note);
+                setLastSignedBy(data.signedBy);
             };
             loadNote();
         } else {
             setSoeConsiderations('');
+            setLastSignedBy('');
         }
     }, [selectedStudentId, selectedYear]);
 
     const handleSaveConsiderations = async () => {
         if (!selectedStudentId) return;
         setSaving(true);
-        const success = await SupabaseService.saveStudentSOENote(selectedStudentId, selectedYear, soeConsiderations);
+        // Signature: if userName exists, use it.
+        const signature = userName || userEmail || "Sistema";
+        const success = await SupabaseService.saveStudentSOENote(selectedStudentId, selectedYear, soeConsiderations, signature);
         if (success) {
             onShowToast("Considerações salvas com sucesso!");
+            setLastSignedBy(signature);
         } else {
             onShowToast("Erro ao salvar considerações.");
         }
@@ -564,6 +572,11 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole }) => {
                             <div className="flex items-center gap-2">
                                 <Edit3 size={16} className="text-gray-600" />
                                 <h3 className="font-bold text-sm uppercase text-gray-800">Considerações Gerais / SOE</h3>
+                                {lastSignedBy && (
+                                    <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+                                        Assinado por: {lastSignedBy}
+                                    </span>
+                                )}
                             </div>
                             <div className="flex items-center gap-2 print:hidden">
                                 <span className="text-[10px] text-gray-500 uppercase mr-2">Campo Editável</span>

@@ -19,6 +19,7 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewState>('MONITORING');
   const [userRole, setUserRole] = useState<UserRole>(UserRole.COORDINATOR);
   const [userEmail, setUserEmail] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
   const [isDark, setIsDark] = useState(false);
   const [toast, setToast] = useState<{ msg: string, visible: boolean }>({ msg: '', visible: false });
 
@@ -36,9 +37,10 @@ function App() {
     setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
   };
 
-  const handleLogin = (role: UserRole, email: string) => {
+  const handleLogin = (role: UserRole, email: string, name?: string) => {
     setUserRole(role);
     setUserEmail(email);
+    if (name) setUserName(name);
     setIsAuthenticated(true);
     // Set initial view based on role
     if (role === UserRole.COORDINATOR) setCurrentView('DASHBOARD');
@@ -50,6 +52,7 @@ function App() {
     setIsAuthenticated(false);
     setUserRole(UserRole.COORDINATOR); // Reset
     setUserEmail('');
+    setUserName('');
   };
 
   const renderView = () => {
@@ -57,7 +60,7 @@ function App() {
       case 'MONITORING': return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole} />;
       case 'DASHBOARD': return <Dashboard />;
       case 'REPORTS': return <StudentReport onShowToast={showToast} currentUserRole={userRole} />;
-      case 'FOA': return <FOA onShowToast={showToast} currentUserRole={userRole} />;
+      case 'FOA': return <FOA onShowToast={showToast} currentUserRole={userRole} userEmail={userEmail} userName={userName} />;
       case 'OCCURRENCES': return <Occurrences onShowToast={showToast} />;
       case 'ADMIN': return <AdminPanel onShowToast={showToast} />;
       case 'SETTINGS': return <ChangePassword userEmail={userEmail} onShowToast={showToast} />;

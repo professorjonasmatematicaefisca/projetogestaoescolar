@@ -24,7 +24,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             const result = await SupabaseService.loginUser(email, password);
 
             if (result.success && result.role && result.email) {
-                onLogin(result.role, result.email);
+                onLogin(result.role, result.email, result.name);
             } else {
                 // Fallback para as credenciais padrão se o login falhar
                 if (email === 'coordenador@gmail.com' && password === 'mudar123') {
