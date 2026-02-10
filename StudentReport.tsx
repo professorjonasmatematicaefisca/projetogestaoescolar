@@ -13,11 +13,12 @@ import { UserRole, Student, ClassSession, ClassRoom } from './types';
 interface ReportProps {
     onShowToast: (msg: string) => void;
     currentUserRole?: UserRole;
+    initialStudentId?: string;
 }
 
 type ReportType = 'STUDENT' | 'CLASS' | 'COMPARE';
 
-export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserRole }) => {
+export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserRole, initialStudentId }) => {
     const [reportType, setReportType] = useState<ReportType>('STUDENT');
 
     // Data Sources
@@ -77,23 +78,32 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
         }
     }, [classes]);
 
-    // Init Student Selection based on filter
+    // Init Student Selection based on filter OR initialStudentId
     useEffect(() => {
-        // Only auto-select first student if filtered class changes or no student is selected
-        const filtered = studentFilterClass
-            ? students.filter(s => s.className === studentFilterClass)
-            : students;
-
-        if (filtered.length > 0) {
-            // Only force reset if the current selected student is NOT in the new list
-            const currentSelectedInList = filtered.find(s => s.id === selectedStudentId);
-            if (!currentSelectedInList) {
-                setSelectedStudentId(filtered[0].id);
+        if (initialStudentId && students.length > 0) {
+            const student = students.find(s => s.id === initialStudentId);
+            if (student) {
+                setStudentFilterClass(student.className);
+                setSelectedStudentId(student.id);
+                setReportType('STUDENT'); // Force student view
             }
         } else {
-            setSelectedStudentId('');
+            // Only auto-select first student if filtered class changes or no student is selected
+            const filtered = studentFilterClass
+                ? students.filter(s => s.className === studentFilterClass)
+                : students;
+
+            if (filtered.length > 0) {
+                // Only force reset if the current selected student is NOT in the new list
+                const currentSelectedInList = filtered.find(s => s.id === selectedStudentId);
+                if (!currentSelectedInList) {
+                    setSelectedStudentId(filtered[0].id);
+                }
+            } else {
+                setSelectedStudentId('');
+            }
         }
-    }, [studentFilterClass, students]);
+    }, [studentFilterClass, students, initialStudentId]);
 
 
     // --- HELPERS FOR DATA PROCESSING ---

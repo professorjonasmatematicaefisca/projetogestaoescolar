@@ -20,6 +20,7 @@ function App() {
   const [userRole, setUserRole] = useState<UserRole>(UserRole.COORDINATOR);
   const [userEmail, setUserEmail] = useState<string>('');
   const [userName, setUserName] = useState<string>('');
+  const [targetStudentId, setTargetStudentId] = useState<string | undefined>(undefined);
   const [isDark, setIsDark] = useState(false);
   const [toast, setToast] = useState<{ msg: string, visible: boolean }>({ msg: '', visible: false });
 
@@ -48,6 +49,18 @@ function App() {
     else setCurrentView('OCCURRENCES');
   };
 
+  // Helper to switch view and select student
+  const handleNavigateToStudent = (studentId: string) => {
+    setTargetStudentId(studentId);
+    setCurrentView('REPORTS');
+  };
+
+  // Reset when changing views manually
+  const handleViewChange = (view: ViewState) => {
+    if (view !== 'REPORTS') setTargetStudentId(undefined);
+    setCurrentView(view);
+  };
+
   const handleLogout = () => {
     setIsAuthenticated(false);
     setUserRole(UserRole.COORDINATOR); // Reset
@@ -58,8 +71,8 @@ function App() {
   const renderView = () => {
     switch (currentView) {
       case 'MONITORING': return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole} />;
-      case 'DASHBOARD': return <Dashboard />;
-      case 'REPORTS': return <StudentReport onShowToast={showToast} currentUserRole={userRole} />;
+      case 'DASHBOARD': return <Dashboard onNavigateToStudent={handleNavigateToStudent} />;
+      case 'REPORTS': return <StudentReport onShowToast={showToast} currentUserRole={userRole} initialStudentId={targetStudentId} />;
       case 'FOA': return <FOA onShowToast={showToast} currentUserRole={userRole} userEmail={userEmail} userName={userName} />;
       case 'OCCURRENCES': return <Occurrences onShowToast={showToast} />;
       case 'ADMIN': return <AdminPanel onShowToast={showToast} />;
@@ -76,7 +89,7 @@ function App() {
     <div className={isDark ? 'dark' : ''}>
       <Layout
         currentView={currentView}
-        onViewChange={setCurrentView}
+        onViewChange={handleViewChange}
         role={userRole}
         onRoleChange={setUserRole}
         onLogout={handleLogout}

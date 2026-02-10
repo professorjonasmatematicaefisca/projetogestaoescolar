@@ -42,8 +42,8 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   const menuItems = [
-    { view: 'MONITORING', icon: ClipboardList, label: 'Sala de Aula' },
     { view: 'DASHBOARD', icon: LayoutDashboard, label: 'Dashboard' },
+    { view: 'MONITORING', icon: ClipboardList, label: 'Sala de Aula' },
     { view: 'REPORTS', icon: GraduationCap, label: 'Relatórios' },
     { view: 'FOA', icon: FileText, label: 'FOA (Observação)' },
     { view: 'OCCURRENCES', icon: AlertTriangle, label: 'Ocorrências' },
