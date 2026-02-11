@@ -8,6 +8,7 @@ import { Occurrences } from './Occurrences';
 import { AdminPanel } from './AdminPanel';
 import { ChangePassword } from './ChangePassword';
 import { FOA } from './FOA';
+import { Planning } from './Planning';
 import { UserRole, ViewState } from './types';
 
 import { supabase } from './supabaseClient';
@@ -107,6 +108,7 @@ function App() {
       case 'MONITORING': return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole} />;
       case 'DASHBOARD': return <Dashboard onNavigateToStudent={handleNavigateToStudent} />;
       case 'REPORTS': return <StudentReport onShowToast={showToast} currentUserRole={userRole} initialStudentId={targetStudentId} />;
+      case 'PLANNING': return <Planning />;
       case 'FOA': return <FOA onShowToast={showToast} currentUserRole={userRole} userEmail={userEmail} userName={userName} />;
       case 'OCCURRENCES': return <Occurrences onShowToast={showToast} />;
       case 'ADMIN': return <AdminPanel onShowToast={showToast} />;

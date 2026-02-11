@@ -11,7 +11,10 @@ import {
   UserCircle,
   Settings,
   Lock,
-  FileText
+  Settings,
+  Lock,
+  FileText,
+  BookOpen
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -40,8 +43,8 @@ export const Layout: React.FC<LayoutProps> = ({
 
   // Define allowed views per role
   const rolePermissions: Record<UserRole, ViewState[]> = {
-    [UserRole.COORDINATOR]: ['MONITORING', 'DASHBOARD', 'REPORTS', 'OCCURRENCES', 'ADMIN', 'SETTINGS', 'FOA'],
-    [UserRole.TEACHER]: ['MONITORING', 'REPORTS', 'SETTINGS', 'FOA'],
+    [UserRole.COORDINATOR]: ['MONITORING', 'DASHBOARD', 'REPORTS', 'PLANNING', 'OCCURRENCES', 'ADMIN', 'SETTINGS', 'FOA'],
+    [UserRole.TEACHER]: ['MONITORING', 'REPORTS', 'PLANNING', 'SETTINGS', 'FOA'],
     [UserRole.MONITOR]: ['OCCURRENCES', 'SETTINGS']
   };
 
@@ -49,6 +52,7 @@ export const Layout: React.FC<LayoutProps> = ({
     { view: 'DASHBOARD', icon: LayoutDashboard, label: 'Dashboard' },
     { view: 'MONITORING', icon: ClipboardList, label: 'Sala de Aula' },
     { view: 'REPORTS', icon: GraduationCap, label: 'Relatórios' },
+    { view: 'PLANNING', icon: BookOpen, label: 'Planejamento' },
     { view: 'FOA', icon: FileText, label: 'FOA (Observação)' },
     { view: 'OCCURRENCES', icon: AlertTriangle, label: 'Ocorrências' },
   ] as const;
