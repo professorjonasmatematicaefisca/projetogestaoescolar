@@ -783,53 +783,58 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                                 />
                             </div>
 
-                            <div className="border border-gray-700 rounded-lg p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                    <label className="text-xs font-bold text-emerald-400 uppercase flex items-center gap-2">
-                                        <School size={14} />
-                                        Atribuições de Aulas
-                                    </label>
-                                    <button
-                                        type="button"
-                                        onClick={addAssignment}
-                                        className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center hover:bg-emerald-600 transition-all"
-                                    >
-                                        <Plus size={14} className="text-white" />
-                                    </button>
-                                </div>
 
-                                {staffForm.assignments.length === 0 ? (
-                                    <p className="text-xs text-gray-500 italic">Nenhuma atribuição.</p>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {staffForm.assignments.map((assignment, idx) => (
-                                            <div key={idx} className="flex gap-2">
-                                                <select
-                                                    value={assignment.classId}
-                                                    onChange={(e) => updateAssignment(idx, 'classId', e.target.value)}
-                                                    className="flex-1 bg-[#0f172a] border border-gray-700 rounded px-2 py-1.5 text-sm text-white outline-none focus:border-emerald-500"
-                                                >
-                                                    {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                                                </select>
-                                                <select
-                                                    value={assignment.subject}
-                                                    onChange={(e) => updateAssignment(idx, 'subject', e.target.value)}
-                                                    className="flex-1 bg-[#0f172a] border border-gray-700 rounded px-2 py-1.5 text-sm text-white outline-none focus:border-emerald-500"
-                                                >
-                                                    {disciplines.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-                                                </select>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeAssignment(idx)}
-                                                    className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded transition-all"
-                                                >
-                                                    <X size={14} />
-                                                </button>
-                                            </div>
-                                        ))}
+                            {/* Atribuições de Aulas - Apenas para Professor e Coordenador */}
+                            {staffForm.role !== UserRole.MONITOR && (
+                                <div className="border border-gray-700 rounded-lg p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <label className="text-xs font-bold text-emerald-400 uppercase flex items-center gap-2">
+                                            <School size={14} />
+                                            Atribuições de Aulas
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={addAssignment}
+                                            className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center hover:bg-emerald-600 transition-all"
+                                        >
+                                            <Plus size={14} className="text-white" />
+                                        </button>
                                     </div>
-                                )}
-                            </div>
+
+                                    {staffForm.assignments.length === 0 ? (
+                                        <p className="text-xs text-gray-500 italic">Nenhuma atribuição.</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {staffForm.assignments.map((assignment, idx) => (
+                                                <div key={idx} className="flex gap-2">
+                                                    <select
+                                                        value={assignment.classId}
+                                                        onChange={(e) => updateAssignment(idx, 'classId', e.target.value)}
+                                                        className="flex-1 bg-[#0f172a] border border-gray-700 rounded px-2 py-1.5 text-sm text-white outline-none focus:border-emerald-500"
+                                                    >
+                                                        {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                                    </select>
+                                                    <select
+                                                        value={assignment.subject}
+                                                        onChange={(e) => updateAssignment(idx, 'subject', e.target.value)}
+                                                        className="flex-1 bg-[#0f172a] border border-gray-700 rounded px-2 py-1.5 text-sm text-white outline-none focus:border-emerald-500"
+                                                    >
+                                                        {disciplines.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                                                    </select>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeAssignment(idx)}
+                                                        className="p-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white rounded transition-all"
+                                                    >
+                                                        <X size={14} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
 
                             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 flex items-start gap-2">
                                 <Lock size={16} className="text-yellow-500 mt-0.5" />
