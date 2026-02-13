@@ -630,6 +630,9 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                                         <span key={r} className="text-[10px] bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded border border-gray-700">{r}</span>
                                                     ))}
                                                 </div>
+                                                <p className="text-[10px] text-gray-500 mt-1.5">
+                                                    Registrado por: <span className="text-gray-400 font-medium">{exit.registeredBy || 'Sistema'}</span>
+                                                </p>
                                             </div>
                                         </div>
                                         <button
