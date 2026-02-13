@@ -147,9 +147,15 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
         }
 
         let successCount = 0;
+        let lastError = "";
+
         for (const studentId of selectedStudentIds) {
-            const success = await SupabaseService.registerExit(studentId, selectedExitReasons);
-            if (success) successCount++;
+            const { success, error } = await SupabaseService.registerExit(studentId, selectedExitReasons);
+            if (success) {
+                successCount++;
+            } else {
+                lastError = error || "Erro desconhecido";
+            }
         }
 
         if (successCount > 0) {
@@ -158,6 +164,9 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
             setOpenExits(open);
             setSelectedStudentIds([]);
             setSelectedExitReasons([]);
+        } else if (lastError) {
+            onShowToast(`Erro ao registrar: ${lastError}`);
+            console.error("Registration check failed:", lastError);
         }
     };
 

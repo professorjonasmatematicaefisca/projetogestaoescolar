@@ -588,7 +588,7 @@ export const SupabaseService = {
     },
 
     // --- STUDENT EXITS (SAÍDAS) ---
-    async registerExit(studentId: string, reasons: string[]): Promise<boolean> {
+    async registerExit(studentId: string, reasons: string[]): Promise<{ success: boolean; error?: string }> {
         const { error } = await supabase
             .from('student_exits')
             .insert({
@@ -599,9 +599,9 @@ export const SupabaseService = {
 
         if (error) {
             console.error("Error registering exit:", error);
-            return false;
+            return { success: false, error: error.message };
         }
-        return true;
+        return { success: true };
     },
 
     async registerReturn(exitId: string): Promise<boolean> {
