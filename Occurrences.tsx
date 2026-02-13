@@ -5,6 +5,8 @@ import { SupabaseService } from './services/supabaseService';
 import { AlertTriangle, Plus, X, Search, Heart, Shield, AlertCircle, ThumbsUp, Camera, Save, Filter, RefreshCw, Clock, LogOut, LogIn, CheckCircle, GraduationCap, BarChart3, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useEffect } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface OccurrencesProps {
     onShowToast: (msg: string) => void;
@@ -181,11 +183,14 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
             return;
         }
 
+        // Get logged user from localStorage
+        const loggedUser = localStorage.getItem('userName') || 'Sistema';
+
         let successCount = 0;
         let lastError = "";
 
         for (const studentId of selectedStudentIds) {
-            const { success, error } = await SupabaseService.registerExit(studentId, selectedExitReasons);
+            const { success, error } = await SupabaseService.registerExit(studentId, selectedExitReasons, loggedUser);
             if (success) {
                 successCount++;
             } else {
@@ -216,6 +221,49 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
             setOpenExits(open);
             setExitHistory(hist);
         }
+    };
+
+    const generateStudentPDF = (student: Student) => {
+        const doc = new jsPDF();
+
+        // Header
+        doc.setFontSize(18);
+        doc.setTextColor(16, 185, 129); // Emerald color
+        doc.text('Relatório de Saídas - Monitoria', 14, 20);
+
+        // Student Info
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Aluno: ${student.name}`, 14, 35);
+        doc.text(`Turma: ${student.className}`, 14, 42);
+        doc.text(`Data de Geração: ${new Date().toLocaleDateString('pt-BR')}`, 14, 49);
+
+        // Filter student exits
+        const studentExits = exitHistory.filter(exit => exit.studentId === student.id);
+
+        // Table data
+        const tableData = studentExits.map(exit => [
+            new Date(exit.exitTime).toLocaleDateString('pt-BR'),
+            new Date(exit.exitTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            exit.returnTime ? new Date(exit.returnTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-',
+            exit.reasons.join(', '),
+            formatDuration(exit.exitTime, exit.returnTime),
+            exit.registeredBy || 'Sistema'
+        ]);
+
+        // Generate table
+        autoTable(doc, {
+            head: [['Data', 'Saída', 'Retorno', 'Motivo', 'Tempo', 'Registrado por']],
+            body: tableData,
+            startY: 60,
+            theme: 'grid',
+            headStyles: { fillColor: [16, 185, 129] },
+            styles: { fontSize: 9 }
+        });
+
+        // Save PDF
+        doc.save(`relatorio_${student.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+        onShowToast('PDF gerado com sucesso!');
     };
 
     const formatDuration = (start: string, end?: string) => {
@@ -879,9 +927,18 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                     <p className="text-gray-400">{selectedStudentForModal.className}</p>
                                 </div>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white">
-                                <X size={24} />
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => generateStudentPDF(selectedStudentForModal)}
+                                    className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 font-bold text-sm"
+                                >
+                                    <Save size={16} />
+                                    Gerar PDF
+                                </button>
+                                <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white">
+                                    <X size={24} />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Histórico Completo */}
@@ -894,6 +951,7 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                         <th className="pb-3">Horário Saída</th>
                                         <th className="pb-3">Horário Retorno</th>
                                         <th className="pb-3">Motivo</th>
+                                        <th className="pb-3">Registrado por</th>
                                         <th className="pb-3 text-right pr-4">Tempo Total</th>
                                     </tr>
                                 </thead>
@@ -913,6 +971,7 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                                     {exit.returnTime ? new Date(exit.returnTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-'}
                                                 </td>
                                                 <td className="py-3 text-gray-400 text-xs">{exit.reasons.join(', ')}</td>
+                                                <td className="py-3 text-gray-400 text-xs">{exit.registeredBy || 'Sistema'}</td>
                                                 <td className="py-3 text-right pr-4">
                                                     <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">
                                                         {formatDuration(exit.exitTime, exit.returnTime)}

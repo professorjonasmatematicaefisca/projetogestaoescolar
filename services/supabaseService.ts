@@ -588,13 +588,14 @@ export const SupabaseService = {
     },
 
     // --- STUDENT EXITS (SAÍDAS) ---
-    async registerExit(studentId: string, reasons: string[]): Promise<{ success: boolean; error?: string }> {
+    async registerExit(studentId: string, reasons: string[], registeredBy: string = 'Sistema'): Promise<{ success: boolean; error?: string }> {
         const { error } = await supabase
             .from('student_exits')
             .insert({
                 student_id: studentId,
                 reasons: reasons,
-                exit_time: new Date().toISOString()
+                exit_time: new Date().toISOString(),
+                registered_by: registeredBy
             });
 
         if (error) {
@@ -643,7 +644,8 @@ export const SupabaseService = {
             className: e.student?.class_name,
             reasons: e.reasons,
             exitTime: e.exit_time,
-            returnTime: e.return_time
+            returnTime: e.return_time,
+            registeredBy: e.registered_by
         }));
     },
 
@@ -671,7 +673,8 @@ export const SupabaseService = {
             className: e.student?.class_name,
             reasons: e.reasons,
             exitTime: e.exit_time,
-            returnTime: e.return_time
+            returnTime: e.return_time,
+            registeredBy: e.registered_by
         }));
     }
 };

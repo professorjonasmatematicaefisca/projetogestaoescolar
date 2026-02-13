@@ -118,6 +118,7 @@ export interface StudentExit {
   reasons: string[];
   exitTime: string;
   returnTime?: string;
+  registeredBy?: string; // Who registered this exit
 }
 
 export type ViewState = 'MONITORING' | 'DASHBOARD' | 'REPORTS' | 'OCCURRENCES' | 'ADMIN' | 'SETTINGS' | 'FOA' | 'PLANNING';
