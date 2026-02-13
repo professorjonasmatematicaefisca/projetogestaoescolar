@@ -109,4 +109,15 @@ export interface Occurrence {
   reportedBy: string;
 }
 
+export interface StudentExit {
+  id: string;
+  studentId: string;
+  studentName?: string; // For UI convenience
+  studentPhoto?: string; // For UI convenience
+  className?: string;   // For UI convenience
+  reasons: string[];
+  exitTime: string;
+  returnTime?: string;
+}
+
 export type ViewState = 'MONITORING' | 'DASHBOARD' | 'REPORTS' | 'OCCURRENCES' | 'ADMIN' | 'SETTINGS' | 'FOA' | 'PLANNING';

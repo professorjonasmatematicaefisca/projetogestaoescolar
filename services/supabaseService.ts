@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { Student, ClassRoom, Teacher, Occurrence, ClassSession, SessionRecord, UserRole } from '../types';
+import { Student, ClassRoom, Teacher, Occurrence, ClassSession, SessionRecord, UserRole, StudentExit } from '../types';
 import { SEED_STUDENTS, SEED_CLASSES, SEED_TEACHERS, SEED_OCCURRENCES } from './mockData';
 
 export const SupabaseService = {
@@ -585,5 +585,93 @@ export const SupabaseService = {
             return false;
         }
         return true;
+    },
+
+    // --- STUDENT EXITS (SAÍDAS) ---
+    async registerExit(studentId: string, reasons: string[]): Promise<boolean> {
+        const { error } = await supabase
+            .from('student_exits')
+            .insert({
+                student_id: studentId,
+                reasons: reasons,
+                exit_time: new Date().toISOString()
+            });
+
+        if (error) {
+            console.error("Error registering exit:", error);
+            return false;
+        }
+        return true;
+    },
+
+    async registerReturn(exitId: string): Promise<boolean> {
+        const { error } = await supabase
+            .from('student_exits')
+            .update({
+                return_time: new Date().toISOString()
+            })
+            .eq('id', exitId);
+
+        if (error) {
+            console.error("Error registering return:", error);
+            return false;
+        }
+        return true;
+    },
+
+    async getOpenExits(): Promise<StudentExit[]> {
+        const { data, error } = await supabase
+            .from('student_exits')
+            .select(`
+                *,
+                student:student_id (name, photo_url, class_name)
+            `)
+            .is('return_time', null)
+            .order('exit_time', { ascending: false });
+
+        if (error) {
+            console.error("Error fetching open exits:", error);
+            // Fallback for demo/dev if table doesn't exist
+            return [];
+        }
+
+        return data.map((e: any) => ({
+            id: e.id,
+            studentId: e.student_id,
+            studentName: e.student?.name,
+            studentPhoto: e.student?.photo_url,
+            className: e.student?.class_name,
+            reasons: e.reasons,
+            exitTime: e.exit_time,
+            returnTime: e.return_time
+        }));
+    },
+
+    async getExitHistory(): Promise<StudentExit[]> {
+        const { data, error } = await supabase
+            .from('student_exits')
+            .select(`
+                *,
+                student:student_id (name, photo_url, class_name)
+            `)
+            .not('return_time', 'is', null) // Only completed exits
+            .order('exit_time', { ascending: false })
+            .limit(50); // Limit to recent 50
+
+        if (error) {
+            console.error("Error fetching exit history:", error);
+            return [];
+        }
+
+        return data.map((e: any) => ({
+            id: e.id,
+            studentId: e.student_id,
+            studentName: e.student?.name,
+            studentPhoto: e.student?.photo_url,
+            className: e.student?.class_name,
+            reasons: e.reasons,
+            exitTime: e.exit_time,
+            returnTime: e.return_time
+        }));
     }
 };
