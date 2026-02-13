@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Occurrence, OccurrenceType, OccurrenceStatus, Student, ClassRoom, StudentExit } from './types';
 import { StorageService } from './services/storageService';
 import { SupabaseService } from './services/supabaseService';
-import { AlertTriangle, Plus, X, Search, Heart, Shield, AlertCircle, ThumbsUp, Camera, Save, Filter, RefreshCw, Clock, LogOut, LogIn, CheckCircle } from 'lucide-react';
+import { AlertTriangle, Plus, X, Search, Heart, Shield, AlertCircle, ThumbsUp, Camera, Save, Filter, RefreshCw, Clock, LogOut, LogIn, CheckCircle, GraduationCap, BarChart3, Calendar } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useEffect } from 'react';
 
 interface OccurrencesProps {
@@ -21,25 +22,42 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
     const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
     const [status, setStatus] = useState<OccurrenceStatus>(OccurrenceStatus.OPEN);
 
-    // Exits State
-    const [activeTab, setActiveTab] = useState<'OCCURRENCES' | 'EXITS'>('OCCURRENCES');
+    // Monitoria State
+    const [activeTab, setActiveTab] = useState<'OCCURRENCES' | 'EXITS' | 'REPORTS'>('OCCURRENCES');
+
+    // Data State
     const [openExits, setOpenExits] = useState<StudentExit[]>([]);
     const [exitHistory, setExitHistory] = useState<StudentExit[]>([]);
+    const [classes, setClasses] = useState<ClassRoom[]>([]);
+
+    // Filters & Selection
+    const [selectedClassId, setSelectedClassId] = useState<string>('');
     const [selectedExitReasons, setSelectedExitReasons] = useState<string[]>([]);
-    const EXIT_REASONS = ['Banheiro', 'Água', 'Coordenação', 'Enfermaria', 'Diretoria'];
+
+    // Filters & Selection
+
+    // Reports State
+    const [reportDateRange, setReportDateRange] = useState({ start: '', end: '' });
+    const [reportClassId, setReportClassId] = useState('');
+    const [reportStudentId, setReportStudentId] = useState('');
+
+    const EXIT_REASONS = ['Banheiro', 'Água', 'Coordenação', 'Enfermaria', 'Diretoria', 'Apoio Pedagógico'];
+    const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
-                const [obs, sts, open, hist] = await Promise.all([
+                const [obs, sts, cls, open, hist] = await Promise.all([
                     SupabaseService.getOccurrences(),
                     SupabaseService.getStudents(),
+                    SupabaseService.getClasses(),
                     SupabaseService.getOpenExits(),
                     SupabaseService.getExitHistory()
                 ]);
                 setOccurrences(obs);
                 setStudents(sts);
+                setClasses(cls);
                 setOpenExits(open);
                 setExitHistory(hist);
             } catch (error) {
@@ -51,6 +69,48 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
         };
         fetchData();
     }, []);
+
+    const filteredStudents = selectedClassId
+        ? students.filter(s => s.className === classes.find(c => c.id === selectedClassId)?.name)
+        : students;
+
+    // Report Data Generation
+    const getReportData = () => {
+        // Filter history based on date and class
+        let filteredHistory = [...exitHistory];
+
+        if (reportClassId) {
+            filteredHistory = filteredHistory.filter(h => h.className === classes.find(c => c.id === reportClassId)?.name);
+        }
+
+        if (reportStudentId) {
+            filteredHistory = filteredHistory.filter(h => h.studentId === reportStudentId);
+        }
+
+        // Basic stats
+        const totalExits = filteredHistory.length;
+        const totalTime = filteredHistory.reduce((acc, curr) => {
+            if (!curr.returnTime) return acc;
+            const start = new Date(curr.exitTime).getTime();
+            const end = new Date(curr.returnTime).getTime();
+            return acc + (end - start);
+        }, 0);
+        const avgTime = totalExits > 0 ? Math.round((totalTime / 60000) / totalExits) : 0;
+
+        // Charts Data
+        const reasonCounts = filteredHistory.reduce((acc, curr) => {
+            curr.reasons.forEach(r => {
+                acc[r] = (acc[r] || 0) + 1;
+            });
+            return acc;
+        }, {} as Record<string, number>);
+
+        const pieData = Object.entries(reasonCounts).map(([name, value]) => ({ name, value }));
+
+        return { totalExits, avgTime, pieData, filteredHistory };
+    };
+
+    const reportData = getReportData();
 
     const handleCreate = async () => {
         if (!newDesc || selectedStudentIds.length === 0) return;
@@ -148,45 +208,35 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                 <div>
                     <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
-                        <span>Gestão Central</span>
+                        <span>Gestão Escolar</span>
                         <span>/</span>
-                        <span className="text-emerald-500 font-bold">Controle e Monitoramento</span>
+                        <span className="text-emerald-500 font-bold">Monitoria</span>
                     </div>
                     <div className="flex items-center gap-4">
-                        <h2 className="text-3xl font-bold text-white">Central de Controle</h2>
+                        <h2 className="text-3xl font-bold text-white">Central de Monitoria</h2>
                         <div className="flex bg-[#1e293b] rounded-lg p-1 border border-gray-700">
-                            <button
-                                onClick={() => setActiveTab('OCCURRENCES')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${activeTab === 'OCCURRENCES'
-                                    ? 'bg-emerald-500 text-[#0f172a]'
-                                    : 'text-gray-400 hover:text-white'
-                                    }`}
-                            >
-                                OCORRÊNCIAS
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('EXITS')}
-                                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors ${activeTab === 'EXITS'
-                                    ? 'bg-emerald-500 text-[#0f172a]'
-                                    : 'text-gray-400 hover:text-white'
-                                    }`}
-                            >
-                                SAÍDAS
-                            </button>
+                            {[
+                                { id: 'OCCURRENCES', label: 'OCORRÊNCIAS', icon: AlertTriangle },
+                                { id: 'EXITS', label: 'SAÍDAS', icon: LogOut },
+                                { id: 'REPORTS', label: 'RELATÓRIOS', icon: BarChart3 }
+                            ].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id as any)}
+                                    className={`px-4 py-1.5 rounded-md text-sm font-bold transition-colors flex items-center gap-2 ${activeTab === tab.id
+                                        ? 'bg-emerald-500 text-[#0f172a]'
+                                        : 'text-gray-400 hover:text-white'
+                                        }`}
+                                >
+                                    <tab.icon size={14} />
+                                    {tab.label}
+                                </button>
+                            ))}
                         </div>
                     </div>
-                    <p className="text-gray-400 mt-1">
-                        {activeTab === 'OCCURRENCES'
-                            ? "Sistema de alta performance para monitoramento escolar e gestão comportamental."
-                            : "Registro e monitoramento de saídas de alunos em tempo real."}
-                    </p>
                 </div>
 
                 <div className="flex gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                        <input type="text" placeholder="Buscar ID do aluno..." className="bg-[#1e293b] text-white pl-10 pr-4 py-2.5 rounded-lg border border-gray-700 outline-none focus:border-emerald-500 w-64" />
-                    </div>
                     <button className="bg-emerald-500 text-[#0f172a] px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-400 transition-colors">
                         <AlertCircle size={18} />
                         Alerta SOS
@@ -197,7 +247,126 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                 </div>
             </div>
 
-            {activeTab === 'EXITS' ? (
+            {activeTab === 'REPORTS' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                    {/* Filters */}
+                    <div className="bg-[#0f172a] border border-gray-800 rounded-xl p-6 shadow-lg">
+                        <div className="flex flex-col md:flex-row gap-4 items-end">
+                            <div className="flex-1">
+                                <label className="block text-gray-400 text-xs font-bold uppercase mb-2">Filtrar por Turma</label>
+                                <select
+                                    className="w-full bg-[#1e293b] border border-gray-700 rounded-lg py-2.5 px-4 text-white outline-none focus:border-emerald-500"
+                                    value={reportClassId}
+                                    onChange={(e) => setReportClassId(e.target.value)}
+                                >
+                                    <option value="">Todas as Turmas</option>
+                                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-gray-400 text-xs font-bold uppercase mb-2">Período</label>
+                                <div className="flex gap-2">
+                                    <input type="date" className="w-full bg-[#1e293b] border border-gray-700 rounded-lg py-2.5 px-4 text-white" />
+                                    <input type="date" className="w-full bg-[#1e293b] border border-gray-700 rounded-lg py-2.5 px-4 text-white" />
+                                </div>
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-gray-400 text-xs font-bold uppercase mb-2">Aluno (Opcional)</label>
+                                <select
+                                    className="w-full bg-[#1e293b] border border-gray-700 rounded-lg py-2.5 px-4 text-white outline-none focus:border-emerald-500"
+                                    value={reportStudentId}
+                                    onChange={(e) => setReportStudentId(e.target.value)}
+                                >
+                                    <option value="">Todos os Alunos</option>
+                                    {students
+                                        .filter(s => !reportClassId || s.className === classes.find(c => c.id === reportClassId)?.name)
+                                        .map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+                            <button className="px-6 py-2.5 bg-emerald-500 text-[#0f172a] font-bold rounded-lg hover:bg-emerald-400 transition-colors">
+                                <Filter size={18} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Dashboard Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-[#1e293b] border border-gray-700 rounded-xl p-6">
+                            <h4 className="text-gray-400 text-xs font-bold uppercase mb-2">Total de Saídas</h4>
+                            <p className="text-4xl font-bold text-white text-emerald-500">{reportData.totalExits}</p>
+                        </div>
+                        <div className="bg-[#1e293b] border border-gray-700 rounded-xl p-6">
+                            <h4 className="text-gray-400 text-xs font-bold uppercase mb-2">Tempo Médio Fora</h4>
+                            <p className="text-4xl font-bold text-white text-blue-500">{reportData.avgTime}<span className="text-lg text-gray-500 ml-1">min</span></p>
+                        </div>
+                        <div className="bg-[#1e293b] border border-gray-700 rounded-xl p-6">
+                            <h4 className="text-gray-400 text-xs font-bold uppercase mb-2">Motivo Principal</h4>
+                            <p className="text-4xl font-bold text-white text-orange-500">
+                                {reportData.pieData.sort((a, b) => Number(b.value) - Number(a.value))[0]?.name || '-'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Charts */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-[#0f172a] border border-gray-800 rounded-xl p-6 shadow-lg h-[400px]">
+                            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                                <BarChart3 className="text-emerald-500" size={20} />
+                                Motivos de Saída
+                            </h3>
+                            <ResponsiveContainer width="100%" height="85%">
+                                <PieChart>
+                                    <Pie
+                                        data={reportData.pieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={100}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        {reportData.pieData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#374151', color: '#fff' }} />
+                                    <Legend />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        <div className="bg-[#0f172a] border border-gray-800 rounded-xl p-6 shadow-lg">
+                            <h3 className="text-lg font-bold text-white mb-6">Histórico Detalhado</h3>
+                            <div className="overflow-y-auto max-h-[300px]">
+                                <table className="w-full text-left">
+                                    <thead className="sticky top-0 bg-[#0f172a]">
+                                        <tr className="text-[10px] text-gray-500 font-bold uppercase border-b border-gray-800">
+                                            <th className="pb-3 pl-4">Aluno</th>
+                                            <th className="pb-3">Turma</th>
+                                            <th className="pb-3">Motivo</th>
+                                            <th className="pb-3">Tempo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-sm">
+                                        {reportData.filteredHistory.map(h => (
+                                            <tr key={h.id} className="border-b border-gray-800/50">
+                                                <td className="py-3 pl-4 text-gray-300">{h.studentName}</td>
+                                                <td className="py-3 text-gray-400 text-xs">{h.className || '-'}</td>
+                                                <td className="py-3 text-gray-400 text-xs">{h.reasons.join(', ')}</td>
+                                                <td className="py-3 text-emerald-500 font-bold text-xs">
+                                                    {formatDuration(h.exitTime, h.returnTime)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'EXITS' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4">
                     {/* Exits: New Registration */}
                     <div className="lg:col-span-1 space-y-6">
@@ -207,11 +376,27 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                 <h3>Nova Saída</h3>
                             </div>
 
+                            {/* Class Filter */}
+                            <div className="mb-4">
+                                <label className="block text-gray-400 text-xs font-bold uppercase mb-2">Filtrar Turma</label>
+                                <select
+                                    className="w-full bg-[#1e293b] border border-gray-700 rounded-lg py-2 px-3 text-white text-sm outline-none focus:border-emerald-500"
+                                    value={selectedClassId}
+                                    onChange={(e) => {
+                                        setSelectedClassId(e.target.value);
+                                        setSelectedStudentIds([]); // clear selection on class change
+                                    }}
+                                >
+                                    <option value="">Todas as Turmas</option>
+                                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
+
                             {/* Student Selection (Simplified Reuse) */}
                             <div className="mb-4">
                                 <label className="block text-gray-400 text-xs font-bold uppercase mb-2">Selecione o Aluno</label>
                                 <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 bg-[#1e293b] rounded-lg p-2 border border-gray-700">
-                                    {students.map(s => (
+                                    {filteredStudents.map(s => (
                                         <div
                                             key={s.id}
                                             onClick={() => {
@@ -229,6 +414,7 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                             <img src={s.photoUrl} className="w-8 h-8 rounded-full" />
                                             <div className="flex-1">
                                                 <p className="text-sm font-bold text-white">{s.name}</p>
+                                                <p className="text-[10px] text-gray-500">{s.className}</p>
                                             </div>
                                             {selectedStudentIds.includes(s.id) && <CheckCircle size={14} className="text-emerald-500" />}
                                         </div>
@@ -375,7 +561,10 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                         </div>
                     </div>
                 </div>
-            ) : (
+            )}
+
+            {activeTab === 'OCCURRENCES' && (
+                // Existing Occurrences Layout (Wrapped)
                 <>
                     {/* Existing Occurrences Layout */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 animate-in fade-in slide-in-from-bottom-4">

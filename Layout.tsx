@@ -11,8 +11,7 @@ import {
   UserCircle,
   Settings,
   Lock,
-  Settings,
-  Lock,
+
   FileText,
   BookOpen
 } from 'lucide-react';
@@ -54,7 +53,7 @@ export const Layout: React.FC<LayoutProps> = ({
     { view: 'REPORTS', icon: GraduationCap, label: 'Relatórios' },
     { view: 'PLANNING', icon: BookOpen, label: 'Planejamento' },
     { view: 'FOA', icon: FileText, label: 'FOA (Observação)' },
-    { view: 'OCCURRENCES', icon: AlertTriangle, label: 'Ocorrências' },
+    { view: 'OCCURRENCES', icon: AlertTriangle, label: 'Monitoria' }, // Renamed from Ocorrências
   ] as const;
 
   const allowedViews = rolePermissions[role] || [];
