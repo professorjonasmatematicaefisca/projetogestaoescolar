@@ -35,6 +35,7 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
     // Launch form
     const [formBimestre, setFormBimestre] = useState('1');
     const [formExamType, setFormExamType] = useState<string>('P1');
+    const [formTeacherId, setFormTeacherId] = useState('');
     const [formClassId, setFormClassId] = useState('');
     const [formDisciplineId, setFormDisciplineId] = useState('');
     const [selectedModules, setSelectedModules] = useState<{ moduleId: string; orientation: string }[]>([]);
@@ -66,7 +67,10 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
             const currentTeacher = teachers.find(t => t.email === userEmail);
             const actualAssignments = currentTeacher?.assignments || [];
             setTeacherAssignments(actualAssignments);
-            if (currentTeacher) setCurrentTeacherId(currentTeacher.id);
+            if (currentTeacher) {
+                setCurrentTeacherId(currentTeacher.id);
+                setFormTeacherId(currentTeacher.id);
+            }
 
             // Load planning modules
             const mods = await SupabaseService.getPlanningModules();
@@ -128,13 +132,19 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
             return;
         }
 
+        const teacherToSave = userRole === UserRole.COORDINATOR ? formTeacherId : currentTeacherId;
+        if (!teacherToSave) {
+            onShowToast('Selecione um professor para realizar o lançamento.');
+            return;
+        }
+
         let savedCount = 0;
         for (const sel of selectedModules) {
             const mod = planningModules.find(m => m.id === sel.moduleId);
             if (!mod) continue;
 
             const result = await SupabaseService.saveStudyGuideItem({
-                teacherId: currentTeacherId,
+                teacherId: teacherToSave,
                 disciplineId: mod.disciplineId,
                 classId: mod.classId,
                 moduleId: sel.moduleId,
@@ -322,7 +332,24 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
                     {/* Config selectors */}
                     <div className="bg-[#0f172a] rounded-3xl border border-gray-800 shadow-2xl p-6">
                         <h3 className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-4">Configuração da Prova</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                            {userRole === UserRole.COORDINATOR && (
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2">Professor</label>
+                                    <select
+                                        className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-indigo-500/50 transition-all outline-none font-bold text-sm"
+                                        value={formTeacherId}
+                                        onChange={e => {
+                                            setFormTeacherId(e.target.value);
+                                            setFormClassId('');
+                                            setFormDisciplineId('');
+                                        }}
+                                    >
+                                        <option value="">Selecione...</option>
+                                        {allTeachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                    </select>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2">Bimestre</label>
                                 <select className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-indigo-500/50 transition-all outline-none font-bold text-sm" value={formBimestre} onChange={e => setFormBimestre(e.target.value)}>
@@ -342,47 +369,56 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
                                 <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2">Turma</label>
                                 <select className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-indigo-500/50 transition-all outline-none font-bold text-sm" value={formClassId} onChange={e => setFormClassId(e.target.value)}>
                                     <option value="">Selecione...</option>
-                                    {(userRole === UserRole.TEACHER ? myClasses : classes).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    {(userRole === UserRole.TEACHER ? (myClasses.length > 0 ? myClasses : classes) : classes).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2">Disciplina</label>
                                 <select className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-indigo-500/50 transition-all outline-none font-bold text-sm" value={formDisciplineId} onChange={e => setFormDisciplineId(e.target.value)}>
                                     <option value="">Selecione...</option>
-                                    {(userRole === UserRole.TEACHER ? myDisciplines : disciplines).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                    {(userRole === UserRole.TEACHER ? (myDisciplines.length > 0 ? myDisciplines : disciplines) : disciplines).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                                 </select>
                             </div>
                         </div>
                     </div>
 
                     {/* Available content from planning */}
-                    {formClassId && formDisciplineId && (
-                        <div className="bg-[#0f172a] rounded-3xl border border-gray-800 shadow-2xl p-6">
-                            <h3 className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                <BookOpen size={14} />
-                                Conteúdos do Planejamento Disponíveis
-                            </h3>
-                            {availableModules.length === 0 ? (
-                                <p className="text-center text-gray-600 italic text-sm py-6">Nenhum conteúdo disponível para esta seleção.</p>
-                            ) : (
-                                <div className="flex flex-wrap gap-2">
-                                    {availableModules.map(mod => (
-                                        <button
-                                            key={mod.id}
-                                            onClick={() => handleAddModule(mod.id)}
-                                            className="group flex items-center gap-2 bg-gray-800/50 hover:bg-indigo-500/10 border border-gray-700 hover:border-indigo-500/30 rounded-xl px-4 py-2.5 transition-all"
-                                        >
-                                            <Tag size={12} className="text-indigo-400" />
-                                            <span className="text-xs font-bold text-gray-300 group-hover:text-indigo-300">
-                                                Cap. {mod.chapter} — Mod. {mod.module} — {mod.title}
-                                            </span>
-                                            <Plus size={14} className="text-gray-600 group-hover:text-indigo-400" />
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <div className="bg-[#0f172a] rounded-3xl border border-gray-800 shadow-2xl p-6">
+                        <h3 className="text-xs font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <BookOpen size={14} />
+                            Conteúdos do Planejamento Disponíveis
+                        </h3>
+                        {(!formClassId || !formDisciplineId) ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                                <Filter size={32} className="text-gray-700 mb-3" />
+                                <p className="text-gray-500 font-bold text-sm">Selecione uma Turma e Disciplina acima para visualizar os conteúdos planejados.</p>
+                                {userRole === UserRole.COORDINATOR && !formTeacherId && (
+                                    <p className="text-indigo-400 text-xs mt-2 font-black uppercase tracking-wider">⚠️ Primeiro selecione o Professor.</p>
+                                )}
+                            </div>
+                        ) : availableModules.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                                <X size={32} className="text-gray-700 mb-3" />
+                                <p className="text-gray-600 italic text-sm">Nenhum conteúdo disponível ou todos já foram registrados para esta seleção.</p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-wrap gap-2">
+                                {availableModules.map(mod => (
+                                    <button
+                                        key={mod.id}
+                                        onClick={() => handleAddModule(mod.id)}
+                                        className="group flex items-center gap-2 bg-gray-800/50 hover:bg-indigo-500/10 border border-gray-700 hover:border-indigo-500/30 rounded-xl px-4 py-2.5 transition-all text-left"
+                                    >
+                                        <Tag size={12} className="text-indigo-400 shrink-0" />
+                                        <span className="text-xs font-bold text-gray-300 group-hover:text-indigo-300">
+                                            Cap. {mod.chapter} — Mod. {mod.module} — {mod.title}
+                                        </span>
+                                        <Plus size={14} className="text-gray-600 group-hover:text-indigo-400 shrink-0" />
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
                     {/* Selected items with orientation */}
                     {selectedModules.length > 0 && (
