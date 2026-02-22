@@ -102,6 +102,27 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
     const getDisciplineName = (discId?: string) => disciplines.find(d => d.id === discId)?.name || discId || '';
     const getTeacherName = (teacherId?: string) => allTeachers.find(t => t.id === teacherId)?.name || '';
 
+    const getTeacherColor = (teacherId?: string) => {
+        const colors = [
+            '#6366f1', // indigo-500
+            '#10b981', // emerald-500
+            '#f59e0b', // amber-500
+            '#ef4444', // red-500
+            '#06b6d4', // cyan-500
+            '#8b5cf6', // violet-500
+            '#ec4899', // pink-500
+            '#f97316', // orange-500
+            '#14b8a6', // teal-500
+        ];
+        if (!teacherId) return colors[0];
+        // simple hash
+        let hash = 0;
+        for (let i = 0; i < teacherId.length; i++) {
+            hash = teacherId.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return colors[Math.abs(hash) % colors.length];
+    };
+
     // Available modules for selection (filtered by form selections, not already added)
     const availableModules = planningModules.filter(m => {
         if (formClassId && m.classId !== formClassId) return false;
@@ -236,29 +257,100 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
             <head>
                 <title>Roteiro de Estudos</title>
                 <style>
+                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
                     * { margin: 0; padding: 0; box-sizing: border-box; }
-                    body { font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; color: #1a1a2e; background: #fff; }
-                    .header { text-align: center; margin-bottom: 30px; border-bottom: 3px solid #1a1a2e; padding-bottom: 15px; }
-                    .header h1 { font-size: 22px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; }
-                    .header p { font-size: 11px; color: #666; margin-top: 5px; }
-                    .filters-info { font-size: 11px; color: #555; margin-bottom: 20px; text-align: center; }
-                    .teacher-section { margin-bottom: 25px; page-break-inside: avoid; border: 2px solid #1a1a2e; border-radius: 8px; overflow: hidden; }
-                    .teacher-header { background: #1a1a2e; color: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
-                    .teacher-header .name { font-weight: 800; font-size: 14px; }
-                    .teacher-header .discipline { font-size: 11px; opacity: 0.8; }
-                    .content-area { padding: 15px 20px; }
-                    .content-tag { display: inline-block; background: #f0f4ff; border: 1px solid #c7d2fe; border-radius: 6px; padding: 6px 12px; margin: 4px; font-size: 11px; font-weight: 600; color: #3730a3; }
-                    .orientation { font-size: 10px; color: #666; font-style: italic; margin-top: 2px; padding-left: 15px; border-left: 2px solid #c7d2fe; margin-left: 10px; margin-bottom: 8px; display: block; }
+                    body { 
+                        font-family: 'Inter', 'Segoe UI', Arial, sans-serif; 
+                        padding: 40px; 
+                        color: #1e293b; 
+                        background: #fff; 
+                        line-height: 1.5;
+                    }
+                    .header { 
+                        text-align: center; 
+                        margin-bottom: 40px; 
+                        border-bottom: 4px solid #059669; 
+                        padding-bottom: 20px;
+                    }
+                    .header h1 { 
+                        font-size: 28px; 
+                        font-weight: 900; 
+                        text-transform: uppercase; 
+                        letter-spacing: 3px; 
+                        color: #064e3b;
+                        margin-bottom: 5px;
+                    }
+                    .header p { 
+                        font-size: 14px; 
+                        color: #059669; 
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        letter-spacing: 1px;
+                    }
+                    .teacher-section { 
+                        margin-bottom: 30px; 
+                        page-break-inside: avoid; 
+                        border: 2px solid #e2e8f0; 
+                        border-radius: 12px; 
+                        overflow: hidden;
+                        box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                    }
+                    .teacher-header { 
+                        background: #065f46; 
+                        color: #fff; 
+                        padding: 15px 25px; 
+                        display: flex; 
+                        justify-content: space-between; 
+                        align-items: center;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    .teacher-header .name { font-weight: 800; font-size: 16px; text-transform: uppercase; }
+                    .teacher-header .discipline { font-size: 12px; font-weight: 600; opacity: 0.9; }
+                    .content-area { padding: 20px 25px; background: #fff; }
+                    .item-group { margin-bottom: 15px; }
+                    .content-tag { 
+                        display: inline-block; 
+                        background: #ecfdf5; 
+                        border: 1px solid #10b981; 
+                        border-radius: 8px; 
+                        padding: 8px 16px; 
+                        font-size: 13px; 
+                        font-weight: 700; 
+                        color: #064e3b;
+                        margin-bottom: 8px;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    .orientation { 
+                        font-size: 13px; 
+                        color: #334155; 
+                        font-weight: 500;
+                        margin-top: 4px; 
+                        padding: 10px 15px; 
+                        background: #f8fafc;
+                        border-left: 4px solid #10b981; 
+                        border-radius: 4px;
+                        display: block;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    .footer {
+                        margin-top: 50px;
+                        text-align: center;
+                        font-size: 10px;
+                        color: #94a3b8;
+                    }
                     @media print {
-                        body { padding: 15px; }
-                        .teacher-section { break-inside: avoid; }
+                        body { padding: 20px; }
+                        .teacher-section { border: 2px solid #065f46; }
                     }
                 </style>
             </head>
             <body>
                 <div class="header">
-                    <h1>📋 Roteiro de Estudos</h1>
-                    <p>${filterBimestre !== 'all' ? filterBimestre + 'º Bimestre' : 'Todos os Bimestres'} • ${filterExamType !== 'all' ? EXAM_LABELS[filterExamType] : 'Todos os Tipos de Prova'} ${filterClassId !== 'all' ? ' • ' + getClassName(filterClassId) : ''}</p>
+                    <h1>ROTEIRO DE ESTUDOS</h1>
+                    <p>${filterBimestre !== 'all' ? filterBimestre + 'º BIMESTRE' : 'TODOS OS BIMESTRES'} • ${filterExamType !== 'all' ? EXAM_LABELS[filterExamType].toUpperCase() : 'TODOS OS TIPOS DE PROVA'} ${filterClassId !== 'all' ? ' • ' + getClassName(filterClassId).toUpperCase() : ''}</p>
                 </div>
                 ${groupedReport.map(group => `
                     <div class="teacher-section">
@@ -270,18 +362,23 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
                             ${group.items.map(item => {
             const mod = item.module;
             return `
-                                    <span class="content-tag">Cap. ${mod?.chapter || '?'} — Mod. ${mod?.module || '?'} — ${mod?.title || 'Sem título'}</span>
-                                    ${item.orientation ? `<span class="orientation">📝 ${item.orientation}</span>` : ''}
+                                    <div class="item-group">
+                                        <span class="content-tag">Cap. ${mod?.chapter || '?'} — Mod. ${mod?.module || '?'} — ${mod?.title || 'Sem título'}</span>
+                                        ${item.orientation ? `<div class="orientation"><strong>📝 Orientação:</strong> ${item.orientation}</div>` : ''}
+                                    </div>
                                 `;
         }).join('')}
                         </div>
                     </div>
                 `).join('')}
+                <div class="footer">
+                    Gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')} • EduControl PRO
+                </div>
             </body>
             </html>
         `);
         printWindow.document.close();
-        setTimeout(() => { printWindow.print(); }, 500);
+        setTimeout(() => { printWindow.print(); }, 800);
     };
 
     if (loading) {
@@ -556,13 +653,16 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
                             groupedReport.map((group) => (
                                 <div key={`${group.teacherId}_${group.disciplineId}`} className="bg-[#0f172a] rounded-3xl border border-gray-800 shadow-2xl overflow-hidden">
                                     {/* Teacher header */}
-                                    <div className="p-5 bg-gradient-to-r from-gray-900 to-indigo-950/30 border-b border-gray-800 flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 font-black text-lg border border-indigo-500/20">
+                                    <div className="p-5 bg-gradient-to-r from-gray-900 to-gray-900/50 border-b border-gray-800 flex items-center gap-4">
+                                        <div
+                                            className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-black text-lg border border-white/10"
+                                            style={{ backgroundColor: getTeacherColor(group.teacherId) }}
+                                        >
                                             {group.teacherName.charAt(0).toUpperCase()}
                                         </div>
                                         <div>
                                             <p className="text-base font-black text-white">{group.teacherName}</p>
-                                            <p className="text-xs text-indigo-400 font-bold">{group.disciplineName}</p>
+                                            <p className="text-xs font-bold" style={{ color: getTeacherColor(group.teacherId) }}>{group.disciplineName}</p>
                                         </div>
                                     </div>
 

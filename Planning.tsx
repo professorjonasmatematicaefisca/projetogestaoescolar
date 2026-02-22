@@ -54,6 +54,26 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
     // Schedule filter
     const [scheduleFilterTeacher, setScheduleFilterTeacher] = useState('all');
 
+    const getTeacherColor = (teacherId?: string) => {
+        const colors = [
+            '#6366f1', // indigo-500
+            '#10b981', // emerald-500
+            '#f59e0b', // amber-500
+            '#ef4444', // red-500
+            '#06b6d4', // cyan-500
+            '#8b5cf6', // violet-500
+            '#ec4899', // pink-500
+            '#f97316', // orange-500
+            '#14b8a6', // teal-500
+        ];
+        if (!teacherId) return colors[0];
+        let hash = 0;
+        for (let i = 0; i < teacherId.length; i++) {
+            hash = teacherId.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return colors[Math.abs(hash) % colors.length];
+    };
+
     useEffect(() => {
         loadData();
     }, [userEmail, activeTab]);
@@ -648,9 +668,14 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                     {daySchedules.map(sch => (
                                                         <div
                                                             key={sch.id}
-                                                            className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-md font-bold truncate flex items-center gap-1 group/item"
+                                                            className="text-[9px] border px-1.5 py-0.5 rounded-md font-bold truncate flex items-center gap-1 group/item"
+                                                            style={{
+                                                                backgroundColor: `${getTeacherColor(sch.module?.teacherId)}15`,
+                                                                color: getTeacherColor(sch.module?.teacherId),
+                                                                borderColor: `${getTeacherColor(sch.module?.teacherId)}30`
+                                                            }}
                                                         >
-                                                            <div className="w-1 h-1 rounded-full bg-emerald-500 shrink-0" />
+                                                            <div className="w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: getTeacherColor(sch.module?.teacherId) }} />
                                                             {getDisciplineName(sch.module?.disciplineId)} - M{formatModule(sch.module?.module)}
                                                             {!isLockedForMe && (
                                                                 <button
@@ -682,9 +707,9 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                         <p className="text-xs text-center text-gray-600 italic py-10">Nenhuma aula agendada para este período.</p>
                                     ) : (
                                         schedules.slice(0, 5).map(sch => (
-                                            <div key={sch.id} className="bg-gray-900/50 p-3 rounded-xl border border-gray-800/50 flex flex-col gap-2">
+                                            <div key={sch.id} className="bg-gray-900/50 p-3 rounded-xl border flex flex-col gap-2" style={{ borderLeft: `4px solid ${getTeacherColor(sch.module?.teacherId)}`, borderColor: `${getTeacherColor(sch.module?.teacherId)}20` }}>
                                                 <div className="flex justify-between items-start">
-                                                    <span className="text-[10px] font-black text-emerald-500 uppercase">{sch.plannedDate.split('-').reverse().join('/')}</span>
+                                                    <span className="text-[10px] font-black uppercase" style={{ color: getTeacherColor(sch.module?.teacherId) }}>{sch.plannedDate.split('-').reverse().join('/')}</span>
                                                     <span className="text-[9px] bg-gray-800 px-1.5 py-0.5 rounded text-gray-400 font-bold">{getClassName(sch.module?.classId)}</span>
                                                 </div>
                                                 <p className="text-xs font-bold text-gray-200 truncate">{sch.module?.title}</p>
@@ -745,12 +770,15 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                     return (
                                         <div
                                             key={tid}
-                                            onClick={() => setPxeSelectedTeacher(tid)}
+                                            onClick={() => setPxeSelectedTeacher(tid as string)}
                                             className="bg-gray-900/50 rounded-2xl border border-gray-800/50 p-5 cursor-pointer hover:border-amber-500/30 hover:bg-amber-500/[0.03] transition-all group"
                                         >
                                             <div className="flex items-center justify-between mb-3">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 font-black text-sm">
+                                                    <div
+                                                        className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm border border-white/10"
+                                                        style={{ backgroundColor: getTeacherColor(tid as string) }}
+                                                    >
                                                         {(teacher?.name || '?').charAt(0).toUpperCase()}
                                                     </div>
                                                     <div>
@@ -816,7 +844,10 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                     <div key={teacher.id} className={`p-4 rounded-2xl border transition-all ${isLocked ? 'bg-red-500/5 border-red-500/30' : 'bg-gray-900/50 border-gray-800/50'}`}>
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${isLocked ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                                <div
+                                                    className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black text-white border border-white/10"
+                                                    style={{ backgroundColor: isLocked ? '#ef4444' : getTeacherColor(teacher.id) }}
+                                                >
                                                     {teacher.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                                                 </div>
                                                 <div>
