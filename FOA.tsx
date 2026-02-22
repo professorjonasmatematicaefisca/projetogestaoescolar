@@ -136,21 +136,21 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
         if (isNaN(value)) return '-';
 
         switch (type) {
-            case 'comportamento': // Conversa + Dormir
-                if (value <= 0.5) return 'O';
-                if (value <= 1.5) return 'B';
-                if (value <= 2.5) return 'S';
+            case 'comportamento': // Conversa + Dormir (Higher is worse)
+                if (value <= 0.2) return 'O';
+                if (value <= 0.6) return 'B';
+                if (value <= 1.2) return 'S';
                 return 'I';
 
-            case 'atencao': // Banheiro
+            case 'atencao': // Banheiro (Higher is worse)
                 if (value <= 0.3) return 'O';
                 if (value <= 0.8) return 'B';
                 if (value <= 1.5) return 'S';
                 return 'I';
 
             case 'material': // Material (1=Good, 0=Bad)
-                if (value === 1) return 'O';
-                if (value >= 0.8) return 'B';
+                if (value >= 0.9) return 'O';
+                if (value >= 0.7) return 'B';
                 if (value >= 0.5) return 'S';
                 return 'I';
 
@@ -166,10 +166,10 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                 if (value >= 1.0) return 'S';
                 return 'I';
 
-            case 'participacao': // Participation (1=Good, 0=Bad/Neutral)
-                if (value >= 0.8) return 'O';
-                if (value >= 0.5) return 'B';
-                if (value >= 0.2) return 'S';
+            case 'participacao': // Participation (0-10 Ticks)
+                if (value >= 8.0) return 'O';
+                if (value >= 5.0) return 'B';
+                if (value >= 2.0) return 'S';
                 return 'I';
 
             case 'autogestao': // Phone (0=Good, 1=Bad)

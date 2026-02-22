@@ -223,13 +223,13 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 avg: parseFloat(avg),
                 attendance: attendance,
                 // Show as deductions/bonuses
-                talk: count ? -(Math.min(3.0, (sumTalk / count) * 1.0)) : 0,
-                sleep: count ? -(Math.min(3.0, (sumSleep / count) * 1.0)) : 0,
-                bathroom: count ? -(Math.min(1.5, (sumBathroom / count) * 0.5)) : 0,
-                material: count ? -(((count - sumMaterial) / count) * 1.5) : 0,
-                activity: count ? -(((count * 3 - sumActivity) / count) * 1.0) : 0,
-                phone: count ? -(sumPhone / count * 1.0) : 0,
-                participation: count ? (sumParticipation / count * 0.5) : 0
+                talk: count ? -((sumTalk / count) * 2.0) : 0,
+                sleep: count ? -((sumSleep / count) * 2.0) : 0,
+                bathroom: count ? -((sumBathroom / count) * 0.5) : 0,
+                material: count ? -(((count - sumMaterial) / count) * 0.5) : 0,
+                activity: count ? -(((count * 3 - sumActivity) / count) * 0.5) : 0,
+                phone: count ? -((sumPhone / count) * 2.0) : 0,
+                participation: count ? ((sumParticipation / count) * 0.5) : 0
             };
         });
 
@@ -514,14 +514,14 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                             <AlertCircle size={16} className="text-emerald-500" /> Critérios de Avaliação
                         </h3>
                         <div className="space-y-3">
-                            <CriteriaRow label="Presença" desc="Falta = 0 (Justif. = 5,0)" val="Zera Nota" />
-                            <CriteriaRow label="Participação" desc="Interação em aula" val="+0,5" />
-                            <CriteriaRow label="Conversa" desc="-1,0 por ocorrência" val="até -3,0" />
-                            <CriteriaRow label="Banheiro" desc="-0,5 por saída" val="até -1,5" />
-                            <CriteriaRow label="Dormir" desc="-1,0 por ocorrência" val="até -3,0" />
-                            <CriteriaRow label="Material" desc="Sem material" val="-1,5" />
-                            <CriteriaRow label="Atividade" desc="-1,0 por nível perdido" val="até -3,0" />
-                            <CriteriaRow label="Celular" desc="Uso não autorizado" val="-1,0" />
+                            <CriteriaRow label="Presença" desc="Falta = 0 (Justif. = 5,0)" val="Fixo" />
+                            <CriteriaRow label="Participação" desc="+0,5 por tick (0-10)" val="+5,0 máx" />
+                            <CriteriaRow label="Conversa" desc="-2,0 por ocorrência" val="Sem teto" />
+                            <CriteriaRow label="Dormir" desc="-2,0 por ocorrência" val="Sem teto" />
+                            <CriteriaRow label="Material" desc="Sem material (Sim/Não)" val="-0,5" />
+                            <CriteriaRow label="Tarefas" desc="Não fez (Sim/Não)" val="-0,5" />
+                            <CriteriaRow label="Atividade" desc="-0,5 por nível perdido (0-3)" val="até -1,5" />
+                            <CriteriaRow label="Celular" desc="Uso não autorizado" val="-2,0" />
                         </div>
                     </div>
                 </div>
@@ -603,13 +603,14 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                                 if (!r.present) {
                                                     deductions.push(r.justifiedAbsence ? "Falta Justificada (Nota 5.0)" : "Falta (Nota 0.0)");
                                                 } else {
-                                                    if (r.counters.talk > 0) deductions.push(`${r.counters.talk}x Conversa`);
-                                                    if (r.counters.bathroom > 0) deductions.push(`${r.counters.bathroom}x Banheiro`);
-                                                    if (r.counters.sleep > 0) deductions.push(`${r.counters.sleep}x Sono`);
-                                                    if (r.counters.material === 0) deductions.push(`Sem Material`);
-                                                    if (r.counters.activity < 3) deductions.push(`Atividade Incompleta (-${3 - r.counters.activity})`);
-                                                    if (r.phoneConfiscated) deductions.push(`Celular`);
-                                                    if (r.counters.participation > 0) deductions.push(`Participação (+0.5)`);
+                                                    if (r.counters.talk > 0) deductions.push(`${r.counters.talk}x Conversa (-${r.counters.talk * 2})`);
+                                                    if (r.counters.bathroom > 0) deductions.push(`${r.counters.bathroom}x Banheiro (-${(r.counters.bathroom * 0.5).toFixed(1)})`);
+                                                    if (r.counters.sleep > 0) deductions.push(`${r.counters.sleep}x Sono (-${r.counters.sleep * 2})`);
+                                                    if (r.counters.material === 0) deductions.push(`Sem Material (-0.5)`);
+                                                    if (r.counters.homework === 0) deductions.push(`Sem Tarefa (-0.5)`);
+                                                    if (r.counters.activity < 3) deductions.push(`Ativ. Incompleta (-${((3 - r.counters.activity) * 0.5).toFixed(1)})`);
+                                                    if (r.phoneConfiscated) deductions.push(`Celular (-2.0)`);
+                                                    if (r.counters.participation > 0) deductions.push(`Participação (+${(r.counters.participation * 0.5).toFixed(1)})`);
                                                 }
 
                                                 return (

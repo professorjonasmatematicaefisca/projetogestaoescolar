@@ -57,7 +57,7 @@ export interface Counters {
   material: number;
   activity: number;
   homework: number; // New: 0 (No) or 1 (Yes)
-  participation: number; // New: 0 (No) or 1 (Yes/Bonus)
+  participation: number; // New: Total ticks (0-10)
 }
 
 export interface SessionRecord {

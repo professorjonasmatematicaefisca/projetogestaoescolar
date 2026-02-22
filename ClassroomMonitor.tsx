@@ -320,10 +320,14 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             let newVal = currentVal + delta;
 
             // Apply Constraints based on rules
-            if (type === 'material' || type === 'homework' || type === 'participation') {
+            if (type === 'material' || type === 'homework') {
                 newVal = Math.max(0, Math.min(1, newVal)); // 0 or 1 for Toggles
+            } else if (type === 'activity') {
+                newVal = Math.max(0, Math.min(3, newVal)); // 0 to 3 for Activity Ticks
+            } else if (type === 'participation') {
+                newVal = Math.max(0, Math.min(10, newVal)); // 0 to 10 for Participation Ticks
             } else {
-                newVal = Math.max(0, Math.min(3, newVal)); // 0 to 3 for others
+                newVal = Math.max(0, newVal); // No hard upper limit for penalties
             }
 
             return {
@@ -688,7 +692,14 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                                 <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#0f172a] ${record.present ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
                                             </div>
                                             <div>
-                                                <h3 className="font-bold text-gray-100 text-sm">{student.name}</h3>
+                                                <h3 className="font-bold text-gray-100 text-sm">
+                                                    {student.name}
+                                                    {record.present && (
+                                                        <span className={`ml-2 font-black ${StorageService.calculateGrade(record) <= 5 ? 'text-red-500' : 'text-emerald-400'}`}>
+                                                            ({StorageService.calculateGrade(record).toFixed(1)})
+                                                        </span>
+                                                    )}
+                                                </h3>
                                                 <p className="text-xs text-gray-500">RA: 4492{student.id.split('-')[1]}</p>
                                             </div>
                                         </div>
@@ -761,11 +772,19 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                             </div>
                                         )}
 
+                                        {record.present && StorageService.calculateGrade(record) === 0 && (
+                                            <div className="absolute inset-x-0 top-0 h-full bg-red-900/60 z-10 flex flex-col items-center justify-center backdrop-blur-[2px] p-4 text-center">
+                                                <div className="bg-red-600 text-white font-black text-xs px-3 py-1.5 rounded-full shadow-lg border border-red-400 animate-pulse">
+                                                    ALUNO ZEROU ESTA AULA
+                                                </div>
+                                                <span className="text-red-200 text-[9px] uppercase font-bold mt-2 tracking-wider">Pontuação mínima atingida</span>
+                                            </div>
+                                        )}
+
                                         <CounterRow
                                             label="Conversa"
                                             icon={MessageSquare}
                                             value={record.counters.talk}
-                                            max={3}
                                             onMinus={() => handleCounter(student.id, 'talk', -1)}
                                             onPlus={() => handleCounter(student.id, 'talk', 1)}
                                         />
@@ -773,7 +792,6 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                             label="Banheiro"
                                             icon={AlertCircle}
                                             value={record.counters.bathroom}
-                                            max={3}
                                             onMinus={() => handleCounter(student.id, 'bathroom', -1)}
                                             onPlus={() => handleCounter(student.id, 'bathroom', 1)}
                                         />
@@ -781,7 +799,6 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                             label="Dormir"
                                             icon={Moon}
                                             value={record.counters.sleep}
-                                            max={3}
                                             onMinus={() => handleCounter(student.id, 'sleep', -1)}
                                             onPlus={() => handleCounter(student.id, 'sleep', 1)}
                                         />
@@ -822,9 +839,9 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                                 label="Participação"
                                                 icon={Hand}
                                                 value={record.counters.participation ?? 0}
-                                                max={1}
-                                                // Participation: 1 is Good
-                                                customColor={record.counters.participation > 0 ? 'text-emerald-400' : 'text-gray-500'}
+                                                max={10}
+                                                // Participation: 10 ticks = +5.0 points
+                                                customColor={record.counters.participation > 0 ? 'text-blue-400' : 'text-gray-500'}
                                                 onMinus={() => handleCounter(student.id, 'participation', -1)}
                                                 onPlus={() => handleCounter(student.id, 'participation', 1)}
                                             />

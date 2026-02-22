@@ -138,44 +138,47 @@ export const StorageService = {
   calculateGrade: (record: SessionRecord): number => {
     // 1. Presence Logic
     if (!record.present) {
-      return record.justifiedAbsence ? 5.0 : 0.0;
+      return 0.0; // In case of absence, score is always 0.0
     }
 
     let grade = 10.0;
 
     // 2. Deductions
-    // Conversa (Talk): -1.0 per occurrence (Max 3.0 deduction)
-    grade -= Math.min(3.0, record.counters.talk * 1.0);
+    // Conversa (Talk): -2.0 per occurrence
+    grade -= (record.counters.talk * 2.0);
 
-    // Banheiro (Bathroom): -0.5 per occurrence (Max 1.5 deduction)
-    grade -= Math.min(1.5, record.counters.bathroom * 0.5);
+    // Dormir (Sleep): -2.0 per occurrence
+    grade -= (record.counters.sleep * 2.0);
 
-    // Dormir (Sleep): -1.0 per occurrence (Max 3.0 deduction)
-    grade -= Math.min(3.0, record.counters.sleep * 1.0);
-
-    // Material: If 0 (missing), deduct 1.5
+    // Material: If 0 (missing), deduct 0.5
     if (record.counters.material === 0) {
-      grade -= 1.5;
+      grade -= 0.5;
     }
 
-    // Atividade (Activity): Starts at 3. Deduct 1.0 per level lost.
+    // Atividade (Activity): Starts at 3. Deduct 0.5 per tick lost.
     const lostActivityLevels = 3 - record.counters.activity;
     if (lostActivityLevels > 0) {
-      grade -= (lostActivityLevels * 1.0);
+      grade -= (lostActivityLevels * 0.5);
     }
 
-    // Celular (Phone): If SIM (true), deduct 1.0
+    // Tarefas (Homework): If 0 (missing), deduct 0.5
+    if (record.counters.homework === 0) {
+      grade -= 0.5;
+    }
+
+    // Banheiro (Bathroom): Still -0.5 per occurrence (Legacy/Compatibility)
+    grade -= (record.counters.bathroom * 0.5);
+
+    // Celular (Phone): If SIM (true), deduct 1.0 (Legacy/Compatibility)
     if (record.phoneConfiscated) {
       grade -= 1.0;
     }
 
     // 3. Bonuses
-    // Participation: +0.5 if present
+    // Participation: +0.5 per tick, up to 10 ticks (+5.0 bonus)
     if (record.counters.participation && record.counters.participation > 0) {
-      grade += 0.5;
+      grade += (record.counters.participation * 0.5);
     }
-
-    // *NOTE*: Homework (Tarefas) does NOT affect the grade calculation as per request.
 
     // Ensure grade is between 0 and 10
     return Math.max(0, Math.min(10, grade));
