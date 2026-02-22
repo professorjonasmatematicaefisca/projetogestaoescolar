@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { Student, ClassRoom, Teacher, Occurrence, ClassSession, SessionRecord, UserRole, StudentExit, PlanningModule, PlanningSchedule } from '../types';
+import { Student, ClassRoom, Teacher, Occurrence, ClassSession, SessionRecord, UserRole, StudentExit, PlanningModule, PlanningSchedule, StudyGuideItem } from '../types';
 import { SEED_STUDENTS, SEED_CLASSES, SEED_TEACHERS, SEED_OCCURRENCES } from './mockData';
 
 export const SupabaseService = {
@@ -847,5 +847,65 @@ export const SupabaseService = {
             returnTime: e.return_time,
             registeredBy: e.registered_by
         }));
+    },
+
+    // --- STUDY GUIDE ---
+    async getStudyGuideItems(filters?: { teacherId?: string; bimestre?: number; examType?: string; classId?: string }): Promise<StudyGuideItem[]> {
+        let query = supabase.from('study_guide_items').select('*, planning_modules(*)');
+        if (filters?.teacherId) query = query.eq('teacher_id', filters.teacherId);
+        if (filters?.bimestre) query = query.eq('bimestre', filters.bimestre);
+        if (filters?.examType) query = query.eq('exam_type', filters.examType);
+        if (filters?.classId) query = query.eq('class_id', filters.classId);
+        const { data, error } = await query.order('created_at', { ascending: false });
+        if (error) { console.error('getStudyGuideItems error:', error); return []; }
+        return (data || []).map((item: any) => ({
+            id: item.id,
+            teacherId: item.teacher_id,
+            disciplineId: item.discipline_id,
+            classId: item.class_id,
+            moduleId: item.module_id,
+            bimestre: item.bimestre,
+            examType: item.exam_type,
+            orientation: item.orientation,
+            createdAt: item.created_at,
+            module: item.planning_modules ? {
+                id: item.planning_modules.id,
+                disciplineId: item.planning_modules.discipline_id,
+                teacherId: item.planning_modules.teacher_id,
+                classId: item.planning_modules.class_id,
+                front: item.planning_modules.front || '',
+                chapter: item.planning_modules.chapter,
+                module: item.planning_modules.module,
+                title: item.planning_modules.title,
+                topic: item.planning_modules.topic,
+                bimestre: item.planning_modules.bimestre || 1
+            } : undefined
+        }));
+    },
+
+    async saveStudyGuideItem(item: Omit<StudyGuideItem, 'id'>): Promise<string | null> {
+        const { data, error } = await supabase.from('study_guide_items').insert({
+            teacher_id: item.teacherId,
+            discipline_id: item.disciplineId,
+            class_id: item.classId,
+            module_id: item.moduleId,
+            bimestre: item.bimestre,
+            exam_type: item.examType,
+            orientation: item.orientation || null
+        }).select('id').single();
+        if (error) { console.error('saveStudyGuideItem error:', error); return null; }
+        return data?.id || null;
+    },
+
+    async updateStudyGuideItem(id: string, data: { orientation?: string }): Promise<boolean> {
+        const { error } = await supabase.from('study_guide_items').update({ orientation: data.orientation }).eq('id', id);
+        if (error) { console.error('updateStudyGuideItem error:', error); return false; }
+        return true;
+    },
+
+    async deleteStudyGuideItem(id: string): Promise<boolean> {
+        const { error } = await supabase.from('study_guide_items').delete().eq('id', id);
+        if (error) { console.error('deleteStudyGuideItem error:', error); return false; }
+        return true;
     }
 };

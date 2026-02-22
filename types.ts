@@ -146,5 +146,17 @@ export interface PlanningSchedule {
   createdAt?: string;
 }
 
-export type ViewState = 'MONITORING' | 'DASHBOARD' | 'REPORTS' | 'OCCURRENCES' | 'ADMIN' | 'SETTINGS' | 'FOA' | 'PLANNING';
+export interface StudyGuideItem {
+  id: string;
+  teacherId: string;
+  disciplineId: string;
+  classId: string;
+  moduleId: string;
+  bimestre: number;
+  examType: 'P1' | 'P2' | 'SUBSTITUTIVA' | 'RECUPERACAO';
+  orientation?: string;
+  module?: PlanningModule; // joined
+  createdAt?: string;
+}
 
+export type ViewState = 'MONITORING' | 'DASHBOARD' | 'REPORTS' | 'OCCURRENCES' | 'ADMIN' | 'SETTINGS' | 'FOA' | 'PLANNING' | 'STUDY_GUIDE';

@@ -13,7 +13,8 @@ import {
   Lock,
 
   FileText,
-  BookOpen
+  BookOpen,
+  ClipboardCheck
 } from 'lucide-react';
 import { UserAvatar } from './components/UserAvatar';
 
@@ -43,8 +44,8 @@ export const Layout: React.FC<LayoutProps> = ({
 
   // Define allowed views per role
   const rolePermissions: Record<UserRole, ViewState[]> = {
-    [UserRole.COORDINATOR]: ['MONITORING', 'DASHBOARD', 'REPORTS', 'PLANNING', 'OCCURRENCES', 'ADMIN', 'SETTINGS', 'FOA'],
-    [UserRole.TEACHER]: ['MONITORING', 'REPORTS', 'PLANNING', 'SETTINGS', 'FOA'],
+    [UserRole.COORDINATOR]: ['MONITORING', 'DASHBOARD', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'OCCURRENCES', 'ADMIN', 'SETTINGS', 'FOA'],
+    [UserRole.TEACHER]: ['MONITORING', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'SETTINGS', 'FOA'],
     [UserRole.MONITOR]: ['OCCURRENCES', 'SETTINGS']
   };
 
@@ -53,6 +54,7 @@ export const Layout: React.FC<LayoutProps> = ({
     { view: 'MONITORING', icon: ClipboardList, label: 'Sala de Aula' },
     { view: 'REPORTS', icon: GraduationCap, label: 'Relatórios' },
     { view: 'PLANNING', icon: BookOpen, label: 'Planejamento' },
+    { view: 'STUDY_GUIDE', icon: ClipboardCheck, label: 'Roteiro de Estudos' },
     { view: 'FOA', icon: FileText, label: 'FOA (Observação)' },
     { view: 'OCCURRENCES', icon: AlertTriangle, label: 'Monitoria' }, // Renamed from Ocorrências
   ] as const;
