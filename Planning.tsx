@@ -61,9 +61,19 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
             if (userRole === UserRole.TEACHER) {
                 filteredMods = mods.filter(m => {
                     return actualAssignments.some(assign => {
-                        const discipline = allDisciplines.find(d => d.name === assign.subject);
-                        return m.classId === assign.classId &&
-                            (m.disciplineId === assign.subject || m.disciplineId === discipline?.id);
+                        // classId in assignment may be UUID or class name — check both
+                        const matchClass = allClasses.find(c => c.id === assign.classId || c.name === assign.classId);
+                        const classMatch = matchClass
+                            ? m.classId === matchClass.id
+                            : m.classId === assign.classId;
+
+                        // discipline in assignment may be name — find its ID
+                        const matchDisc = allDisciplines.find(d => d.name === assign.subject || d.id === assign.subject);
+                        const discMatch = matchDisc
+                            ? m.disciplineId === matchDisc.id
+                            : m.disciplineId === assign.subject;
+
+                        return classMatch && discMatch;
                     });
                 });
             }
@@ -90,21 +100,26 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
         const teachers = await SupabaseService.getTeachers();
         const currentTeacher = teachers.find(t => t.email === userEmail);
 
-        // Ensure selectedDiscipline is an ID, not a name
-        let finalDisciplineId = selectedDiscipline;
+        // Resolve discipline to UUID — selectedDiscipline might be name or UUID
         const matchedDisc = disciplines.find(d => d.name === selectedDiscipline || d.id === selectedDiscipline);
-        if (matchedDisc) finalDisciplineId = matchedDisc.id;
+        const finalDisciplineId = matchedDisc?.id || selectedDiscipline;
 
-        const success = await SupabaseService.savePlanningModule({
+        // Resolve class to UUID — selectedClass might be name or UUID
+        const allClassesNow = await SupabaseService.getClasses();
+        const matchedClass = allClassesNow.find(c => c.name === selectedClass || c.id === selectedClass);
+        const finalClassId = matchedClass?.id || selectedClass;
+
+        const savedId = await SupabaseService.savePlanningModule({
             disciplineId: finalDisciplineId,
             teacherId: currentTeacher?.id || '',
-            classId: selectedClass,
-            front: '-', // Default placeholder since we don't use it anymore
+            classId: finalClassId,
+            front: '-',
             chapter: formData.chapter,
             module: formData.moduleNumber,
             title: formData.title,
             topic: formData.topic
         });
+        const success = savedId !== null;
 
         if (success) {
             onShowToast("Módulo salvo com sucesso!");
