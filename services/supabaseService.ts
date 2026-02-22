@@ -102,6 +102,49 @@ export const SupabaseService = {
         return true;
     },
 
+    // --- PLANNING LOCKS ---
+    async getPlanningLocks(): Promise<{ globalLocked: boolean; teacherLocks: { teacherId: string; locked: boolean }[] }> {
+        const { data, error } = await supabase.from('planning_locks').select('*');
+        if (error || !data) return { globalLocked: false, teacherLocks: [] };
+
+        const globalRow = data.find((r: any) => r.id === 'global');
+        const teacherRows = data.filter((r: any) => r.id !== 'global' && r.teacher_id);
+
+        return {
+            globalLocked: globalRow?.locked || false,
+            teacherLocks: teacherRows.map((r: any) => ({ teacherId: r.teacher_id, locked: r.locked }))
+        };
+    },
+
+    async setGlobalLock(locked: boolean, lockedBy?: string): Promise<boolean> {
+        const { error } = await supabase.from('planning_locks').upsert({
+            id: 'global',
+            locked,
+            locked_by: lockedBy || null,
+            teacher_id: null,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+        return !error;
+    },
+
+    async setTeacherLock(teacherId: string, locked: boolean, lockedBy?: string): Promise<boolean> {
+        const lockId = `teacher_${teacherId}`;
+        const { error } = await supabase.from('planning_locks').upsert({
+            id: lockId,
+            locked,
+            teacher_id: teacherId,
+            locked_by: lockedBy || null,
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'id' });
+        return !error;
+    },
+
+    async removeTeacherLock(teacherId: string): Promise<boolean> {
+        const lockId = `teacher_${teacherId}`;
+        const { error } = await supabase.from('planning_locks').delete().eq('id', lockId);
+        return !error;
+    },
+
     async savePlanningSchedule(schedule: Omit<PlanningSchedule, 'id'>): Promise<boolean> {
         const { error } = await supabase.from('planning_schedule').insert({
             module_id: schedule.moduleId,
