@@ -49,8 +49,9 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
             setDisciplines(allDisciplines);
 
             const currentTeacher = teachers.find(t => t.email === userEmail);
-            if (currentTeacher?.assignments) {
-                setTeacherAssignments(currentTeacher.assignments);
+            const actualAssignments = currentTeacher?.assignments || [];
+            if (actualAssignments) {
+                setTeacherAssignments(actualAssignments);
             }
 
             const mods = await SupabaseService.getPlanningModules();
@@ -59,8 +60,8 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
             let filteredMods = mods;
             if (userRole === UserRole.TEACHER) {
                 filteredMods = mods.filter(m => {
-                    return teacherAssignments.some(assign => {
-                        const discipline = disciplines.find(d => d.name === assign.subject);
+                    return actualAssignments.some(assign => {
+                        const discipline = allDisciplines.find(d => d.name === assign.subject);
                         return m.classId === assign.classId &&
                             (m.disciplineId === assign.subject || m.disciplineId === discipline?.id);
                     });
@@ -89,8 +90,13 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
         const teachers = await SupabaseService.getTeachers();
         const currentTeacher = teachers.find(t => t.email === userEmail);
 
+        // Ensure selectedDiscipline is an ID, not a name
+        let finalDisciplineId = selectedDiscipline;
+        const matchedDisc = disciplines.find(d => d.name === selectedDiscipline || d.id === selectedDiscipline);
+        if (matchedDisc) finalDisciplineId = matchedDisc.id;
+
         const success = await SupabaseService.savePlanningModule({
-            disciplineId: selectedDiscipline,
+            disciplineId: finalDisciplineId,
             teacherId: currentTeacher?.id || '',
             classId: selectedClass,
             front: '-', // Default placeholder since we don't use it anymore
@@ -264,14 +270,14 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                 {userRole === UserRole.COORDINATOR ? (
                                                     disciplines.map(d => <option key={d.id as string} value={d.id as string}>{d.name}</option>)
                                                 ) : (
-                                                    // Get unique subjects assigned to the current teacher for the selected class
                                                     Array.from(new Set(teacherAssignments
                                                         .filter(a => a.classId === selectedClass)
                                                         .map(a => a.subject)))
                                                         .map((subject, idx) => {
-                                                            const disciplineId = disciplines.find(d => d.name === subject)?.id || subject;
+                                                            const matchedD = disciplines.find(d => d.name === subject);
+                                                            const val = matchedD ? matchedD.id : subject;
                                                             return (
-                                                                <option key={`${subject}-${idx}`} value={disciplineId}>
+                                                                <option key={`${subject}-${idx}`} value={val}>
                                                                     {subject}
                                                                 </option>
                                                             );
