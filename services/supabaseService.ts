@@ -1,8 +1,119 @@
 import { supabase } from '../supabaseClient';
-import { Student, ClassRoom, Teacher, Occurrence, ClassSession, SessionRecord, UserRole, StudentExit } from '../types';
+import { Student, ClassRoom, Teacher, Occurrence, ClassSession, SessionRecord, UserRole, StudentExit, PlanningModule, PlanningSchedule } from '../types';
 import { SEED_STUDENTS, SEED_CLASSES, SEED_TEACHERS, SEED_OCCURRENCES } from './mockData';
 
 export const SupabaseService = {
+    async getPlanningModules(filters?: { teacherId?: string, classId?: string, disciplineId?: string }): Promise<PlanningModule[]> {
+        let query = supabase.from('planning_modules').select('*');
+
+        if (filters?.teacherId) query = query.eq('teacher_id', filters.teacherId);
+        if (filters?.classId) query = query.eq('class_id', filters.classId);
+        if (filters?.disciplineId) query = query.eq('discipline_id', filters.disciplineId);
+
+        const { data, error } = await query.order('created_at', { ascending: false });
+
+        if (error) {
+            console.error("Error fetching planning modules:", error);
+            return [];
+        }
+
+        return data.map((m: any) => ({
+            id: m.id,
+            disciplineId: m.discipline_id,
+            teacherId: m.teacher_id,
+            classId: m.class_id,
+            front: m.front,
+            chapter: m.chapter,
+            module: m.module,
+            title: m.title,
+            topic: m.topic,
+            createdAt: m.created_at
+        }));
+    },
+
+    async deletePlanningModule(id: string): Promise<boolean> {
+        const { error } = await supabase.from('planning_modules').delete().eq('id', id);
+        if (error) {
+            console.error("Error deleting planning module:", error);
+            return false;
+        }
+        return true;
+    },
+
+    async savePlanningModule(module: Omit<PlanningModule, 'id'>): Promise<string | null> {
+        const { data, error } = await supabase.from('planning_modules').insert({
+            discipline_id: module.disciplineId,
+            teacher_id: module.teacherId,
+            class_id: module.classId,
+            front: module.front,
+            chapter: module.chapter,
+            module: module.module,
+            title: module.title,
+            topic: module.topic
+        }).select().single();
+
+        if (error) {
+            console.error("Error saving planning module:", error);
+            return null;
+        }
+        return data.id;
+    },
+
+    async getPlanningSchedule(filters?: { moduleId?: string, teacherId?: string }): Promise<(PlanningSchedule & { module?: PlanningModule })[]> {
+        let query = supabase
+            .from('planning_schedule')
+            .select('*, module:planning_modules(*)');
+
+        if (filters?.moduleId) query = query.eq('module_id', filters.moduleId);
+
+        const { data, error } = await query.order('planned_date', { ascending: true });
+
+        if (error) {
+            console.error("Error fetching planning schedule:", error);
+            return [];
+        }
+
+        return data.map((s: any) => ({
+            id: s.id,
+            moduleId: s.module_id,
+            plannedDate: s.planned_date,
+            createdAt: s.created_at,
+            module: s.module ? {
+                id: s.module.id,
+                disciplineId: s.module.discipline_id,
+                teacherId: s.module.teacher_id,
+                classId: s.module.class_id,
+                front: s.module.front,
+                chapter: s.module.chapter,
+                module: s.module.module,
+                title: s.module.title,
+                topic: s.module.topic,
+                createdAt: s.module.created_at
+            } : undefined
+        }));
+    },
+
+    async deletePlanningSchedule(id: string): Promise<boolean> {
+        const { error } = await supabase.from('planning_schedule').delete().eq('id', id);
+        if (error) {
+            console.error("Error deleting schedule:", error);
+            return false;
+        }
+        return true;
+    },
+
+    async savePlanningSchedule(schedule: Omit<PlanningSchedule, 'id'>): Promise<boolean> {
+        const { error } = await supabase.from('planning_schedule').insert({
+            module_id: schedule.moduleId,
+            planned_date: schedule.plannedDate
+        });
+
+        if (error) {
+            console.error("Error saving planning schedule:", error);
+            return false;
+        }
+        return true;
+    },
     // --- MIGRATION UTILS ---
     async migrateMockData() {
         console.log("Starting migration...");

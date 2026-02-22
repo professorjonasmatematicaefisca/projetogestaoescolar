@@ -108,7 +108,7 @@ function App() {
       case 'MONITORING': return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole} />;
       case 'DASHBOARD': return <Dashboard onNavigateToStudent={handleNavigateToStudent} />;
       case 'REPORTS': return <StudentReport onShowToast={showToast} currentUserRole={userRole} initialStudentId={targetStudentId} />;
-      case 'PLANNING': return <Planning />;
+      case 'PLANNING': return <Planning userEmail={userEmail} userRole={userRole} onShowToast={showToast} />;
       case 'FOA': return <FOA onShowToast={showToast} currentUserRole={userRole} userEmail={userEmail} userName={userName} />;
       case 'OCCURRENCES': return <Occurrences onShowToast={showToast} />;
       case 'ADMIN': return <AdminPanel onShowToast={showToast} />;

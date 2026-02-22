@@ -121,4 +121,26 @@ export interface StudentExit {
   registeredBy?: string; // Who registered this exit
 }
 
+
+export interface PlanningModule {
+  id: string;
+  disciplineId: string;
+  teacherId: string;
+  classId: string;
+  front: string;
+  chapter: string;
+  module: string;
+  title: string;
+  topic: string;
+  createdAt?: string;
+}
+
+export interface PlanningSchedule {
+  id: string;
+  moduleId: string;
+  plannedDate: string;
+  createdAt?: string;
+}
+
 export type ViewState = 'MONITORING' | 'DASHBOARD' | 'REPORTS' | 'OCCURRENCES' | 'ADMIN' | 'SETTINGS' | 'FOA' | 'PLANNING';
+
