@@ -49,6 +49,10 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
     // Planejado x Executado states
     const [sessions, setSessions] = useState<ClassSession[]>([]);
     const [justificationModal, setJustificationModal] = useState<{ scheduleId: string; open: boolean; text: string }>({ scheduleId: '', open: false, text: '' });
+    const [pxeSelectedTeacher, setPxeSelectedTeacher] = useState<string>('');
+
+    // Schedule filter
+    const [scheduleFilterTeacher, setScheduleFilterTeacher] = useState('all');
 
     useEffect(() => {
         loadData();
@@ -600,6 +604,19 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                 </div>
                             </div>
 
+                            {/* Teacher filter for schedule */}
+                            <div className="px-6 pb-4 flex items-center gap-3">
+                                <Filter size={14} className="text-gray-500" />
+                                <select
+                                    className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-xs font-bold text-gray-200 outline-none focus:ring-2 focus:ring-emerald-500/30"
+                                    value={scheduleFilterTeacher}
+                                    onChange={(e) => setScheduleFilterTeacher(e.target.value)}
+                                >
+                                    <option value="all">Todos os Professores</option>
+                                    {allTeachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </select>
+                            </div>
+
                             <div className="p-4">
                                 <div className="grid grid-cols-7 mb-2">
                                     {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(d => (
@@ -613,7 +630,11 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                     {Array.from({ length: days }).map((_, i) => {
                                         const day = i + 1;
                                         const fullDate = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                                        const daySchedules = schedules.filter(s => s.plannedDate === fullDate);
+                                        const filteredScheds = scheduleFilterTeacher === 'all' ? schedules : schedules.filter(s => {
+                                            const mod = s.module || allModules.find(m => m.id === s.moduleId);
+                                            return mod?.teacherId === scheduleFilterTeacher;
+                                        });
+                                        const daySchedules = filteredScheds.filter(s => s.plannedDate === fullDate);
                                         const isToday = new Date().toDateString() === new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
 
                                         return (
@@ -691,76 +712,74 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                 <BarChart3 className="text-amber-500" />
                                 Planejado x Executado
                             </h2>
-                            <p className="text-xs text-gray-500 mt-1">Comparação entre aulas planejadas e registros de sala de aula.</p>
+                            <p className="text-xs text-gray-500 mt-1">Clique num professor para ver o relatório detalhado.</p>
                         </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full border-collapse">
-                                <thead>
-                                    <tr className="bg-gray-800/30">
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800">Data Planejada</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800">Disciplina / Módulo</th>
-                                        <th className="px-6 py-4 text-center text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800">Status</th>
-                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800">Justificativa</th>
-                                        <th className="px-6 py-4 text-center text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800">Ação</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-800/50">
-                                    {schedules.length === 0 ? (
-                                        <tr><td colSpan={5} className="text-center py-16 text-gray-600 italic text-sm">Nenhum agendamento encontrado.</td></tr>
-                                    ) : schedules.map(sch => {
-                                        const mod = sch.module || allModules.find(m => m.id === sch.moduleId);
-                                        const discName = getDisciplineName(mod?.disciplineId);
-                                        const className = getClassName(mod?.classId);
-                                        // Check if a session was registered on planned date matching teacher+subject+class
-                                        const matchSession = sessions.find(sess => {
-                                            const sessDate = sess.date?.split('T')[0];
-                                            return sessDate === sch.plannedDate && sess.teacherId === mod?.teacherId;
-                                        });
-                                        const wasExecuted = !!matchSession;
-                                        const isPast = new Date(sch.plannedDate + 'T23:59:59') < new Date();
-                                        const statusLabel = wasExecuted ? 'Executado' : (isPast ? 'Não Executado' : 'Pendente');
-                                        const statusColor = wasExecuted ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : (isPast ? 'text-red-400 bg-red-500/10 border-red-500/20' : 'text-amber-400 bg-amber-500/10 border-amber-500/20');
+                        <div className="p-6 space-y-4">
+                            {(() => {
+                                // Build per-teacher stats
+                                const teacherIds = Array.from(new Set(allSchedules.map(s => {
+                                    const mod = s.module || allModules.find(m => m.id === s.moduleId);
+                                    return mod?.teacherId || '';
+                                }).filter(Boolean)));
 
-                                        return (
-                                            <tr key={sch.id} className="hover:bg-amber-500/[0.02] transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <span className="text-sm font-bold text-gray-200">{sch.plannedDate.split('-').reverse().join('/')}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="text-sm font-bold text-gray-200">{discName}</div>
-                                                    <div className="text-[10px] text-gray-500">Mod. {formatModule(mod?.module)} — {className}</div>
-                                                    <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{mod?.title}</div>
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-lg border ${statusColor}`}>{statusLabel}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {sch.justification ? (
-                                                        <p className="text-xs text-gray-400 italic max-w-xs">{sch.justification}</p>
-                                                    ) : isPast && !wasExecuted ? (
-                                                        <span className="text-[10px] text-red-400 italic">Sem justificativa</span>
-                                                    ) : (
-                                                        <span className="text-[10px] text-gray-600">—</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    {isPast && !wasExecuted && !isLockedForMe && (
-                                                        <button
-                                                            onClick={() => setJustificationModal({ scheduleId: sch.id, open: true, text: sch.justification || '' })}
-                                                            className="flex items-center gap-1.5 mx-auto px-3 py-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl text-[10px] font-bold hover:bg-amber-500/20 transition-all"
-                                                        >
-                                                            <MessageSquare size={12} />
-                                                            Justificar
-                                                        </button>
-                                                    )}
-                                                    {wasExecuted && <CheckCircle2 size={18} className="text-emerald-500 mx-auto" />}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                                if (teacherIds.length === 0) return <p className="text-center text-gray-600 italic py-10 text-sm">Nenhum agendamento encontrado.</p>;
+
+                                return teacherIds.map(tid => {
+                                    const teacher = allTeachers.find(t => t.id === tid);
+                                    const tSchedules = allSchedules.filter(s => {
+                                        const mod = s.module || allModules.find(m => m.id === s.moduleId);
+                                        return mod?.teacherId === tid;
+                                    });
+                                    const total = tSchedules.length;
+                                    const executed = tSchedules.filter(s => {
+                                        const matchSess = sessions.find(sess => sess.date?.split('T')[0] === s.plannedDate && sess.teacherId === tid);
+                                        return !!matchSess;
+                                    }).length;
+                                    const pending = tSchedules.filter(s => new Date(s.plannedDate + 'T23:59:59') >= new Date()).length;
+                                    const notExecuted = total - executed - pending;
+                                    const pctExecuted = total > 0 ? Math.round((executed / total) * 100) : 0;
+                                    const pctNotExecuted = total > 0 ? Math.round((notExecuted / total) * 100) : 0;
+                                    const pctPending = total > 0 ? Math.round((pending / total) * 100) : 0;
+
+                                    return (
+                                        <div
+                                            key={tid}
+                                            onClick={() => setPxeSelectedTeacher(tid)}
+                                            className="bg-gray-900/50 rounded-2xl border border-gray-800/50 p-5 cursor-pointer hover:border-amber-500/30 hover:bg-amber-500/[0.03] transition-all group"
+                                        >
+                                            <div className="flex items-center justify-between mb-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 font-black text-sm">
+                                                        {(teacher?.name || '?').charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">{teacher?.name || 'Desconhecido'}</p>
+                                                        <p className="text-[10px] text-gray-500">{total} aulas planejadas</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-4 text-[10px] font-bold">
+                                                    <span className="text-emerald-400">{executed} exec.</span>
+                                                    <span className="text-red-400">{notExecuted} não exec.</span>
+                                                    <span className="text-amber-400">{pending} pend.</span>
+                                                    <ChevronRight size={16} className="text-gray-600 group-hover:text-amber-400 transition-colors" />
+                                                </div>
+                                            </div>
+                                            {/* Progress bar */}
+                                            <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden flex">
+                                                {pctExecuted > 0 && <div className="bg-emerald-500 h-full transition-all" style={{ width: `${pctExecuted}%` }} />}
+                                                {pctNotExecuted > 0 && <div className="bg-red-500 h-full transition-all" style={{ width: `${pctNotExecuted}%` }} />}
+                                                {pctPending > 0 && <div className="bg-amber-500/40 h-full transition-all" style={{ width: `${pctPending}%` }} />}
+                                            </div>
+                                            <div className="flex gap-4 mt-2 text-[9px] text-gray-600">
+                                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />Executado {pctExecuted}%</span>
+                                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" />Não Exec. {pctNotExecuted}%</span>
+                                                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500/40 inline-block" />Pendente {pctPending}%</span>
+                                            </div>
+                                        </div>
+                                    );
+                                });
+                            })()}
                         </div>
                     </div>
                 </div>
@@ -891,6 +910,114 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                     </div>
                 </div>
             ) : null}
+
+            {/* Modal Relatório Detalhado do Professor */}
+            {pxeSelectedTeacher && (() => {
+                const teacher = allTeachers.find(t => t.id === pxeSelectedTeacher);
+                const tSchedules = allSchedules.filter(s => {
+                    const mod = s.module || allModules.find(m => m.id === s.moduleId);
+                    return mod?.teacherId === pxeSelectedTeacher;
+                }).sort((a, b) => a.plannedDate.localeCompare(b.plannedDate));
+
+                return (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-gray-950/80 backdrop-blur-sm" onClick={() => setPxeSelectedTeacher('')} />
+                        <div className="relative bg-[#0f172a] w-full max-w-4xl max-h-[85vh] rounded-3xl border border-gray-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+                            {/* Header */}
+                            <div className="p-6 bg-gray-900/40 border-b border-gray-800 flex items-center justify-between shrink-0">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-400 font-black text-lg">
+                                        {(teacher?.name || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-white italic">{teacher?.name || 'Professor'}</h3>
+                                        <p className="text-xs text-gray-500">Relatório Planejado x Executado • {tSchedules.length} aulas</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setPxeSelectedTeacher('')} className="p-2 hover:bg-gray-800 rounded-xl text-gray-500 hover:text-white transition-all">✕</button>
+                            </div>
+
+                            {/* Table */}
+                            <div className="overflow-auto flex-1">
+                                <table className="w-full border-collapse">
+                                    <thead className="sticky top-0 bg-[#0f172a] z-10">
+                                        <tr className="bg-gray-800/30">
+                                            <th className="px-5 py-3 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] border-b border-gray-800">Módulo</th>
+                                            <th className="px-5 py-3 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] border-b border-gray-800">Capítulo</th>
+                                            <th className="px-5 py-3 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] border-b border-gray-800">Conteúdo</th>
+                                            <th className="px-5 py-3 text-center text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] border-b border-gray-800">Data Prevista</th>
+                                            <th className="px-5 py-3 text-center text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] border-b border-gray-800">Data Executada</th>
+                                            <th className="px-5 py-3 text-center text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] border-b border-gray-800">Status</th>
+                                            <th className="px-5 py-3 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] border-b border-gray-800">Justificativa</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-800/50">
+                                        {tSchedules.map(sch => {
+                                            const mod = sch.module || allModules.find(m => m.id === sch.moduleId);
+                                            const matchSess = sessions.find(sess => {
+                                                const sessDate = sess.date?.split('T')[0];
+                                                return sessDate === sch.plannedDate && sess.teacherId === pxeSelectedTeacher;
+                                            });
+                                            // Also check if executed on different date
+                                            const anyMatch = sessions.find(sess => sess.teacherId === pxeSelectedTeacher && (sess.subject === getDisciplineName(mod?.disciplineId) || sess.className === getClassName(mod?.classId)));
+                                            const wasExecuted = !!matchSess;
+                                            const executedDate = matchSess ? matchSess.date?.split('T')[0] : (anyMatch ? anyMatch.date?.split('T')[0] : null);
+                                            const isPast = new Date(sch.plannedDate + 'T23:59:59') < new Date();
+                                            const isOnTime = wasExecuted || (executedDate && executedDate <= sch.plannedDate);
+                                            const rowColor = wasExecuted || isOnTime ? 'hover:bg-emerald-500/[0.03]' : (isPast ? 'hover:bg-red-500/[0.03]' : 'hover:bg-amber-500/[0.03]');
+                                            const statusBadge = wasExecuted ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : (isPast ? 'bg-red-500/10 text-red-400 border-red-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20');
+                                            const statusText = wasExecuted ? '✓ No prazo' : (isPast ? '✗ Atrasado' : '◦ Pendente');
+
+                                            return (
+                                                <tr key={sch.id} className={`transition-colors ${rowColor}`}>
+                                                    <td className="px-5 py-3">
+                                                        <span className="text-xs font-bold text-gray-200">{getDisciplineName(mod?.disciplineId)}</span>
+                                                        <span className="text-[10px] text-gray-500 ml-1">M{formatModule(mod?.module)}</span>
+                                                    </td>
+                                                    <td className="px-5 py-3 text-xs text-gray-300">Cap. {formatModule(mod?.chapter)}</td>
+                                                    <td className="px-5 py-3">
+                                                        <p className="text-xs font-bold text-gray-200 truncate max-w-[200px]">{mod?.title}</p>
+                                                        <p className="text-[10px] text-gray-500 truncate max-w-[200px]">{mod?.topic}</p>
+                                                    </td>
+                                                    <td className="px-5 py-3 text-center">
+                                                        <span className="text-xs font-bold text-gray-300">{sch.plannedDate.split('-').reverse().join('/')}</span>
+                                                    </td>
+                                                    <td className="px-5 py-3 text-center">
+                                                        {wasExecuted ? (
+                                                            <span className="text-xs font-bold text-emerald-400">{executedDate?.split('-').reverse().join('/')}</span>
+                                                        ) : executedDate ? (
+                                                            <span className="text-xs font-bold text-amber-400">{executedDate?.split('-').reverse().join('/')}</span>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-600 italic">—</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-5 py-3 text-center">
+                                                        <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg border ${statusBadge}`}>{statusText}</span>
+                                                    </td>
+                                                    <td className="px-5 py-3">
+                                                        {sch.justification ? (
+                                                            <p className="text-[10px] text-gray-400 italic max-w-[160px] truncate">{sch.justification}</p>
+                                                        ) : isPast && !wasExecuted ? (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setJustificationModal({ scheduleId: sch.id, open: true, text: '' }); }}
+                                                                className="text-[10px] text-amber-400 hover:text-amber-300 font-bold"
+                                                            >
+                                                                + Justificar
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-[10px] text-gray-700">—</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Modal de Justificativa */}
             {justificationModal.open && (
