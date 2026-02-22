@@ -54,10 +54,21 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                 setTeacherAssignments(currentTeacher.assignments);
             }
 
-            const mods = await SupabaseService.getPlanningModules(
-                userRole === UserRole.TEACHER ? { teacherId: currentTeacher?.id } : undefined
-            );
-            setModules(mods);
+            const mods = await SupabaseService.getPlanningModules();
+
+            // Filter modules locally based on teacher assignments if user is a teacher
+            let filteredMods = mods;
+            if (userRole === UserRole.TEACHER) {
+                filteredMods = mods.filter(m => {
+                    return teacherAssignments.some(assign => {
+                        const discipline = disciplines.find(d => d.name === assign.subject);
+                        return m.classId === assign.classId &&
+                            (m.disciplineId === assign.subject || m.disciplineId === discipline?.id) &&
+                            (m.front === assign.front || !m.front || m.front === 'Geral');
+                    });
+                });
+            }
+            setModules(filteredMods);
 
             if (activeTab === 'SCHEDULE') {
                 const scheds = await SupabaseService.getPlanningSchedule();
@@ -256,13 +267,15 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                 {userRole === UserRole.COORDINATOR ? (
                                                     disciplines.map(d => <option key={d.id as string} value={d.id as string}>{d.name}</option>)
                                                 ) : (
-                                                    teacherAssignments
+                                                    // Get unique subjects assigned to the current teacher for the selected class
+                                                    Array.from(new Set(teacherAssignments
                                                         .filter(a => a.classId === selectedClass)
-                                                        .map((a, idx) => {
-                                                            const discipline = disciplines.find(d => d.name === a.subject);
+                                                        .map(a => a.subject)))
+                                                        .map((subject, idx) => {
+                                                            const disciplineId = disciplines.find(d => d.name === subject)?.id || subject;
                                                             return (
-                                                                <option key={`${a.subject}-${idx}`} value={discipline?.id || a.subject}>
-                                                                    {a.subject}
+                                                                <option key={`${subject}-${idx}`} value={disciplineId}>
+                                                                    {subject}
                                                                 </option>
                                                             );
                                                         })
@@ -289,7 +302,10 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                 >
                                                     <option value="">Selecione a Frente</option>
                                                     {teacherAssignments
-                                                        .filter(a => a.classId === selectedClass && a.subject === selectedDiscipline)
+                                                        .filter(a => {
+                                                            const disciplineId = disciplines.find(d => d.name === a.subject)?.id || a.subject;
+                                                            return a.classId === selectedClass && disciplineId === selectedDiscipline;
+                                                        })
                                                         .map((a, idx) => (
                                                             <option key={`${a.front}-${idx}`} value={a.front || 'Geral'}>{a.front || 'Geral'}</option>
                                                         ))
