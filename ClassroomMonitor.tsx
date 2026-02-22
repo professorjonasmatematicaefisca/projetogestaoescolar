@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { UserAvatar } from './components/UserAvatar';
 
 interface ClassroomMonitorProps {
     onShowToast: (msg: string) => void;
@@ -679,7 +680,11 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                     <div className="p-4 flex items-center justify-between border-b border-gray-800">
                                         <div className="flex items-center gap-3">
                                             <div className="relative">
-                                                <img src={student.photoUrl} alt={student.name} className="w-12 h-12 rounded-full object-cover ring-2 ring-gray-700" />
+                                                <UserAvatar
+                                                    name={student.name}
+                                                    photoUrl={student.photoUrl}
+                                                    size="lg"
+                                                />
                                                 <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#0f172a] ${record.present ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
                                             </div>
                                             <div>

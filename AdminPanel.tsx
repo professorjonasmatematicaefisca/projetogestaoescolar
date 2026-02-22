@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, Users, School, BookOpen, X, Plus, Camera, Lock, Trash2, GraduationCap, Edit2 } from 'lucide-react';
 import { SupabaseService } from './services/supabaseService';
 import { Student, Teacher, ClassRoom, Discipline, UserRole, TeacherClassAssignment } from './types';
+import { UserAvatar } from './components/UserAvatar';
 
 interface AdminPanelProps {
     onShowToast: (msg: string) => void;
@@ -346,20 +347,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
         }
     };
 
-    // Helper Functions
-    const getInitials = (name: string) => {
-        return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-    };
-
-    const getAvatarColor = (name: string) => {
-        const colors = [
-            'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-green-500',
-            'bg-yellow-500', 'bg-red-500', 'bg-indigo-500', 'bg-teal-500'
-        ];
-        const index = name.charCodeAt(0) % colors.length;
-        return colors[index];
-    };
-
     const getRoleBadgeColor = (role: UserRole) => {
         switch (role) {
             case UserRole.COORDINATOR: return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
@@ -479,9 +466,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                         </div>
 
                         <div className="flex flex-col items-center text-center mt-6">
-                            <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl mb-3 ${getAvatarColor(student.name)}`}>
-                                {getInitials(student.name)}
-                            </div>
+                            <UserAvatar
+                                name={student.name}
+                                photoUrl={student.photoUrl}
+                                size="xl"
+                                className="mb-3"
+                            />
 
                             <h3 className="text-white font-bold mb-1">{student.name}</h3>
                             <p className="text-xs text-gray-400 mb-2">{student.parentEmail}</p>
@@ -521,9 +511,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                         </div>
 
                         <div className="flex flex-col items-center text-center mt-6">
-                            <div className="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center text-gray-400 mb-3">
-                                <Users size={32} />
-                            </div>
+                            <UserAvatar
+                                name={member.name}
+                                photoUrl={member.photoUrl}
+                                size="xl"
+                                className="mb-3"
+                            />
 
                             <h3 className="text-white font-bold mb-1">{member.name}</h3>
                             <p className="text-xs text-gray-400 mb-3">{member.email}</p>

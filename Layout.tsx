@@ -15,6 +15,7 @@ import {
   FileText,
   BookOpen
 } from 'lucide-react';
+import { UserAvatar } from './components/UserAvatar';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -155,17 +156,11 @@ export const Layout: React.FC<LayoutProps> = ({
           </button>
 
           <div className="flex items-center gap-3 mb-2 p-2">
-            {userPhoto ? (
-              <img
-                src={userPhoto}
-                alt="Perfil"
-                className="w-10 h-10 rounded-full object-cover border border-gray-600"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-gray-300">
-                <UserCircle size={24} />
-              </div>
-            )}
+            <UserAvatar
+              name={userName || (role === UserRole.COORDINATOR ? 'Coordenador' : role === UserRole.TEACHER ? 'Professor' : 'Monitor')}
+              photoUrl={userPhoto}
+              size="md"
+            />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">
                 {userName || (role === UserRole.COORDINATOR ? 'Coordenação' : role === UserRole.TEACHER ? 'Professor(a)' : 'Monitor(a)')}

@@ -7,6 +7,7 @@ import { Sparkles, TrendingUp, AlertTriangle, Users, Download, School } from 'lu
 import { SupabaseService } from './services/supabaseService';
 import { StorageService } from './services/storageService';
 import { ClassSession, ClassRoom } from './types';
+import { UserAvatar } from './components/UserAvatar';
 
 interface DashboardProps {
     onNavigateToStudent?: (studentId: string) => void;
@@ -278,7 +279,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent }) => 
                                 className="flex items-center gap-3 p-3 rounded-lg bg-[#1e293b] hover:bg-[#2d3b4e] cursor-pointer transition-colors border border-gray-700 hover:border-emerald-500/50 group"
                             >
                                 <div className="relative">
-                                    <img src={student.photoUrl} alt={student.name} className="w-10 h-10 rounded-full object-cover border border-gray-600" />
+                                    <UserAvatar
+                                        name={student.name}
+                                        photoUrl={student.photoUrl}
+                                        size="md"
+                                    />
                                     <div className="absolute -top-1 -left-1 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white border border-[#1e293b]">
                                         {idx + 1}
                                     </div>

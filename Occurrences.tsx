@@ -7,6 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { useEffect } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { UserAvatar } from './components/UserAvatar';
 
 interface OccurrencesProps {
     onShowToast: (msg: string) => void;
@@ -333,9 +334,7 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                         <AlertCircle size={18} />
                         Alerta SOS
                     </button>
-                    <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden border-2 border-white">
-                        <img src="https://i.pravatar.cc/150?u=admin" />
-                    </div>
+                    <UserAvatar name="Administrador" size="md" />
                 </div>
             </div>
 
@@ -427,7 +426,11 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                 >
                                     <div className="flex items-center gap-3 flex-1">
                                         <div className="text-2xl font-bold text-gray-500 w-8">{index + 1}°</div>
-                                        <img src={student.studentPhoto} className="w-12 h-12 rounded-full border-2 border-emerald-500" />
+                                        <UserAvatar
+                                            name={student.studentName}
+                                            photoUrl={student.studentPhoto}
+                                            size="lg"
+                                        />
                                         <div>
                                             <p className="font-bold text-white">{student.studentName}</p>
                                             <p className="text-xs text-gray-400">{student.className}</p>
@@ -550,7 +553,11 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                                 : 'bg-transparent border-transparent hover:bg-gray-800'
                                                 }`}
                                         >
-                                            <img src={s.photoUrl} className="w-8 h-8 rounded-full" />
+                                            <UserAvatar
+                                                name={s.name}
+                                                photoUrl={s.photoUrl}
+                                                size="sm"
+                                            />
                                             <div className="flex-1">
                                                 <p className="text-sm font-bold text-white">{s.name}</p>
                                                 <p className="text-[10px] text-gray-500">{s.className}</p>
@@ -614,7 +621,11 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                     <div key={exit.id} className="bg-[#1e293b] border border-gray-700 rounded-xl p-4 flex items-center justify-between group hover:border-orange-500/50 transition-colors">
                                         <div className="flex items-center gap-3">
                                             <div className="relative">
-                                                <img src={exit.studentPhoto || "https://i.pravatar.cc/150"} className="w-12 h-12 rounded-full border-2 border-[#0f172a]" />
+                                                <UserAvatar
+                                                    name={exit.studentName}
+                                                    photoUrl={exit.studentPhoto}
+                                                    size="lg"
+                                                />
                                                 <div className="absolute -bottom-1 -right-1 bg-orange-500 text-[#0f172a] text-[10px] font-bold px-1.5 rounded-full border border-[#1e293b]">
                                                     OUT
                                                 </div>
@@ -677,7 +688,11 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                             <tr key={exit.id} className="border-b border-gray-800/50 hover:bg-[#1e293b] transition-colors">
                                                 <td className="py-3 pl-4">
                                                     <div className="flex items-center gap-2">
-                                                        <img src={exit.studentPhoto} className="w-6 h-6 rounded-full" />
+                                                        <UserAvatar
+                                                            name={exit.studentName}
+                                                            photoUrl={exit.studentPhoto}
+                                                            size="xs"
+                                                        />
                                                         <span className="text-gray-300 font-bold text-xs">{exit.studentName}</span>
                                                     </div>
                                                 </td>
@@ -796,7 +811,11 @@ export const Occurrences: React.FC<OccurrencesProps> = ({ onShowToast }) => {
                                                     : 'bg-[#1e293b] border-transparent hover:bg-gray-800'
                                                     }`}
                                             >
-                                                <img src={s.photoUrl} className="w-8 h-8 rounded-full" />
+                                                <UserAvatar
+                                                    name={s.name}
+                                                    photoUrl={s.photoUrl}
+                                                    size="sm"
+                                                />
                                                 <div className="flex-1">
                                                     <p className="text-sm font-bold text-white">{s.name}</p>
                                                     <p className="text-[10px] text-gray-500">TURMA 10-A • ID: {s.id.split('-')[1]}</p>
