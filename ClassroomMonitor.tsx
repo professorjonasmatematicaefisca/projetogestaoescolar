@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Student, ClassSession, SessionRecord, Counters, Teacher, ClassRoom, UserRole } from './types';
+import { Student, ClassSession, SessionRecord, Counters, Teacher, ClassRoom, UserRole, PlanningModule, Discipline } from './types';
 import { StorageService } from './services/storageService';
 import { SupabaseService } from './services/supabaseService';
 import {
     MessageSquare, Moon, Smartphone, Book,
-    Zap, Save, RefreshCw, Check, X,
+    Zap, Save, RefreshCw, Check, X, Tag,
     MoreVertical, Search, Bell, AlertCircle, Clock, ChevronDown, Calendar, FileText, Hand, Plus, Camera, Trash2, BookOpen, History, ArrowRight, Upload
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -76,6 +76,12 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
     const [classTopic, setClassTopic] = useState(''); // General Notes
     const [classHomework, setClassHomework] = useState('');
     const [classPhotos, setClassPhotos] = useState<string[]>([]);
+
+    // --- Planning Modules for Content Selection ---
+    const [allDisciplines, setAllDisciplines] = useState<Discipline[]>([]);
+    const [contentModules, setContentModules] = useState<PlanningModule[]>([]);
+    const [selectedContentIds, setSelectedContentIds] = useState<string[]>([]);
+    const [loadingModules, setLoadingModules] = useState(false);
 
     // Camera State
     const [isCameraActive, setIsCameraActive] = useState(false);
@@ -395,11 +401,59 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     // --- Class Register Modal Logic ---
 
+    const loadContentModules = async () => {
+        setLoadingModules(true);
+        try {
+            const [mods, discs] = await Promise.all([
+                SupabaseService.getPlanningModules(),
+                SupabaseService.getDisciplines()
+            ]);
+            setAllDisciplines(discs);
+
+            // Find class ID and discipline ID from current selection
+            const classObj = allClasses.find(c => c.name === selectedClassId);
+            const discObj = discs.find(d => d.name === selectedSubject);
+
+            const filtered = mods.filter(m => {
+                const classMatch = classObj ? m.classId === classObj.id : false;
+                const discMatch = discObj ? m.disciplineId === discObj.id : false;
+                return classMatch && discMatch;
+            });
+            setContentModules(filtered);
+        } catch (err) {
+            console.error('Error loading planning modules:', err);
+        }
+        setLoadingModules(false);
+    };
+
+    const handleOpenClassModal = () => {
+        setClassModalOpen(true);
+        setSelectedContentIds([]);
+        loadContentModules();
+    };
+
+    const toggleContentModule = (moduleId: string) => {
+        setSelectedContentIds(prev =>
+            prev.includes(moduleId) ? prev.filter(id => id !== moduleId) : [...prev, moduleId]
+        );
+    };
+
+    const buildContentString = (): string => {
+        const parts: string[] = [];
+        selectedContentIds.forEach(id => {
+            const mod = contentModules.find(m => m.id === id);
+            if (mod) parts.push(`Cap. ${mod.chapter} — Mod. ${mod.module} — ${mod.title}`);
+        });
+        if (classTopic.trim()) parts.push(classTopic.trim());
+        return parts.join(' | ');
+    };
+
     const handleSaveClassInfo = async () => {
         if (session) {
+            const contentStr = buildContentString();
             const updatedSession = {
                 ...session,
-                generalNotes: classTopic,
+                generalNotes: contentStr,
                 homework: classHomework,
                 photos: classPhotos
             };
@@ -407,12 +461,11 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             const success = await SupabaseService.saveSession(updatedSession, userEmail);
             if (success) {
                 onShowToast("Conteúdo de aula salvo no Supabase!");
-                setHasUnsavedChanges(false); // Saved successfully
+                setHasUnsavedChanges(false);
             } else {
                 onShowToast("Aviso: Falha ao salvar no servidor. Verifique sua conexão.");
-                // Backup save to Storage anyway
                 StorageService.saveSession(updatedSession);
-                setHasUnsavedChanges(false); // Consider saved locally
+                setHasUnsavedChanges(false);
             }
             setClassModalOpen(false);
             stopCamera();
@@ -856,7 +909,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 <div className="flex flex-wrap gap-2 w-full md:w-auto justify-center sm:justify-end">
                     {/* New Class Register Button */}
                     <button
-                        onClick={() => setClassModalOpen(true)}
+                        onClick={handleOpenClassModal}
                         className="flex-1 sm:flex-none min-w-[140px] px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm"
                     >
                         <Plus size={18} />
@@ -1012,11 +1065,56 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
                                         <div>
                                             <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Conteúdo Ministrado</label>
+                                            <p className="text-[10px] text-gray-600 mb-3">Selecione os conteúdos do planejamento ministrados nesta aula:</p>
+                                            {loadingModules ? (
+                                                <div className="flex items-center gap-2 py-4 justify-center">
+                                                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                                    <span className="text-xs text-gray-500">Carregando conteúdos...</span>
+                                                </div>
+                                            ) : contentModules.length > 0 ? (
+                                                <div className="flex flex-wrap gap-2 mb-3">
+                                                    {contentModules.map(mod => (
+                                                        <button
+                                                            key={mod.id}
+                                                            type="button"
+                                                            onClick={() => toggleContentModule(mod.id)}
+                                                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${selectedContentIds.includes(mod.id)
+                                                                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/40 shadow-lg shadow-blue-500/10'
+                                                                    : 'bg-gray-800/60 text-gray-400 border-gray-700 hover:border-blue-500/30 hover:text-gray-200'
+                                                                }`}
+                                                        >
+                                                            {selectedContentIds.includes(mod.id) ? <Check size={12} /> : <Tag size={12} />}
+                                                            Cap. {mod.chapter} — Mod. {mod.module} — {mod.title}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-gray-600 italic py-3 text-center bg-gray-900/30 rounded-lg border border-dashed border-gray-800">
+                                                    Nenhum conteúdo planejado encontrado para {selectedClassId} / {selectedSubject}.
+                                                </p>
+                                            )}
+                                            {selectedContentIds.length > 0 && (
+                                                <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-3 mb-3">
+                                                    <span className="text-[10px] text-blue-400 font-bold uppercase">Selecionados ({selectedContentIds.length})</span>
+                                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                                        {selectedContentIds.map(id => {
+                                                            const mod = contentModules.find(m => m.id === id);
+                                                            return mod ? (
+                                                                <span key={id} className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-lg px-2 py-1 text-[10px] font-bold">
+                                                                    <Check size={10} />
+                                                                    Cap. {mod.chapter} — Mod. {mod.module} — {mod.title}
+                                                                    <button onClick={() => toggleContentModule(id)} className="ml-1 hover:text-red-400"><X size={10} /></button>
+                                                                </span>
+                                                            ) : null;
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
                                             <textarea
                                                 value={classTopic}
                                                 onChange={(e) => setClassTopic(e.target.value)}
-                                                className="w-full h-24 bg-[#0f172a] border border-gray-700 rounded-lg p-3 text-white placeholder-gray-600 outline-none focus:border-blue-500"
-                                                placeholder="Descreva o assunto abordado na aula de hoje..."
+                                                className="w-full h-16 bg-[#0f172a] border border-gray-700 rounded-lg p-3 text-white placeholder-gray-600 outline-none focus:border-blue-500 text-xs"
+                                                placeholder="Observações adicionais sobre o conteúdo (opcional)..."
                                             ></textarea>
                                         </div>
 
