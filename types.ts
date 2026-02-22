@@ -133,6 +133,7 @@ export interface PlanningModule {
   module: string;
   title: string;
   topic: string;
+  bimestre: number;
   createdAt?: string;
 }
 
@@ -140,6 +141,8 @@ export interface PlanningSchedule {
   id: string;
   moduleId: string;
   plannedDate: string;
+  executionStatus?: 'pending' | 'executed' | 'not_executed';
+  justification?: string;
   createdAt?: string;
 }
 

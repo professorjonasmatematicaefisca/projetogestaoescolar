@@ -27,6 +27,7 @@ export const SupabaseService = {
             module: m.module,
             title: m.title,
             topic: m.topic,
+            bimestre: m.bimestre || 1,
             createdAt: m.created_at
         }));
     },
@@ -49,7 +50,8 @@ export const SupabaseService = {
             chapter: module.chapter,
             module: module.module,
             title: module.title,
-            topic: module.topic
+            topic: module.topic,
+            bimestre: module.bimestre || 1
         }).select().single();
 
         if (error) {
@@ -77,6 +79,8 @@ export const SupabaseService = {
             id: s.id,
             moduleId: s.module_id,
             plannedDate: s.planned_date,
+            executionStatus: s.execution_status || 'pending',
+            justification: s.justification,
             createdAt: s.created_at,
             module: s.module ? {
                 id: s.module.id,
@@ -88,6 +92,7 @@ export const SupabaseService = {
                 module: s.module.module,
                 title: s.module.title,
                 topic: s.module.topic,
+                bimestre: s.module.bimestre || 1,
                 createdAt: s.module.created_at
             } : undefined
         }));
@@ -153,6 +158,18 @@ export const SupabaseService = {
 
         if (error) {
             console.error("Error saving planning schedule:", error);
+            return false;
+        }
+        return true;
+    },
+
+    async updateScheduleJustification(scheduleId: string, status: string, justification: string): Promise<boolean> {
+        const { error } = await supabase.from('planning_schedule').update({
+            execution_status: status,
+            justification: justification
+        }).eq('id', scheduleId);
+        if (error) {
+            console.error("Error updating justification:", error);
             return false;
         }
         return true;

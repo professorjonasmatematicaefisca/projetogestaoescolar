@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Plus, Search, Calendar, ChevronRight, ChevronLeft, Save, Trash2, Filter, List, CheckCircle2, Clock, Lock, Unlock, Users, Eye, ShieldAlert } from 'lucide-react';
+import { BookOpen, Plus, Search, Calendar, ChevronRight, ChevronLeft, Save, Trash2, Filter, List, CheckCircle2, Clock, Lock, Unlock, Users, Eye, ShieldAlert, BarChart3, AlertTriangle, MessageSquare } from 'lucide-react';
 import { SupabaseService } from './services/supabaseService';
-import { UserRole, PlanningModule, ClassRoom, Discipline, TeacherClassAssignment, PlanningSchedule, Teacher } from './types';
+import { UserRole, PlanningModule, ClassRoom, Discipline, TeacherClassAssignment, PlanningSchedule, Teacher, ClassSession } from './types';
 
 interface PlanningProps {
     userEmail: string;
@@ -9,7 +9,7 @@ interface PlanningProps {
     onShowToast: (msg: string) => void;
 }
 
-type Tab = 'CONTENT' | 'SCHEDULE' | 'COORDINATOR_VIEW';
+type Tab = 'CONTENT' | 'SCHEDULE' | 'PLANNED_VS_EXECUTED' | 'COORDINATOR_VIEW';
 
 export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowToast }) => {
     const [activeTab, setActiveTab] = useState<Tab>('CONTENT');
@@ -28,8 +28,9 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
     const [showAddForm, setShowAddForm] = useState(false);
     const [selectedClass, setSelectedClass] = useState('');
     const [selectedDiscipline, setSelectedDiscipline] = useState('');
-    const [formData, setFormData] = useState({ chapter: '', moduleNumber: '', title: '', topic: '' });
+    const [formData, setFormData] = useState({ chapter: '', moduleNumber: '', title: '', topic: '', bimestre: '1' });
     const [filterClass, setFilterClass] = useState('all');
+    const [filterBimestre, setFilterBimestre] = useState('all');
 
     // Calendar states
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -44,6 +45,10 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
     // Coordinator view states
     const [coordSelectedTeacher, setCoordSelectedTeacher] = useState('');
     const [coordDate, setCoordDate] = useState(new Date());
+
+    // Planejado x Executado states
+    const [sessions, setSessions] = useState<ClassSession[]>([]);
+    const [justificationModal, setJustificationModal] = useState<{ scheduleId: string; open: boolean; text: string }>({ scheduleId: '', open: false, text: '' });
 
     useEffect(() => {
         loadData();
@@ -107,6 +112,10 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                 const myLock = locks.teacherLocks.find(l => l.teacherId === currentTeacher.id);
                 setIsLockedForMe(locks.globalLocked || (myLock?.locked ?? false));
             }
+
+            // Load sessions for Planejado x Executado
+            const allSessions = await SupabaseService.getSessions();
+            setSessions(allSessions);
         } catch (error) {
             console.error("Error loading planning data:", error);
         } finally {
@@ -144,14 +153,15 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
             chapter: formData.chapter,
             module: formData.moduleNumber,
             title: formData.title,
-            topic: formData.topic
+            topic: formData.topic,
+            bimestre: parseInt(formData.bimestre) || 1
         });
         const success = savedId !== null;
 
         if (success) {
             onShowToast("Módulo salvo com sucesso!");
             // Keep form open with turma/disciplina selected — only clear content fields
-            setFormData({ chapter: '', moduleNumber: '', title: '', topic: '' });
+            setFormData({ chapter: '', moduleNumber: '', title: '', topic: '', bimestre: formData.bimestre });
             loadData();
         } else {
             onShowToast("Erro ao salvar módulo");
@@ -233,6 +243,18 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
         if (success) {
             const teacher = allTeachers.find(t => t.id === teacherId);
             onShowToast(newState ? `🔒 ${teacher?.name} bloqueado` : `🔓 ${teacher?.name} liberado`);
+            loadData();
+        }
+    };
+
+    const handleSaveJustification = async () => {
+        if (!justificationModal.scheduleId) return;
+        const success = await SupabaseService.updateScheduleJustification(
+            justificationModal.scheduleId, 'not_executed', justificationModal.text
+        );
+        if (success) {
+            onShowToast('Justificativa salva!');
+            setJustificationModal({ scheduleId: '', open: false, text: '' });
             loadData();
         }
     };
@@ -322,6 +344,13 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                         <Calendar size={18} />
                         Cronograma
                     </button>
+                    <button
+                        onClick={() => setActiveTab('PLANNED_VS_EXECUTED')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all text-sm ${activeTab === 'PLANNED_VS_EXECUTED' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'text-gray-400 hover:text-gray-200'}`}
+                    >
+                        <BarChart3 size={18} />
+                        Plan. x Exec.
+                    </button>
                     {userRole === UserRole.COORDINATOR && (
                         <button
                             onClick={() => setActiveTab('COORDINATOR_VIEW')}
@@ -406,6 +435,19 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                 )}
                                             </select>
                                         </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-2 ml-1">Bimestre</label>
+                                            <select
+                                                className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-emerald-500/50 transition-all outline-none font-bold text-sm"
+                                                value={formData.bimestre}
+                                                onChange={(e) => setFormData({ ...formData, bimestre: e.target.value })}
+                                            >
+                                                <option value="1">1º Bimestre</option>
+                                                <option value="2">2º Bimestre</option>
+                                                <option value="3">3º Bimestre</option>
+                                                <option value="4">4º Bimestre</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -476,6 +518,17 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                 <option value="all">Todas as Turmas</option>
                                 {classes.map(c => <option key={c.id as string} value={c.id as string}>{c.name}</option>)}
                             </select>
+                            <select
+                                className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-xs font-bold text-gray-200 outline-none focus:ring-2 focus:ring-emerald-500/30"
+                                value={filterBimestre}
+                                onChange={(e) => setFilterBimestre(e.target.value)}
+                            >
+                                <option value="all">Todos os Bimestres</option>
+                                <option value="1">1º Bimestre</option>
+                                <option value="2">2º Bimestre</option>
+                                <option value="3">3º Bimestre</option>
+                                <option value="4">4º Bimestre</option>
+                            </select>
                         </div>
 
                         <div className="overflow-x-auto">
@@ -489,11 +542,12 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-800/50">
-                                    {modules.filter(m => filterClass === 'all' || m.classId === filterClass).map((module) => (
+                                    {modules.filter(m => (filterClass === 'all' || m.classId === filterClass) && (filterBimestre === 'all' || m.bimestre === parseInt(filterBimestre))).map((module) => (
                                         <tr key={module.id} className="hover:bg-emerald-500/[0.02] transition-colors group">
                                             <td className="px-8 py-5">
                                                 <div className="font-black text-emerald-400 text-sm mb-1">{getClassName(module.classId)}</div>
                                                 <div className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{getDisciplineName(module.disciplineId)}</div>
+                                                <div className="text-[9px] mt-1 bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md inline-block font-bold">{module.bimestre}º Bim</div>
                                             </td>
                                             <td className="px-8 py-5">
                                                 <div className="text-sm font-bold text-gray-300">Cap. {formatModule(module.chapter)}</div>
@@ -628,7 +682,89 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                         </div>
                     </div>
                 </div>
-            ) : (
+            ) : activeTab === 'PLANNED_VS_EXECUTED' ? (
+                /* ===== ABA PLANEJADO X EXECUTADO ===== */
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="bg-[#0f172a] rounded-3xl border border-gray-800 shadow-2xl overflow-hidden">
+                        <div className="p-6 bg-gray-900/40 border-b border-gray-800">
+                            <h2 className="text-xl font-bold text-white flex items-center gap-3 italic">
+                                <BarChart3 className="text-amber-500" />
+                                Planejado x Executado
+                            </h2>
+                            <p className="text-xs text-gray-500 mt-1">Comparação entre aulas planejadas e registros de sala de aula.</p>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <table className="w-full border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-800/30">
+                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800">Data Planejada</th>
+                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800">Disciplina / Módulo</th>
+                                        <th className="px-6 py-4 text-center text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800">Status</th>
+                                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800">Justificativa</th>
+                                        <th className="px-6 py-4 text-center text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] border-b border-gray-800">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-800/50">
+                                    {schedules.length === 0 ? (
+                                        <tr><td colSpan={5} className="text-center py-16 text-gray-600 italic text-sm">Nenhum agendamento encontrado.</td></tr>
+                                    ) : schedules.map(sch => {
+                                        const mod = sch.module || allModules.find(m => m.id === sch.moduleId);
+                                        const discName = getDisciplineName(mod?.disciplineId);
+                                        const className = getClassName(mod?.classId);
+                                        // Check if a session was registered on planned date matching teacher+subject+class
+                                        const matchSession = sessions.find(sess => {
+                                            const sessDate = sess.date?.split('T')[0];
+                                            return sessDate === sch.plannedDate && sess.teacherId === mod?.teacherId;
+                                        });
+                                        const wasExecuted = !!matchSession;
+                                        const isPast = new Date(sch.plannedDate + 'T23:59:59') < new Date();
+                                        const statusLabel = wasExecuted ? 'Executado' : (isPast ? 'Não Executado' : 'Pendente');
+                                        const statusColor = wasExecuted ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' : (isPast ? 'text-red-400 bg-red-500/10 border-red-500/20' : 'text-amber-400 bg-amber-500/10 border-amber-500/20');
+
+                                        return (
+                                            <tr key={sch.id} className="hover:bg-amber-500/[0.02] transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <span className="text-sm font-bold text-gray-200">{sch.plannedDate.split('-').reverse().join('/')}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="text-sm font-bold text-gray-200">{discName}</div>
+                                                    <div className="text-[10px] text-gray-500">Mod. {formatModule(mod?.module)} — {className}</div>
+                                                    <div className="text-xs text-gray-400 mt-0.5 truncate max-w-xs">{mod?.title}</div>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-lg border ${statusColor}`}>{statusLabel}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {sch.justification ? (
+                                                        <p className="text-xs text-gray-400 italic max-w-xs">{sch.justification}</p>
+                                                    ) : isPast && !wasExecuted ? (
+                                                        <span className="text-[10px] text-red-400 italic">Sem justificativa</span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-gray-600">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    {isPast && !wasExecuted && !isLockedForMe && (
+                                                        <button
+                                                            onClick={() => setJustificationModal({ scheduleId: sch.id, open: true, text: sch.justification || '' })}
+                                                            className="flex items-center gap-1.5 mx-auto px-3 py-2 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-xl text-[10px] font-bold hover:bg-amber-500/20 transition-all"
+                                                        >
+                                                            <MessageSquare size={12} />
+                                                            Justificar
+                                                        </button>
+                                                    )}
+                                                    {wasExecuted && <CheckCircle2 size={18} className="text-emerald-500 mx-auto" />}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            ) : activeTab === 'COORDINATOR_VIEW' ? (
                 /* ===== ABA DO COORDENADOR: Visão Geral ===== */
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {/* Seção de Bloqueio */}
@@ -751,6 +887,45 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                     );
                                 })}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Modal de Justificativa */}
+            {justificationModal.open && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-gray-950/80 backdrop-blur-sm" onClick={() => setJustificationModal({ scheduleId: '', open: false, text: '' })} />
+                    <div className="relative bg-[#0f172a] w-full max-w-md rounded-3xl border border-gray-800 shadow-2xl p-8 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center">
+                                <MessageSquare className="text-amber-500" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-white italic">Justificativa</h3>
+                                <p className="text-xs text-gray-500">Informe o motivo da divergência</p>
+                            </div>
+                        </div>
+                        <textarea
+                            className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-amber-500/50 transition-all outline-none min-h-[120px] font-medium leading-relaxed mb-4"
+                            value={justificationModal.text}
+                            onChange={(e) => setJustificationModal({ ...justificationModal, text: e.target.value })}
+                            placeholder="Ex: Feriado escolar, reunião pedagógica, professor ausente..."
+                        />
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setJustificationModal({ scheduleId: '', open: false, text: '' })}
+                                className="flex-1 px-6 py-3.5 rounded-2xl font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all text-sm"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSaveJustification}
+                                disabled={!justificationModal.text.trim()}
+                                className="flex-1 px-6 py-3.5 rounded-2xl font-black bg-amber-600 text-white hover:bg-amber-500 shadow-lg shadow-amber-600/20 transition-all disabled:opacity-50 text-[10px] uppercase tracking-widest"
+                            >
+                                Salvar
+                            </button>
                         </div>
                     </div>
                 </div>
