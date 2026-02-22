@@ -23,7 +23,6 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
     // Content states
     const [showAddForm, setShowAddForm] = useState(false);
     const [selectedClass, setSelectedClass] = useState('');
-    const [selectedFront, setSelectedFront] = useState('');
     const [selectedDiscipline, setSelectedDiscipline] = useState('');
     const [formData, setFormData] = useState({ chapter: '', moduleNumber: '', title: '', topic: '' });
     const [filterClass, setFilterClass] = useState('all');
@@ -63,8 +62,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                     return teacherAssignments.some(assign => {
                         const discipline = disciplines.find(d => d.name === assign.subject);
                         return m.classId === assign.classId &&
-                            (m.disciplineId === assign.subject || m.disciplineId === discipline?.id) &&
-                            (m.front === assign.front || !m.front || m.front === 'Geral');
+                            (m.disciplineId === assign.subject || m.disciplineId === discipline?.id);
                     });
                 });
             }
@@ -83,8 +81,8 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
 
     const handleSaveModule = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedClass || !selectedFront || !selectedDiscipline) {
-            onShowToast("Selecione Turma, Disciplina e Frente");
+        if (!selectedClass || !selectedDiscipline) {
+            onShowToast("Selecione Turma e Disciplina");
             return;
         }
 
@@ -95,7 +93,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
             disciplineId: selectedDiscipline,
             teacherId: currentTeacher?.id || '',
             classId: selectedClass,
-            front: selectedFront,
+            front: '-', // Default placeholder since we don't use it anymore
             chapter: formData.chapter,
             module: formData.moduleNumber,
             title: formData.title,
@@ -259,7 +257,6 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                 value={selectedDiscipline}
                                                 onChange={(e) => {
                                                     setSelectedDiscipline(e.target.value);
-                                                    setSelectedFront(''); // Reset front when discipline changes
                                                 }}
                                                 required
                                             >
@@ -282,37 +279,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                 )}
                                             </select>
                                         </div>
-                                        <div>
-                                            <label className="block text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-2 ml-1">Frente</label>
-                                            {userRole === UserRole.COORDINATOR ? (
-                                                <input
-                                                    type="text"
-                                                    placeholder="Ex: Frente 1, 11B..."
-                                                    className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-emerald-500/50 transition-all outline-none font-bold text-sm"
-                                                    value={selectedFront}
-                                                    onChange={(e) => setSelectedFront(e.target.value)}
-                                                    required
-                                                />
-                                            ) : (
-                                                <select
-                                                    className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-emerald-500/50 transition-all outline-none font-bold text-sm"
-                                                    value={selectedFront}
-                                                    onChange={(e) => setSelectedFront(e.target.value)}
-                                                    required
-                                                >
-                                                    <option value="">Selecione a Frente</option>
-                                                    {teacherAssignments
-                                                        .filter(a => {
-                                                            const disciplineId = disciplines.find(d => d.name === a.subject)?.id || a.subject;
-                                                            return a.classId === selectedClass && disciplineId === selectedDiscipline;
-                                                        })
-                                                        .map((a, idx) => (
-                                                            <option key={`${a.front}-${idx}`} value={a.front || 'Geral'}>{a.front || 'Geral'}</option>
-                                                        ))
-                                                    }
-                                                </select>
-                                            )}
-                                        </div>
+
                                     </div>
                                 </div>
 
