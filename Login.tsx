@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { UserRole } from './types';
 import { SupabaseService } from './services/supabaseService';
-import { GraduationCap, User, Lock, ArrowRight, Loader2, Eye, EyeOff, Zap, TrendingUp, Rocket } from 'lucide-react';
+import { GraduationCap, User, Lock, ArrowRight, Eye, EyeOff, Zap, TrendingUp, Rocket } from 'lucide-react';
+import { LoadingSpinner } from './components/LoadingSpinner';
 
 interface LoginProps {
     onLogin: (role: UserRole, email: string, name?: string, photoUrl?: string) => void;
@@ -135,7 +136,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 group"
                         >
                             {loading ? (
-                                <Loader2 className="animate-spin" size={20} />
+                                <LoadingSpinner size="sm" text="Autenticando..." />
                             ) : (
                                 <>
                                     ENTRAR NO SISTEMA

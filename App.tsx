@@ -10,11 +10,11 @@ import { ChangePassword } from './ChangePassword';
 import { FOA } from './FOA';
 import { Planning } from './Planning';
 import { UserRole, ViewState } from './types';
+import { ErrorBoundary } from './ErrorBoundary';
 
 import { supabase } from './supabaseClient';
 
 function App() {
-  console.log('Supabase Client:', supabase);
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState<ViewState>('MONITORING');
@@ -56,7 +56,7 @@ function App() {
 
   const showToast = (msg: string) => {
     setToast({ msg, visible: true });
-    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 3000);
+    setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 5000);
   };
 
   const handleLogin = (role: UserRole, email: string, name?: string, photoUrl?: string) => {
@@ -118,31 +118,37 @@ function App() {
   };
 
   if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
+    return (
+      <ErrorBoundary>
+        <Login onLogin={handleLogin} />
+      </ErrorBoundary>
+    );
   }
 
   return (
-    <div className={isDark ? 'dark' : ''}>
-      <Layout
-        currentView={currentView}
-        onViewChange={handleViewChange}
-        role={userRole}
-        onRoleChange={setUserRole}
-        onLogout={handleLogout}
-        isDark={isDark}
-        toggleTheme={toggleTheme}
-        userPhoto={userPhoto}
-        userName={userName}
-      >
-        {renderView()}
-      </Layout>
+    <ErrorBoundary>
+      <div className={isDark ? 'dark' : ''}>
+        <Layout
+          currentView={currentView}
+          onViewChange={handleViewChange}
+          role={userRole}
+          onRoleChange={setUserRole}
+          onLogout={handleLogout}
+          isDark={isDark}
+          toggleTheme={toggleTheme}
+          userPhoto={userPhoto}
+          userName={userName}
+        >
+          {renderView()}
+        </Layout>
 
-      {/* Global Toast Notification */}
-      <div className={`fixed bottom-6 right-6 bg-emerald-800 text-white px-6 py-3 rounded-lg shadow-xl transition-all duration-300 transform ${toast.visible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'} z-50 flex items-center gap-2`}>
-        <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-        {toast.msg}
+        {/* Global Toast Notification */}
+        <div className={`fixed bottom-6 right-6 bg-emerald-800 text-white px-6 py-3 rounded-lg shadow-xl transition-all duration-300 transform ${toast.visible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'} z-50 flex items-center gap-2`}>
+          <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+          {toast.msg}
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
 

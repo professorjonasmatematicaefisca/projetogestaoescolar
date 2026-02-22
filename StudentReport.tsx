@@ -579,77 +579,81 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                     {/* Detailed History Table */}
                     <div className="bg-[#0f172a] rounded-xl border border-gray-800 p-6 shadow-lg">
                         <h3 className="text-lg font-bold text-white mb-4">Histórico Detalhado</h3>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead className="bg-[#1e293b] text-xs font-bold text-gray-400 uppercase">
-                                    <tr>
-                                        <th className="px-4 py-3 rounded-tl-lg">Data</th>
-                                        <th className="px-4 py-3">Professor</th>
-                                        <th className="px-4 py-3">Presença</th>
-                                        <th className="px-4 py-3">Ocorrências (Deduções)</th>
-                                        <th className="px-4 py-3 text-right rounded-tr-lg">Nota Final</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-800 text-sm">
-                                    {chartData.length === 0 && (
-                                        <tr><td colSpan={4} className="p-4 text-center text-gray-500">Nenhum registro encontrado neste período.</td></tr>
-                                    )}
-                                    {chartData.slice().reverse().map((d, idx) => { // Show newest first
-                                        const r = d.record!;
-                                        const deductions = [];
-
-                                        if (!r.present) {
-                                            deductions.push(r.justifiedAbsence ? "Falta Justificada (Nota 5.0)" : "Falta (Nota 0.0)");
-                                        } else {
-                                            if (r.counters.talk > 0) deductions.push(`${r.counters.talk}x Conversa`);
-                                            if (r.counters.bathroom > 0) deductions.push(`${r.counters.bathroom}x Banheiro`);
-                                            if (r.counters.sleep > 0) deductions.push(`${r.counters.sleep}x Sono`);
-                                            if (r.counters.material === 0) deductions.push(`Sem Material`);
-                                            if (r.counters.activity < 3) deductions.push(`Atividade Incompleta (-${3 - r.counters.activity})`);
-                                            if (r.phoneConfiscated) deductions.push(`Celular`);
-                                            if (r.counters.participation > 0) deductions.push(`Participação (+0.5)`);
-                                        }
-
-                                        return (
-                                            <tr key={idx} className="hover:bg-[#1e293b]/50">
-                                                <td className="px-4 py-3 text-gray-300">
-                                                    <div>
-                                                        {format(new Date(d.fullDate), "dd 'de' MMMM", { locale: ptBR })}
-                                                        {d.blocksCount > 1 && <span className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">{d.blocksCount} aulas</span>}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-gray-400 text-xs">
-                                                    {d.teacherName || '---'}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {r.present
-                                                        ? <span className="text-emerald-500 font-bold flex items-center gap-1"><CheckCircle2 size={14} /> SIM</span>
-                                                        : <span className="text-red-500 font-bold flex items-center gap-1"><AlertCircle size={14} /> NÃO</span>
-                                                    }
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {deductions.length > 0 ? (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {deductions.map((ded, i) => (
-                                                                <span key={i} className={`text-[10px] px-2 py-0.5 rounded border ${ded.includes('+') ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
-                                                                    {ded}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-gray-500 text-xs italic">Sem deduções</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    <span className={`font-bold text-lg ${Number(d.aluno) >= 10 ? 'text-emerald-400' : Number(d.aluno) >= 6 ? 'text-white' : 'text-red-400'}`}>
-                                                        {d.aluno?.toFixed(1)}
-                                                    </span>
-                                                </td>
+                        <div className="overflow-x-auto -mx-6 px-6">
+                            <div className="inline-block min-w-full align-middle">
+                                <div className="overflow-hidden">
+                                    <table className="min-w-full text-left">
+                                        <thead className="bg-[#1e293b] text-xs font-bold text-gray-400 uppercase">
+                                            <tr>
+                                                <th className="px-4 py-3 rounded-tl-lg sticky left-0 bg-[#1e293b] z-10">Data</th>
+                                                <th className="px-4 py-3">Professor</th>
+                                                <th className="px-4 py-3">Presença</th>
+                                                <th className="px-4 py-3">Ocorrências (Deduções)</th>
+                                                <th className="px-4 py-3 text-right rounded-tr-lg">Nota Final</th>
                                             </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-800 text-sm">
+                                            {chartData.length === 0 && (
+                                                <tr><td colSpan={4} className="p-4 text-center text-gray-500">Nenhum registro encontrado neste período.</td></tr>
+                                            )}
+                                            {chartData.slice().reverse().map((d, idx) => { // Show newest first
+                                                const r = d.record!;
+                                                const deductions = [];
+
+                                                if (!r.present) {
+                                                    deductions.push(r.justifiedAbsence ? "Falta Justificada (Nota 5.0)" : "Falta (Nota 0.0)");
+                                                } else {
+                                                    if (r.counters.talk > 0) deductions.push(`${r.counters.talk}x Conversa`);
+                                                    if (r.counters.bathroom > 0) deductions.push(`${r.counters.bathroom}x Banheiro`);
+                                                    if (r.counters.sleep > 0) deductions.push(`${r.counters.sleep}x Sono`);
+                                                    if (r.counters.material === 0) deductions.push(`Sem Material`);
+                                                    if (r.counters.activity < 3) deductions.push(`Atividade Incompleta (-${3 - r.counters.activity})`);
+                                                    if (r.phoneConfiscated) deductions.push(`Celular`);
+                                                    if (r.counters.participation > 0) deductions.push(`Participação (+0.5)`);
+                                                }
+
+                                                return (
+                                                    <tr key={idx} className="hover:bg-[#1e293b]/50">
+                                                        <td className="px-4 py-3 text-gray-300">
+                                                            <div>
+                                                                {format(new Date(d.fullDate), "dd 'de' MMMM", { locale: ptBR })}
+                                                                {d.blocksCount > 1 && <span className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">{d.blocksCount} aulas</span>}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-gray-400 text-xs">
+                                                            {d.teacherName || '---'}
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            {r.present
+                                                                ? <span className="text-emerald-500 font-bold flex items-center gap-1"><CheckCircle2 size={14} /> SIM</span>
+                                                                : <span className="text-red-500 font-bold flex items-center gap-1"><AlertCircle size={14} /> NÃO</span>
+                                                            }
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            {deductions.length > 0 ? (
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {deductions.map((ded, i) => (
+                                                                        <span key={i} className={`text-[10px] px-2 py-0.5 rounded border ${ded.includes('+') ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                                                                            {ded}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-gray-500 text-xs italic">Sem deduções</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            <span className={`font-bold text-lg ${Number(d.aluno) >= 10 ? 'text-emerald-400' : Number(d.aluno) >= 6 ? 'text-white' : 'text-red-400'}`}>
+                                                                {d.aluno?.toFixed(1)}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -430,19 +430,7 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                     {/* Main Table */}
                     <div className="overflow-hidden rounded-t-lg border border-gray-900">
                         <table className="w-full text-xs border-collapse table-fixed">
-                            <colgroup>
-                                <col style={{ width: '100px' }} /> {/* Disciplina - Reduced from 150px */}
-                                <col style={{ width: '100px' }} /> {/* Professor - Reduced from 120px */}
-                                <col style={{ width: '40px' }} /> {/* Comp */}
-                                <col style={{ width: '40px' }} /> {/* Atenção */}
-                                <col style={{ width: '40px' }} /> {/* Tarefas */}
-                                <col style={{ width: '40px' }} /> {/* Ativ */}
-                                <col style={{ width: '40px' }} /> {/* Material */}
-                                <col style={{ width: '40px' }} /> {/* Engaja */}
-                                <col style={{ width: '40px' }} /> {/* Auto */}
-                                <col style={{ width: '40px' }} /> {/* Part */}
-                                <col style={{ width: '40px' }} /> {/* Abert */}
-                            </colgroup>
+                            <colgroup><col style={{ width: '100px' }} /><col style={{ width: '100px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /></colgroup>
                             <thead>
                                 {/* Group Headers */}
                                 <tr className="bg-emerald-50">
