@@ -142,9 +142,9 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                 if (value <= 1.2) return 'S';
                 return 'I';
 
-            case 'atencao': // Banheiro (Higher is worse)
-                if (value <= 0.3) return 'O';
-                if (value <= 0.8) return 'B';
+            case 'atencao': // Banheiro (Higher is worse) - Now -1.0 each
+                if (value <= 0.1) return 'O';
+                if (value <= 0.5) return 'B';
                 if (value <= 1.5) return 'S';
                 return 'I';
 
@@ -172,10 +172,10 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                 if (value >= 2.0) return 'S';
                 return 'I';
 
-            case 'autogestao': // Phone (0=Good, 1=Bad)
-                if (value <= 0.1) return 'O';
-                if (value <= 0.3) return 'B';
-                if (value <= 0.6) return 'S';
+            case 'autogestao': // Celular (Value is 0 or 1) - Now -5.0 weight
+                if (value <= 0.05) return 'O';
+                if (value <= 0.15) return 'B';
+                if (value <= 0.3) return 'S';
                 return 'I';
 
             default: return '-';

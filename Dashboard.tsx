@@ -102,9 +102,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent }) => 
                 }
 
                 // Occurrences
-                if (rec.counters.talk > 0) negativePoints += rec.counters.talk;
-                if (rec.counters.sleep > 0) negativePoints += rec.counters.sleep;
-                if (rec.counters.phoneConfiscated) negativePoints += 1;
+                if (rec.counters.talk > 0) negativePoints += (rec.counters.talk * 2);
+                if (rec.counters.sleep > 0) negativePoints += (rec.counters.sleep * 2);
+                if (rec.phoneConfiscated) negativePoints += 5;
             }
         });
 

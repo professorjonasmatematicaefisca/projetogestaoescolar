@@ -166,12 +166,12 @@ export const StorageService = {
       grade -= 0.5;
     }
 
-    // Banheiro (Bathroom): Still -0.5 per occurrence (Legacy/Compatibility)
-    grade -= (record.counters.bathroom * 0.5);
+    // Banheiro (Bathroom): -1.0 per occurrence
+    grade -= (record.counters.bathroom * 1.0);
 
-    // Celular (Phone): If SIM (true), deduct 1.0 (Legacy/Compatibility)
+    // Celular (Phone): If SIM (true), deduct 5.0
     if (record.phoneConfiscated) {
-      grade -= 1.0;
+      grade -= 5.0;
     }
 
     // 3. Bonuses
