@@ -144,6 +144,12 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
         }
     };
 
+    const formatModule = (mod: string | undefined) => {
+        if (!mod) return '';
+        // Remove .0 suffix if present (common when DB returns numeric as float)
+        return mod.toString().replace(/\.0$/, '');
+    };
+
     const getClassName = (id: string | unknown) => classes.find(c => c.id === id)?.name || (id as string);
     const getDisciplineName = (id: string | unknown) => disciplines.find(d => d.id === id)?.name || (id as string);
 
@@ -240,23 +246,56 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                             <select
                                                 className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-emerald-500/50 transition-all outline-none font-bold text-sm"
                                                 value={selectedDiscipline}
-                                                onChange={(e) => setSelectedDiscipline(e.target.value)}
+                                                onChange={(e) => {
+                                                    setSelectedDiscipline(e.target.value);
+                                                    setSelectedFront(''); // Reset front when discipline changes
+                                                }}
                                                 required
                                             >
                                                 <option value="">Selecione a Disciplina</option>
-                                                {disciplines.map(d => <option key={d.id as string} value={d.id as string}>{d.name}</option>)}
+                                                {userRole === UserRole.COORDINATOR ? (
+                                                    disciplines.map(d => <option key={d.id as string} value={d.id as string}>{d.name}</option>)
+                                                ) : (
+                                                    teacherAssignments
+                                                        .filter(a => a.classId === selectedClass)
+                                                        .map((a, idx) => {
+                                                            const discipline = disciplines.find(d => d.name === a.subject);
+                                                            return (
+                                                                <option key={`${a.subject}-${idx}`} value={discipline?.id || a.subject}>
+                                                                    {a.subject}
+                                                                </option>
+                                                            );
+                                                        })
+                                                )}
                                             </select>
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-2 ml-1">Frente</label>
-                                            <input
-                                                type="text"
-                                                placeholder="Ex: Frente 1, 11B..."
-                                                className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-emerald-500/50 transition-all outline-none font-bold text-sm"
-                                                value={selectedFront}
-                                                onChange={(e) => setSelectedFront(e.target.value)}
-                                                required
-                                            />
+                                            {userRole === UserRole.COORDINATOR ? (
+                                                <input
+                                                    type="text"
+                                                    placeholder="Ex: Frente 1, 11B..."
+                                                    className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-emerald-500/50 transition-all outline-none font-bold text-sm"
+                                                    value={selectedFront}
+                                                    onChange={(e) => setSelectedFront(e.target.value)}
+                                                    required
+                                                />
+                                            ) : (
+                                                <select
+                                                    className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-emerald-500/50 transition-all outline-none font-bold text-sm"
+                                                    value={selectedFront}
+                                                    onChange={(e) => setSelectedFront(e.target.value)}
+                                                    required
+                                                >
+                                                    <option value="">Selecione a Frente</option>
+                                                    {teacherAssignments
+                                                        .filter(a => a.classId === selectedClass && a.subject === selectedDiscipline)
+                                                        .map((a, idx) => (
+                                                            <option key={`${a.front}-${idx}`} value={a.front || 'Geral'}>{a.front || 'Geral'}</option>
+                                                        ))
+                                                    }
+                                                </select>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -349,7 +388,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                             </td>
                                             <td className="px-8 py-5">
                                                 <div className="text-sm font-bold text-gray-300">{module.front}</div>
-                                                <div className="text-xs text-gray-500 font-medium">Mod. {module.module}</div>
+                                                <div className="text-xs text-gray-500 font-medium">Mod. {formatModule(module.module)}</div>
                                             </td>
                                             <td className="px-8 py-5 max-w-md">
                                                 <div className="text-sm text-gray-100 font-bold mb-1 leading-tight">{module.title}</div>
@@ -429,7 +468,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                             className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-md font-bold truncate flex items-center gap-1 group/item"
                                                         >
                                                             <div className="w-1 h-1 rounded-full bg-emerald-500 shrink-0" />
-                                                            {sch.module?.front} - {sch.module?.chapter}
+                                                            {sch.module?.front} - {formatModule(sch.module?.chapter)}
                                                             <button
                                                                 onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(sch.id); }}
                                                                 className="ml-auto opacity-0 group-hover/item:opacity-100 hover:text-red-400"

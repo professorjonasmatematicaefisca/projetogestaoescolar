@@ -8,6 +8,7 @@ export enum UserRole {
 export interface TeacherClassAssignment {
   classId: string; // The name of the class (e.g., "9º Ano A")
   subject: string; // The name of the subject
+  front?: string;  // Optional front (e.g., "Frente 1")
 }
 
 export interface User {
