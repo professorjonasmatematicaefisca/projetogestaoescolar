@@ -95,6 +95,9 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
     // --- Unsaved Changes State ---
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+    // Ref to skip the useEffect fetch when session was loaded directly
+    const skipNextFetchRef = useRef(false);
+
     // Close time dropdown on click outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -219,6 +222,12 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             const filtered = allStudents.filter(s => s.className === selectedClassId);
             setFilteredStudents(filtered);
 
+            // Skip fetch if session was loaded directly (e.g., from history)
+            if (skipNextFetchRef.current) {
+                skipNextFetchRef.current = false;
+                return;
+            }
+
             // Check Supabase for existing session for this Day/Class/Teacher/Subject combo
             const fetchExistingSession = async () => {
                 const allSessions = await SupabaseService.getSessions();
@@ -231,7 +240,17 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
                 if (existingSession) {
                     setSession(existingSession);
-                    if (existingSession.block && availableBlocks.includes(existingSession.block)) {
+                    // Restore multiple blocks from composite block label
+                    if (existingSession.blocksCount && existingSession.blocksCount > 1 && existingSession.block) {
+                        const matchingBlocks = availableBlocks.filter(b => {
+                            const blockStart = b.split(' - ')[0];
+                            const blockEnd = b.split(' - ')[1];
+                            return existingSession.block.includes(blockStart) || existingSession.block.includes(blockEnd);
+                        });
+                        if (matchingBlocks.length > 0) {
+                            setSelectedBlocks(matchingBlocks);
+                        }
+                    } else if (existingSession.block && availableBlocks.includes(existingSession.block)) {
                         setSelectedBlocks([existingSession.block]);
                     }
                 } else {
@@ -556,21 +575,51 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
     // --- Load Previous (History) Logic ---
 
     const handleOpenHistory = async () => {
-        const all = await SupabaseService.getSessions();
-        const history = all.filter(s => s.teacherId === selectedTeacherId)
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setHistorySessions(history);
-        setHistoryModalOpen(true);
+        checkUnsavedAndProceed(async () => {
+            const all = await SupabaseService.getSessions();
+            const history = all.filter(s => s.teacherId === selectedTeacherId)
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            setHistorySessions(history);
+            setHistoryModalOpen(true);
+        });
     };
 
     const handleLoadSession = (sess: ClassSession) => {
-        // Set the filters to match the session, this will trigger the useEffect to load it
+        // Directly set the session so all data loads immediately
+        setSession(sess);
+
+        // Prevent the useEffect from re-fetching and overwriting our loaded session
+        skipNextFetchRef.current = true;
+
+        // Sync the filter dropdowns to match the loaded session
         setSelectedDate(sess.date.split('T')[0]);
         setSelectedClassId(sess.className);
         setSelectedSubject(sess.subject);
+
+        // Restore block selection from the session's block field
+        if (sess.blocksCount && sess.blocksCount > 1 && sess.block) {
+            // Try to find matching blocks from available blocks
+            const matchingBlocks = availableBlocks.filter(b => {
+                const blockStart = b.split(' - ')[0];
+                const blockEnd = b.split(' - ')[1];
+                return sess.block.includes(blockStart) || sess.block.includes(blockEnd);
+            });
+            if (matchingBlocks.length > 0) {
+                setSelectedBlocks(matchingBlocks);
+            } else {
+                setSelectedBlocks([sess.block]);
+            }
+        } else if (sess.block) {
+            setSelectedBlocks([sess.block]);
+        }
+
+        // Update filtered students for the loaded class
+        const filtered = allStudents.filter(s => s.className === sess.className);
+        setFilteredStudents(filtered);
+
         setHistoryModalOpen(false);
-        setHasUnsavedChanges(false); // Loading a session resets dirty state
-        onShowToast(`Aula de ${format(new Date(sess.date), "dd/MM")} carregada.`);
+        setHasUnsavedChanges(false);
+        onShowToast(`Aula de ${format(new Date(sess.date), "dd/MM")} — ${sess.className} carregada.`);
     };
 
     // --- Confirmation Helper ---
@@ -592,15 +641,12 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     const handleNewClass = () => {
         checkUnsavedAndProceed(() => {
-            if (session) {
-                StorageService.saveSession(session);
-                onShowToast("Iniciando novo registro...");
-
-                // Reset Class Selection to force user to pick a new one, triggering initialization
-                setSelectedClassId('');
-                // Optional: Reset date to today if it was set to past
-                setSelectedDate(new Date().toISOString().split('T')[0]);
-            }
+            onShowToast("Iniciando novo registro...");
+            // Reset Class Selection to force user to pick a new one, triggering initialization
+            setSelectedClassId('');
+            setSession(null);
+            // Reset date to today
+            setSelectedDate(new Date().toISOString().split('T')[0]);
         });
     };
 
@@ -608,13 +654,30 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     const handleSave = async () => {
         if (session) {
-            const success = await SupabaseService.saveSession(session, userEmail);
+            // Validation: require content before saving
+            if (!session.generalNotes || session.generalNotes.trim() === '') {
+                onShowToast("⚠️ Você precisa registrar o conteúdo ministrado antes de salvar! Clique no botão 'Registro de Aula' para adicionar.");
+                return;
+            }
+
+            // Sync the block info with current selected blocks before saving
+            const compositeBlock = selectedBlocks.length > 1
+                ? `${selectedBlocks[0].split(' - ')[0]} - ${selectedBlocks[selectedBlocks.length - 1].split(' - ')[1]}`
+                : selectedBlocks[0];
+            const updatedSession = {
+                ...session,
+                block: compositeBlock,
+                blocksCount: selectedBlocks.length
+            };
+
+            const success = await SupabaseService.saveSession(updatedSession, userEmail);
             if (success) {
+                setSession(updatedSession);
                 onShowToast("Aula salva no Supabase com sucesso!");
                 setHasUnsavedChanges(false);
             } else {
                 onShowToast("Erro ao salvar no Supabase. Salvando localmente como backup.");
-                StorageService.saveSession(session);
+                StorageService.saveSession(updatedSession);
                 setHasUnsavedChanges(false);
             }
         }
