@@ -404,6 +404,27 @@ export const SupabaseService = {
         return true;
     },
 
+    async deleteSession(sessionId: string): Promise<boolean> {
+        // Delete session records first (FK constraint)
+        const { error: recError } = await supabase
+            .from('session_records')
+            .delete()
+            .eq('session_id', sessionId);
+        if (recError) {
+            console.error("Error deleting session records:", recError);
+            return false;
+        }
+        const { error } = await supabase
+            .from('sessions')
+            .delete()
+            .eq('id', sessionId);
+        if (error) {
+            console.error("Error deleting session:", error);
+            return false;
+        }
+        return true;
+    },
+
     async getSessions(): Promise<ClassSession[]> {
         const { data: sessions, error } = await supabase
             .from('sessions')

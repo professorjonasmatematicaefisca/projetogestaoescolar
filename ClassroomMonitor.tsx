@@ -300,15 +300,12 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             ? `${selectedBlocks[0].split(' - ')[0]} - ${selectedBlocks[selectedBlocks.length - 1].split(' - ')[1]}`
             : selectedBlocks[0];
 
-        // Use selected date with current time to preserve ordering if needed, or just date
-        const dateObj = new Date(selectedDate);
-        // Add current time to the date so we don't default to midnight UTC issues in some views
-        const now = new Date();
-        dateObj.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+        // Use selected date — set to noon to avoid timezone off-by-one issue
+        const dateStr = `${selectedDate}T12:00:00`;
 
         const newSession: ClassSession = {
             id: `sess-${Date.now()}`,
-            date: dateObj.toISOString(),
+            date: new Date(dateStr).toISOString(),
             teacherId: selectedTeacherId,
             subject: selectedSubject,
             className: selectedClassId,
@@ -571,6 +568,26 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             stopCamera(); // Cleanup on unmount
         }
     }, []);
+
+    // --- Delete Session Logic ---
+
+    const handleDeleteSession = async (sess: ClassSession) => {
+        const confirmed = window.confirm(`Tem certeza que deseja EXCLUIR o registro de ${format(new Date(sess.date), "dd/MM/yyyy")} — ${sess.className} (${sess.subject})?\n\nEsta ação não pode ser desfeita.`);
+        if (!confirmed) return;
+
+        const success = await SupabaseService.deleteSession(sess.id);
+        if (success) {
+            setHistorySessions(prev => prev.filter(s => s.id !== sess.id));
+            onShowToast("Registro de aula excluído com sucesso.");
+        } else {
+            onShowToast("Erro ao excluir registro. Tente novamente.");
+        }
+    };
+
+    const handleRequestDeleteSession = (sess: ClassSession) => {
+        onShowToast(`⚠️ Solicitação de exclusão enviada ao coordenador para a aula de ${format(new Date(sess.date), "dd/MM")} — ${sess.className}. Aguarde a aprovação.`);
+        // In the future, this could create a pending request in a separate table
+    };
 
     // --- Load Previous (History) Logic ---
 
@@ -871,8 +888,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                         </div>
                                     </div>
 
-                                    {/* Second Attendance Row (Conditional) */}
-                                    {session.blocksCount && session.blocksCount > 1 && (
+                                    {/* Second Attendance Row (Conditional — uses live selectedBlocks) */}
+                                    {selectedBlocks.length > 1 && (
                                         <div className="px-4 py-2 border-b border-gray-800/50 bg-blue-500/5">
                                             <div className="flex items-center justify-between">
                                                 <label className="text-[10px] text-blue-400 font-bold uppercase">Presença (2ª Chamada)</label>
@@ -1325,10 +1342,12 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                         {historySessions.map(sess => (
                                             <div
                                                 key={sess.id}
-                                                onClick={() => handleLoadSession(sess)}
-                                                className="bg-[#0f172a] border border-gray-800 p-4 rounded-lg cursor-pointer hover:border-emerald-500/50 transition-colors group flex items-center justify-between"
+                                                className="bg-[#0f172a] border border-gray-800 p-4 rounded-lg hover:border-emerald-500/50 transition-colors group flex items-center justify-between"
                                             >
-                                                <div className="flex flex-col gap-1">
+                                                <div
+                                                    className="flex flex-col gap-1 flex-1 cursor-pointer"
+                                                    onClick={() => handleLoadSession(sess)}
+                                                >
                                                     <div className="flex items-center gap-2">
                                                         <Calendar size={14} className="text-emerald-500" />
                                                         <span className="font-bold text-white text-sm">
@@ -1348,7 +1367,26 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                                         </p>
                                                     )}
                                                 </div>
-                                                <ArrowRight size={18} className="text-gray-600 group-hover:text-emerald-500 transition-colors" />
+                                                <div className="flex items-center gap-2">
+                                                    {userRole === 'coordinator' ? (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDeleteSession(sess); }}
+                                                            className="p-2 rounded-lg text-gray-600 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                                            title="Excluir registro"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleRequestDeleteSession(sess); }}
+                                                            className="p-2 rounded-lg text-gray-600 hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                                                            title="Solicitar exclusão ao coordenador"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    )}
+                                                    <ArrowRight size={18} className="text-gray-600 group-hover:text-emerald-500 transition-colors" />
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
