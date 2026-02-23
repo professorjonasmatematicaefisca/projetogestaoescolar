@@ -306,6 +306,33 @@ export const SupabaseService = {
         return true;
     },
 
+    async syncParentAccounts(): Promise<{ success: boolean, createdCount: number }> {
+        const { data: students, error: sError } = await supabase.from('students').select('*');
+        if (sError) return { success: false, createdCount: 0 };
+
+        let createdCount = 0;
+        for (const student of students) {
+            if (student.parent_email) {
+                const { data: existing } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('email', student.parent_email)
+                    .maybeSingle();
+
+                if (!existing) {
+                    const { error: iError } = await supabase.from('users').insert({
+                        name: `Responsável de ${student.name}`,
+                        email: student.parent_email,
+                        password: 'mudar123',
+                        role: 'PARENT'
+                    });
+                    if (!iError) createdCount++;
+                }
+            }
+        }
+        return { success: true, createdCount };
+    },
+
     async getTeachers(): Promise<Teacher[]> {
         const { data, error } = await supabase
             .from('users')

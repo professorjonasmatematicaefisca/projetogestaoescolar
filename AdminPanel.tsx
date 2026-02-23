@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Users, School, BookOpen, X, Plus, Camera, Lock, Trash2, GraduationCap, Edit2 } from 'lucide-react';
+import { UserPlus, Users, School, BookOpen, X, Plus, Camera, Lock, Trash2, GraduationCap, Edit2, RefreshCw } from 'lucide-react';
 import { SupabaseService } from './services/supabaseService';
 import { Student, Teacher, ClassRoom, Discipline, UserRole, TeacherClassAssignment } from './types';
 import { UserAvatar } from './components/UserAvatar';
@@ -50,6 +50,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
     const studentFileRef = React.useRef<HTMLInputElement>(null);
     const staffFileRef = React.useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
+    const [syncing, setSyncing] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -347,6 +348,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
         }
     };
 
+    const handleSyncAccounts = async () => {
+        setSyncing(true);
+        const { success, createdCount } = await SupabaseService.syncParentAccounts();
+        setSyncing(false);
+        if (success) {
+            onShowToast(`✅ Sincronização concluída! ${createdCount} novas contas criadas.`);
+        } else {
+            onShowToast("Erro ao sincronizar contas.");
+        }
+    };
+
     const getRoleBadgeColor = (role: UserRole) => {
         switch (role) {
             case UserRole.COORDINATOR: return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
@@ -441,16 +453,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
 
             {/* Filter Bar (Students Tab Only) */}
             {activeTab === 'STUDENTS' && (
-                <div className="flex items-center gap-4 bg-[#0f172a] p-3 rounded-lg border border-gray-800">
-                    <label className="text-sm font-bold text-gray-400 uppercase">Filtrar Turma:</label>
-                    <select
-                        value={filterClass}
-                        onChange={(e) => setFilterClass(e.target.value)}
-                        className="bg-[#1e293b] text-white border border-gray-700 rounded px-3 py-1.5 text-sm outline-none focus:border-emerald-500"
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0f172a] p-3 rounded-lg border border-gray-800">
+                    <div className="flex items-center gap-4">
+                        <label className="text-sm font-bold text-gray-400 uppercase text-nowrap">Filtrar Turma:</label>
+                        <select
+                            value={filterClass}
+                            onChange={(e) => setFilterClass(e.target.value)}
+                            className="bg-[#1e293b] text-white border border-gray-700 rounded px-3 py-1.5 text-sm outline-none focus:border-emerald-500"
+                        >
+                            <option value="">Todas as Turmas</option>
+                            {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        </select>
+                    </div>
+
+                    <button
+                        onClick={handleSyncAccounts}
+                        disabled={syncing}
+                        title="Criar contas de acesso para pais dos alunos já cadastrados"
+                        className="flex items-center justify-center gap-2 px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-bold transition-all disabled:opacity-50 border border-gray-700"
                     >
-                        <option value="">Todas as Turmas</option>
-                        {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                    </select>
+                        <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+                        {syncing ? 'Sincronizando...' : 'Gerar Acessos para Pais'}
+                    </button>
                 </div>
             )}
 
