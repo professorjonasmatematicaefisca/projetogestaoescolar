@@ -584,9 +584,32 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         }
     };
 
-    const handleRequestDeleteSession = (sess: ClassSession) => {
-        onShowToast(`⚠️ Solicitação de exclusão enviada ao coordenador para a aula de ${format(new Date(sess.date), "dd/MM")} — ${sess.className}. Aguarde a aprovação.`);
-        // In the future, this could create a pending request in a separate table
+    const handleRequestDeleteSession = async (sess: ClassSession) => {
+        const reason = window.prompt(`Motivo da exclusão do registro de ${format(new Date(sess.date), "dd/MM/yyyy")} — ${sess.className}:`);
+        if (reason === null) return; // cancelled
+
+        const teacherName = teachers.find(t => t.id === selectedTeacherId)?.name || userEmail || 'Professor';
+
+        const success = await SupabaseService.createRequest({
+            type: 'delete_session',
+            status: 'pending',
+            teacherId: selectedTeacherId,
+            teacherName,
+            sessionId: sess.id,
+            sessionInfo: {
+                date: sess.date,
+                className: sess.className,
+                subject: sess.subject,
+                block: sess.block
+            },
+            reason: reason || 'Sem motivo informado'
+        });
+
+        if (success) {
+            onShowToast("✅ Solicitação enviada ao coordenador. Aguarde aprovação.");
+        } else {
+            onShowToast("Erro ao enviar solicitação. Tente novamente.");
+        }
     };
 
     // --- Load Previous (History) Logic ---

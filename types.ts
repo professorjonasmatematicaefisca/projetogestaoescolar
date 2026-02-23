@@ -160,4 +160,23 @@ export interface StudyGuideItem {
   createdAt?: string;
 }
 
-export type ViewState = 'MONITORING' | 'DASHBOARD' | 'REPORTS' | 'OCCURRENCES' | 'ADMIN' | 'SETTINGS' | 'FOA' | 'PLANNING' | 'STUDY_GUIDE';
+export type ViewState = 'MONITORING' | 'DASHBOARD' | 'REPORTS' | 'OCCURRENCES' | 'ADMIN' | 'SETTINGS' | 'FOA' | 'PLANNING' | 'STUDY_GUIDE' | 'REQUESTS';
+
+export interface RequestItem {
+  id: string;
+  type: string;
+  status: 'pending' | 'approved' | 'rejected';
+  teacherId?: string;
+  teacherName?: string;
+  sessionId?: string;
+  sessionInfo?: {
+    date: string;
+    className: string;
+    subject: string;
+    block: string;
+  };
+  reason?: string;
+  resolvedBy?: string;
+  resolvedAt?: string;
+  createdAt: string;
+}

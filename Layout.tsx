@@ -11,7 +11,7 @@ import {
   UserCircle,
   Settings,
   Lock,
-
+  Inbox,
   FileText,
   BookOpen,
   ClipboardCheck
@@ -44,7 +44,7 @@ export const Layout: React.FC<LayoutProps> = ({
 
   // Define allowed views per role
   const rolePermissions: Record<UserRole, ViewState[]> = {
-    [UserRole.COORDINATOR]: ['MONITORING', 'DASHBOARD', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'OCCURRENCES', 'ADMIN', 'SETTINGS', 'FOA'],
+    [UserRole.COORDINATOR]: ['MONITORING', 'DASHBOARD', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'OCCURRENCES', 'REQUESTS', 'ADMIN', 'SETTINGS', 'FOA'],
     [UserRole.TEACHER]: ['MONITORING', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'SETTINGS', 'FOA'],
     [UserRole.MONITOR]: ['OCCURRENCES', 'SETTINGS']
   };
@@ -56,7 +56,8 @@ export const Layout: React.FC<LayoutProps> = ({
     { view: 'PLANNING', icon: BookOpen, label: 'Planejamento' },
     { view: 'STUDY_GUIDE', icon: ClipboardCheck, label: 'Roteiro de Estudos' },
     { view: 'FOA', icon: FileText, label: 'FOA (Observação)' },
-    { view: 'OCCURRENCES', icon: AlertTriangle, label: 'Monitoria' }, // Renamed from Ocorrências
+    { view: 'OCCURRENCES', icon: AlertTriangle, label: 'Monitoria' },
+    { view: 'REQUESTS', icon: Inbox, label: 'Solicitações' },
   ] as const;
 
   const allowedViews = rolePermissions[role] || [];

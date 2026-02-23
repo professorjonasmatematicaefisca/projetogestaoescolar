@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { Student, ClassRoom, Teacher, Occurrence, ClassSession, SessionRecord, UserRole, StudentExit, PlanningModule, PlanningSchedule, StudyGuideItem } from '../types';
+import { Student, ClassRoom, Teacher, Occurrence, ClassSession, SessionRecord, UserRole, StudentExit, PlanningModule, PlanningSchedule, StudyGuideItem, RequestItem } from '../types';
 import { SEED_STUDENTS, SEED_CLASSES, SEED_TEACHERS, SEED_OCCURRENCES } from './mockData';
 
 export const SupabaseService = {
@@ -929,6 +929,52 @@ export const SupabaseService = {
     async deleteStudyGuideItem(id: string): Promise<boolean> {
         const { error } = await supabase.from('study_guide_items').delete().eq('id', id);
         if (error) { console.error('deleteStudyGuideItem error:', error); return false; }
+        return true;
+    },
+
+    // --- REQUESTS (Solicitações) ---
+
+    async createRequest(request: Omit<RequestItem, 'id' | 'createdAt'>): Promise<boolean> {
+        const { error } = await supabase.from('requests').insert({
+            type: request.type,
+            status: request.status || 'pending',
+            teacher_id: request.teacherId,
+            teacher_name: request.teacherName,
+            session_id: request.sessionId,
+            session_info: request.sessionInfo,
+            reason: request.reason
+        });
+        if (error) { console.error('createRequest error:', error); return false; }
+        return true;
+    },
+
+    async getRequests(): Promise<RequestItem[]> {
+        const { data, error } = await supabase
+            .from('requests')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) { console.error('getRequests error:', error); return []; }
+        return data.map((r: any) => ({
+            id: r.id,
+            type: r.type,
+            status: r.status,
+            teacherId: r.teacher_id,
+            teacherName: r.teacher_name,
+            sessionId: r.session_id,
+            sessionInfo: r.session_info,
+            reason: r.reason,
+            resolvedBy: r.resolved_by,
+            resolvedAt: r.resolved_at,
+            createdAt: r.created_at
+        }));
+    },
+
+    async updateRequestStatus(requestId: string, status: 'approved' | 'rejected', resolvedBy?: string): Promise<boolean> {
+        const { error } = await supabase
+            .from('requests')
+            .update({ status, resolved_by: resolvedBy, resolved_at: new Date().toISOString() })
+            .eq('id', requestId);
+        if (error) { console.error('updateRequestStatus error:', error); return false; }
         return true;
     }
 };
