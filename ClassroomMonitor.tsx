@@ -644,7 +644,6 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             onShowToast("Iniciando novo registro...");
             // Reset Class Selection to force user to pick a new one, triggering initialization
             setSelectedClassId('');
-            setSession(null);
             // Reset date to today
             setSelectedDate(new Date().toISOString().split('T')[0]);
         });
