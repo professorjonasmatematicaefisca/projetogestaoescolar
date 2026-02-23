@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Users, School, BookOpen, X, Plus, Camera, Lock, Trash2, GraduationCap, Edit2, RefreshCw } from 'lucide-react';
+import { UserPlus, Users, School, BookOpen, X, Plus, Camera, Lock, Trash2, GraduationCap, Edit2, RefreshCw, Mail, AlertCircle } from 'lucide-react';
 import { SupabaseService } from './services/supabaseService';
 import { Student, Teacher, ClassRoom, Discipline, UserRole, TeacherClassAssignment } from './types';
 import { UserAvatar } from './components/UserAvatar';
@@ -464,6 +464,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                             <option value="">Todas as Turmas</option>
                             {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                         </select>
+
+                        {/* Missing Emails Warning */}
+                        {students.filter(s => !s.parentEmail).length > 0 && (
+                            <div className="hidden lg:flex items-center gap-2 text-amber-500 text-xs bg-amber-500/10 px-3 py-1.5 rounded-full border border-amber-500/20">
+                                <AlertCircle size={14} />
+                                <span>{students.filter(s => !s.parentEmail).length} alunos sem email do responsável</span>
+                            </div>
+                        )}
                     </div>
 
                     <button
@@ -498,7 +506,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                             />
 
                             <h3 className="text-white font-bold mb-1">{student.name}</h3>
-                            <p className="text-xs text-gray-400 mb-2">{student.parentEmail}</p>
+
+                            {student.parentEmail ? (
+                                <p className="text-xs text-gray-400 mb-2 truncate w-full px-4">{student.parentEmail}</p>
+                            ) : (
+                                <p className="text-[10px] text-red-400 font-bold mb-2 flex items-center gap-1 justify-center bg-red-400/10 px-2 py-0.5 rounded border border-red-400/20">
+                                    <Mail size={10} />
+                                    Sem email cadastrado
+                                </p>
+                            )}
+
                             <p className="text-[10px] text-gray-500">ID: {student.id.substring(0, 8)}</p>
 
                             <div className="mt-3">
