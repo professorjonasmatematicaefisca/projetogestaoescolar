@@ -298,6 +298,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             records: studentList.map(s => ({
                 studentId: s.id,
                 present: true,
+                present2: true,
                 phoneConfiscated: false,
                 justifiedAbsence: false,
                 // Material starts at 1. Activity starts at 3. Homework starts at 1 (Done). Participation starts at 0.
@@ -345,6 +346,10 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     const setAttendance = (studentId: string, isPresent: boolean) => {
         updateRecord(studentId, r => ({ ...r, present: isPresent, justifiedAbsence: false }));
+    };
+
+    const setAttendance2 = (studentId: string, isPresent: boolean) => {
+        updateRecord(studentId, r => ({ ...r, present2: isPresent }));
     };
 
     const setJustifiedAbsence = (studentId: string, isJustified: boolean) => {
@@ -788,7 +793,6 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                         <div>
                                             <label className="text-[10px] text-gray-500 font-bold uppercase mb-1 block">Celular</label>
                                             <div className="flex bg-[#1e293b] rounded-lg p-0.5">
-                                                {/* Logic: NÃO means No Phone (Good/Green), SIM means Has Phone (Bad/Red) */}
                                                 <button
                                                     onClick={() => setPhone(student.id, false)}
                                                     className={`flex-1 text-[10px] font-bold py-1.5 rounded-md transition-colors ${!record.phoneConfiscated ? 'bg-emerald-900/40 text-emerald-500 border border-emerald-500/30' : 'text-gray-400'}`}
@@ -804,6 +808,29 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Second Attendance Row (Conditional) */}
+                                    {session.blocksCount && session.blocksCount > 1 && (
+                                        <div className="px-4 py-2 border-b border-gray-800/50 bg-blue-500/5">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[10px] text-blue-400 font-bold uppercase">Presença (2ª Chamada)</label>
+                                                <div className="flex bg-[#1e293b] rounded-lg p-0.5 w-[100px]">
+                                                    <button
+                                                        onClick={() => setAttendance2(student.id, true)}
+                                                        className={`flex-1 text-[9px] font-bold py-1 rounded-md transition-colors ${record.present2 !== false ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-400 hover:text-gray-200'}`}
+                                                    >
+                                                        SIM
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setAttendance2(student.id, false)}
+                                                        className={`flex-1 text-[9px] font-bold py-1 rounded-md transition-colors ${record.present2 === false ? 'bg-red-500/20 text-red-500' : 'text-gray-400 hover:text-gray-200'}`}
+                                                    >
+                                                        NÃO
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Counters Grid */}
                                     <div className="p-4 space-y-3 relative">
@@ -903,8 +930,9 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                 </div>
                             );
                         })}
-                    </div>
-                )}
+                    </div >
+                )
+                }
 
                 <div className="flex flex-wrap gap-2 w-full md:w-auto justify-center sm:justify-end">
                     {/* New Class Register Button */}
@@ -916,6 +944,13 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                         Registrar Conteúdo
                     </button>
 
+                    <button
+                        onClick={handleOpenHistory}
+                        className="flex-1 sm:flex-none min-w-[140px] px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm"
+                    >
+                        <History size={18} />
+                        Carregar Anterior
+                    </button>
                     <button
                         onClick={handleNewClass}
                         className="flex-1 sm:flex-none min-w-[140px] px-4 py-2.5 bg-transparent border border-emerald-500 text-emerald-500 hover:bg-emerald-500/10 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 text-sm"
@@ -1079,8 +1114,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                                             type="button"
                                                             onClick={() => toggleContentModule(mod.id)}
                                                             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all ${selectedContentIds.includes(mod.id)
-                                                                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/40 shadow-lg shadow-blue-500/10'
-                                                                    : 'bg-gray-800/60 text-gray-400 border-gray-700 hover:border-blue-500/30 hover:text-gray-200'
+                                                                ? 'bg-blue-500/20 text-blue-300 border-blue-500/40 shadow-lg shadow-blue-500/10'
+                                                                : 'bg-gray-800/60 text-gray-400 border-gray-700 hover:border-blue-500/30 hover:text-gray-200'
                                                                 }`}
                                                         >
                                                             {selectedContentIds.includes(mod.id) ? <Check size={12} /> : <Tag size={12} />}
@@ -1261,7 +1296,6 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                     </div>
                 )
             }
-
         </>
     );
 };

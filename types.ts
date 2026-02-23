@@ -64,6 +64,7 @@ export interface Counters {
 export interface SessionRecord {
   studentId: string;
   present: boolean;
+  present2?: boolean; // New: Support for second attendance call in double classes
   justifiedAbsence?: boolean; // New field for justified absence (Grade 5.0)
   phoneConfiscated: boolean;
   counters: Counters;

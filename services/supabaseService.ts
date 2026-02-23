@@ -386,6 +386,7 @@ export const SupabaseService = {
             session_id: sessionId,
             student_id: r.studentId,
             present: r.present,
+            present2: r.present2 ?? r.present, // Default to present1 if present2 is missing
             justified_absence: r.justifiedAbsence,
             phone_confiscated: r.phoneConfiscated,
             counters: r.counters,
@@ -433,6 +434,7 @@ export const SupabaseService = {
             records: s.session_records.map((r: any) => ({
                 studentId: r.student_id,
                 present: r.present,
+                present2: r.present2,
                 justifiedAbsence: r.justified_absence,
                 phoneConfiscated: r.phone_confiscated,
                 counters: r.counters,
