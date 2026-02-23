@@ -47,7 +47,9 @@ export const Layout: React.FC<LayoutProps> = ({
   const rolePermissions: Record<UserRole, ViewState[]> = {
     [UserRole.COORDINATOR]: ['MONITORING', 'DASHBOARD', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'OCCURRENCES', 'REQUESTS', 'MESSAGES', 'ADMIN', 'SETTINGS', 'FOA'],
     [UserRole.TEACHER]: ['MONITORING', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'MESSAGES', 'SETTINGS', 'FOA'],
-    [UserRole.MONITOR]: ['OCCURRENCES', 'SETTINGS']
+    [UserRole.MONITOR]: ['OCCURRENCES', 'SETTINGS'],
+    [UserRole.STUDENT]: ['MESSAGES', 'SETTINGS'],
+    [UserRole.PARENT]: ['MESSAGES', 'SETTINGS']
   };
 
   const menuItems = [

@@ -2,7 +2,9 @@
 export enum UserRole {
   COORDINATOR = 'COORDINATOR',
   TEACHER = 'TEACHER',
-  MONITOR = 'MONITOR'
+  MONITOR = 'MONITOR',
+  STUDENT = 'STUDENT',
+  PARENT = 'PARENT'
 }
 
 export interface TeacherClassAssignment {

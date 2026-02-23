@@ -284,6 +284,25 @@ export const SupabaseService = {
             console.error("Error creating student:", error);
             return false;
         }
+
+        // Auto-create parent user if parentEmail is provided
+        if (student.parentEmail) {
+            const { data: existing } = await supabase
+                .from('users')
+                .select('id')
+                .eq('email', student.parentEmail)
+                .maybeSingle();
+
+            if (!existing) {
+                await supabase.from('users').insert({
+                    name: `Responsável de ${student.name}`,
+                    email: student.parentEmail,
+                    password: 'mudar123',
+                    role: 'PARENT'
+                });
+            }
+        }
+
         return true;
     },
 

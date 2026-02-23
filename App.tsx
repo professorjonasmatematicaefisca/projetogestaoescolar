@@ -51,6 +51,7 @@ function App() {
       // Only set default view if not already set (though re-render might reset state, view persistence is optional)
       if (storedRole === UserRole.COORDINATOR) setCurrentView('DASHBOARD');
       else if (storedRole === UserRole.TEACHER) setCurrentView('MONITORING');
+      else if (storedRole === UserRole.STUDENT || storedRole === UserRole.PARENT) setCurrentView('MESSAGES');
       else setCurrentView('OCCURRENCES');
     }
   }, []);
@@ -78,6 +79,7 @@ function App() {
     // Set initial view based on role
     if (role === UserRole.COORDINATOR) setCurrentView('DASHBOARD');
     else if (role === UserRole.TEACHER) setCurrentView('MONITORING');
+    else if (role === UserRole.STUDENT || role === UserRole.PARENT) setCurrentView('MESSAGES');
     else setCurrentView('OCCURRENCES');
   };
 
@@ -117,7 +119,7 @@ function App() {
       case 'OCCURRENCES': return <Occurrences onShowToast={showToast} />;
       case 'ADMIN': return <AdminPanel onShowToast={showToast} />;
       case 'REQUESTS': return <RequestsPanel onShowToast={showToast} userEmail={userEmail} />;
-      case 'MESSAGES': return <Comunicados onShowToast={showToast} userEmail={userEmail} userName={userName} userRole={userRole === UserRole.COORDINATOR ? 'coordinator' : 'teacher'} />;
+      case 'MESSAGES': return <Comunicados onShowToast={showToast} userEmail={userEmail} userName={userName} userRole={userRole} />;
       case 'SETTINGS': return <ChangePassword userEmail={userEmail} onShowToast={showToast} />;
       default: return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole} />;
     }
