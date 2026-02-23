@@ -976,5 +976,57 @@ export const SupabaseService = {
             .eq('id', requestId);
         if (error) { console.error('updateRequestStatus error:', error); return false; }
         return true;
+    },
+
+    // --- MESSAGES (Comunicados) ---
+
+    async createMessage(msg: Omit<import('../types').MessageItem, 'id' | 'createdAt'>): Promise<boolean> {
+        const { error } = await supabase.from('messages').insert({
+            sender_name: msg.senderName,
+            sender_email: msg.senderEmail,
+            sender_role: msg.senderRole,
+            subject: msg.subject,
+            body: msg.body,
+            recipients: msg.recipients,
+            target_class: msg.targetClass,
+            attachment_type: msg.attachmentType,
+            attachment_data: msg.attachmentData
+        });
+        if (error) { console.error('createMessage error:', error); return false; }
+        return true;
+    },
+
+    async getMessages(): Promise<import('../types').MessageItem[]> {
+        const { data, error } = await supabase
+            .from('messages')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) { console.error('getMessages error:', error); return []; }
+        return data.map((m: any) => ({
+            id: m.id,
+            senderName: m.sender_name,
+            senderEmail: m.sender_email,
+            senderRole: m.sender_role,
+            subject: m.subject,
+            body: m.body,
+            recipients: m.recipients,
+            targetClass: m.target_class,
+            attachmentType: m.attachment_type,
+            attachmentData: m.attachment_data,
+            isRead: m.is_read,
+            createdAt: m.created_at
+        }));
+    },
+
+    async deleteMessage(id: string): Promise<boolean> {
+        const { error } = await supabase.from('messages').delete().eq('id', id);
+        if (error) { console.error('deleteMessage error:', error); return false; }
+        return true;
+    },
+
+    async markMessageRead(id: string): Promise<boolean> {
+        const { error } = await supabase.from('messages').update({ is_read: true }).eq('id', id);
+        if (error) { console.error('markMessageRead error:', error); return false; }
+        return true;
     }
 };

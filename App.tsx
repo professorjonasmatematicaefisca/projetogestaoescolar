@@ -11,6 +11,7 @@ import { FOA } from './FOA';
 import { Planning } from './Planning';
 import { StudyGuide } from './StudyGuide';
 import { RequestsPanel } from './RequestsPanel';
+import { Comunicados } from './Comunicados';
 import { UserRole, ViewState } from './types';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -116,6 +117,7 @@ function App() {
       case 'OCCURRENCES': return <Occurrences onShowToast={showToast} />;
       case 'ADMIN': return <AdminPanel onShowToast={showToast} />;
       case 'REQUESTS': return <RequestsPanel onShowToast={showToast} userEmail={userEmail} />;
+      case 'MESSAGES': return <Comunicados onShowToast={showToast} userEmail={userEmail} userName={userName} userRole={userRole === UserRole.COORDINATOR ? 'coordinator' : 'teacher'} />;
       case 'SETTINGS': return <ChangePassword userEmail={userEmail} onShowToast={showToast} />;
       default: return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole} />;
     }

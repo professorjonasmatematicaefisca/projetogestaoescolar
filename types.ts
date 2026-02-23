@@ -160,7 +160,7 @@ export interface StudyGuideItem {
   createdAt?: string;
 }
 
-export type ViewState = 'MONITORING' | 'DASHBOARD' | 'REPORTS' | 'OCCURRENCES' | 'ADMIN' | 'SETTINGS' | 'FOA' | 'PLANNING' | 'STUDY_GUIDE' | 'REQUESTS';
+export type ViewState = 'MONITORING' | 'DASHBOARD' | 'REPORTS' | 'OCCURRENCES' | 'ADMIN' | 'SETTINGS' | 'FOA' | 'PLANNING' | 'STUDY_GUIDE' | 'REQUESTS' | 'MESSAGES';
 
 export interface RequestItem {
   id: string;
@@ -180,3 +180,19 @@ export interface RequestItem {
   resolvedAt?: string;
   createdAt: string;
 }
+
+export interface MessageItem {
+  id: string;
+  senderName: string;
+  senderEmail?: string;
+  senderRole: string;
+  subject: string;
+  body: string;
+  recipients: 'students' | 'parents' | 'both' | 'coordinator';
+  targetClass?: string;
+  attachmentType?: string;
+  attachmentData?: any;
+  isRead?: boolean;
+  createdAt: string;
+}
+

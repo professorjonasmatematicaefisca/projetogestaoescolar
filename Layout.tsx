@@ -14,7 +14,8 @@ import {
   Inbox,
   FileText,
   BookOpen,
-  ClipboardCheck
+  ClipboardCheck,
+  MessageSquare
 } from 'lucide-react';
 import { UserAvatar } from './components/UserAvatar';
 
@@ -44,8 +45,8 @@ export const Layout: React.FC<LayoutProps> = ({
 
   // Define allowed views per role
   const rolePermissions: Record<UserRole, ViewState[]> = {
-    [UserRole.COORDINATOR]: ['MONITORING', 'DASHBOARD', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'OCCURRENCES', 'REQUESTS', 'ADMIN', 'SETTINGS', 'FOA'],
-    [UserRole.TEACHER]: ['MONITORING', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'SETTINGS', 'FOA'],
+    [UserRole.COORDINATOR]: ['MONITORING', 'DASHBOARD', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'OCCURRENCES', 'REQUESTS', 'MESSAGES', 'ADMIN', 'SETTINGS', 'FOA'],
+    [UserRole.TEACHER]: ['MONITORING', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'MESSAGES', 'SETTINGS', 'FOA'],
     [UserRole.MONITOR]: ['OCCURRENCES', 'SETTINGS']
   };
 
@@ -58,6 +59,7 @@ export const Layout: React.FC<LayoutProps> = ({
     { view: 'FOA', icon: FileText, label: 'FOA (Observação)' },
     { view: 'OCCURRENCES', icon: AlertTriangle, label: 'Monitoria' },
     { view: 'REQUESTS', icon: Inbox, label: 'Solicitações' },
+    { view: 'MESSAGES', icon: MessageSquare, label: 'Comunicados' },
   ] as const;
 
   const allowedViews = rolePermissions[role] || [];
