@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { MessageItem, ClassSession, StudyGuideItem, Student } from './types';
-import { SupabaseService } from './services/supabaseService';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { SupabaseService } from './services/supabaseService';
+import { StorageService } from './services/storageService';
+import { PDFService } from './services/pdfService';
+import { generateFOADataForStudent } from './services/foaDataHelper';
+import { MessageItem, UserRole, ClassSession, Student, StudyGuideItem, Teacher, Occurrence } from './types';
 import {
     Send, Mail, Trash2, Users, User, UserCheck,
     BookOpen, FileText, PlusCircle, X, ChevronDown,
     GraduationCap, MessageSquare, Filter, Camera,
-    Calendar, ClipboardList, BarChart3, CheckCircle
+    Calendar, ClipboardList, BarChart3, CheckCircle,
+    Download, AlertCircle, Image as ImageIcon, Search,
+    UsersRound, Loader2
 } from 'lucide-react';
 
 interface ComunicadosProps {
@@ -37,10 +42,20 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
     const [sessions, setSessions] = useState<ClassSession[]>([]);
     const [studyGuides, setStudyGuides] = useState<StudyGuideItem[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
+    const [occurrences, setOccurrences] = useState<Occurrence[]>([]);
+    const [allTeachers, setAllTeachers] = useState<Teacher[]>([]);
+    const [allSessions, setAllSessions] = useState<ClassSession[]>([]);
+    const [allOccurrences, setAllOccurrences] = useState<Occurrence[]>([]);
     const [selectedSession, setSelectedSession] = useState<ClassSession | null>(null);
     const [selectedGuide, setSelectedGuide] = useState<StudyGuideItem | null>(null);
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+    const [selectedOccurrence, setSelectedOccurrence] = useState<any | null>(null);
+    const [foaBimestre, setFoaBimestre] = useState<number>(1);
+    const [directImages, setDirectImages] = useState<string[]>([]);
     const [loadingLinked, setLoadingLinked] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const [massSending, setMassSending] = useState(false);
+    const [massSendProgress, setMassSendProgress] = useState({ current: 0, total: 0 });
 
     // Student/Parent info
     const [myClassName, setMyClassName] = useState('');
@@ -50,6 +65,7 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
     useEffect(() => {
         loadMessages();
         loadClasses();
+        loadSharedData();
         if (isReadOnly && userEmail) {
             loadMyClass();
         }
@@ -68,10 +84,20 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
     };
 
     const loadMyClass = async () => {
-        // For students/parents — find their class
         const allStudents = await SupabaseService.getStudents();
         const me = allStudents.find(s => s.parentEmail === userEmail || s.name === userName);
         if (me) setMyClassName(me.className);
+    };
+
+    const loadSharedData = async () => {
+        const [teachers, sessions, occurrences] = await Promise.all([
+            SupabaseService.getTeachers(),
+            SupabaseService.getSessions(),
+            SupabaseService.getOccurrences()
+        ]);
+        setAllTeachers(teachers);
+        setAllSessions(sessions);
+        setAllOccurrences(occurrences);
     };
 
     // Load linked data when attachment type or class changes
@@ -90,6 +116,7 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
         setSelectedSession(null);
         setSelectedGuide(null);
         setSelectedStudent(null);
+        setSelectedOccurrence(null);
 
         if (attachmentType === 'registro_aula') {
             const allSessions = await SupabaseService.getSessions();
@@ -102,11 +129,22 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
                 return mod && mod.classId === targetClass;
             });
             setStudyGuides(filtered);
-        } else if (attachmentType === 'relatorio_aluno') {
+        } else if (attachmentType === 'relatorio_aluno' || attachmentType === 'foa') {
             const allStudents = await SupabaseService.getStudents();
             const filtered = allStudents.filter(s => s.className === targetClass);
             setStudents(filtered);
-            setRecipients('parents');
+            setRecipients(attachmentType === 'foa' ? 'individual_parent' : 'parents');
+        } else if (attachmentType === 'ocorrencia') {
+            const allOccurrences = await SupabaseService.getOccurrences();
+            const allStudents = await SupabaseService.getStudents();
+            const classStudents = allStudents.filter(s => s.className === targetClass);
+            const classStudentIds = classStudents.map(s => s.id);
+
+            const filtered = allOccurrences.filter(occ =>
+                occ.studentIds.some(id => classStudentIds.includes(id))
+            );
+            setOccurrences(filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+            setRecipients('individual_parent');
         }
         setLoadingLinked(false);
     };
@@ -142,11 +180,65 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
             };
         }
         if (attachmentType === 'relatorio_aluno' && selectedStudent) {
+            // Generate real report data
+            const filteredSessions = allSessions.filter(s => s.className === selectedStudent.className);
+            const chartData = filteredSessions
+                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                .map(session => {
+                    const studentRecord = session.records.find(r => r.studentId === selectedStudent.id);
+                    const studentGrade = studentRecord ? StorageService.calculateGrade(studentRecord) : null;
+                    const classTotal = session.records.reduce((acc, r) => acc + StorageService.calculateGrade(r), 0);
+                    const classAvg = session.records.length > 0 ? classTotal / session.records.length : 0;
+                    return {
+                        date: format(new Date(session.date), 'dd/MM', { locale: ptBR }),
+                        aluno: studentGrade,
+                        mediaTurma: parseFloat(classAvg.toFixed(1)),
+                        teacherName: session.teacherName
+                    };
+                })
+                .filter(d => d.aluno !== null);
+
+            const avgGrade = chartData.length > 0
+                ? (chartData.reduce((acc, d) => acc + (d.aluno || 0), 0) / chartData.length).toFixed(1)
+                : '0.0';
+
             return {
                 type: 'relatorio_aluno',
                 studentId: selectedStudent.id,
                 studentName: selectedStudent.name,
-                className: selectedStudent.className
+                className: selectedStudent.className,
+                avgGrade,
+                totalClasses: filteredSessions.length,
+                chartData
+            };
+        }
+        if (attachmentType === 'foa' && selectedStudent) {
+            // Generate real FOA data
+            const year = new Date().getFullYear();
+            const { rows, observations } = generateFOADataForStudent(
+                selectedStudent.id, selectedStudent.className, year, allSessions, allTeachers, allOccurrences
+            );
+            return {
+                type: 'foa',
+                studentId: selectedStudent.id,
+                studentName: selectedStudent.name,
+                className: selectedStudent.className,
+                bimestre: foaBimestre,
+                year,
+                rows,
+                observations
+            };
+        }
+        if (attachmentType === 'ocorrencia' && selectedOccurrence) {
+            return {
+                type: 'ocorrencia',
+                occurrenceId: selectedOccurrence.id,
+                studentName: selectedStudent?.name || 'Aluno',
+                className: targetClass || selectedOccurrence.className || 'Turma',
+                description: selectedOccurrence.description,
+                typeLabel: selectedOccurrence.type,
+                date: selectedOccurrence.date,
+                photos: selectedOccurrence.photos || []
             };
         }
         return null;
@@ -180,8 +272,37 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
 
     const handleSelectStudent = (student: Student) => {
         setSelectedStudent(student);
-        setSubject(`Relatório do Aluno — ${student.name}`);
-        setBody(`Prezado(a) responsável,\n\nSegue o relatório detalhado do(a) aluno(a) ${student.name} (${student.className}).\n\nO relatório contém informações sobre presença, desempenho e observações dos professores.\n\nAtenciosamente,\n${userName || 'Coordenação'}`);
+        if (attachmentType === 'foa') {
+            setSubject(`Ficha de Observação (FOA) — ${student.name}`);
+            setBody(`Prezado(a) responsável,\n\nSegue a Ficha de Observação do Aluno (FOA) referente ao ${foaBimestre}º Bimestre do(a) aluno(a) ${student.name}.\n\nA FOA contém o detalhamento do comportamento, engajamento e desempenho nas disciplinas.\n\nAtenciosamente,\n${userName || 'Coordenação'}`);
+        } else {
+            setSubject(`Relatório do Aluno — ${student.name}`);
+            setBody(`Prezado(a) responsável,\n\nSegue o relatório detalhado do(a) aluno(a) ${student.name} (${student.className}).\n\nO relatório contém informações sobre presença, desempenho e observações dos professores.\n\nAtenciosamente,\n${userName || 'Coordenação'}`);
+        }
+    };
+
+    const handleSelectOccurrence = (occ: any) => {
+        setSelectedOccurrence(occ);
+        setSubject(`Comunicado de Ocorrência — ${format(new Date(occ.date), "dd/MM/yyyy")}`);
+        setBody(`Informamos que houve um registro de ocorrência do tipo [${occ.type}] relacionado ao aluno.\n\nDescrição: ${occ.description}\n\nPara mais detalhes, veja o anexo abaixo.\n\nAtenciosamente,\n${userName || 'Coordenação'}`);
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        setUploading(true);
+        const file = e.target.files[0];
+        const url = await SupabaseService.uploadPhoto(file, 'communications');
+        if (url) {
+            setDirectImages([...directImages, url]);
+            onShowToast("Foto anexada com sucesso!");
+        } else {
+            onShowToast("Erro ao fazer upload da foto.");
+        }
+        setUploading(false);
+    };
+
+    const removeDirectImage = (index: number) => {
+        setDirectImages(directImages.filter((_, i) => i !== index));
     };
 
     const handleSend = async () => {
@@ -199,8 +320,10 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
             body: body.trim(),
             recipients,
             targetClass: targetClass || undefined,
+            targetStudentId: selectedStudent?.id || selectedOccurrence?.studentIds?.[0] || undefined,
             attachmentType: attachmentType || undefined,
-            attachmentData: attachData
+            attachmentData: attachData,
+            directImages: directImages
         });
         setSending(false);
         if (success) {
@@ -222,6 +345,118 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
         setSelectedSession(null);
         setSelectedGuide(null);
         setSelectedStudent(null);
+        setSelectedOccurrence(null);
+        setDirectImages([]);
+    };
+
+    // === MASS SEND: Send FOA or Report individually to each parent ===
+    const handleMassSend = async () => {
+        if (!targetClass || !attachmentType) return;
+        if (attachmentType !== 'foa' && attachmentType !== 'relatorio_aluno') {
+            onShowToast("Envio em massa disponível apenas para FOA e Relatório.");
+            return;
+        }
+
+        const classStudents = students.length > 0
+            ? students
+            : (await SupabaseService.getStudents()).filter(s => s.className === targetClass);
+
+        if (classStudents.length === 0) {
+            onShowToast("Nenhum aluno encontrado nesta turma.");
+            return;
+        }
+
+        if (!window.confirm(`Enviar ${attachmentType === 'foa' ? 'FOA' : 'Relatório'} individualmente para os ${classStudents.length} responsáveis da turma ${targetClass}?`)) return;
+
+        setMassSending(true);
+        setMassSendProgress({ current: 0, total: classStudents.length });
+        let successCount = 0;
+        const year = new Date().getFullYear();
+
+        for (let i = 0; i < classStudents.length; i++) {
+            const student = classStudents[i];
+            setMassSendProgress({ current: i + 1, total: classStudents.length });
+
+            let attachData: any = null;
+            let msgSubject = '';
+            let msgBody = '';
+
+            if (attachmentType === 'foa') {
+                // Generate real FOA data for this student
+                const { rows, observations } = generateFOADataForStudent(
+                    student.id, targetClass, year, allSessions, allTeachers, allOccurrences
+                );
+                attachData = {
+                    type: 'foa',
+                    studentId: student.id,
+                    studentName: student.name,
+                    className: targetClass,
+                    bimestre: foaBimestre,
+                    year,
+                    rows,
+                    observations
+                };
+                msgSubject = `Ficha de Observação (FOA) — ${student.name}`;
+                msgBody = `Prezado(a) responsável,\n\nSegue a Ficha de Observação do Aluno (FOA) referente ao ${foaBimestre}º Bimestre do(a) aluno(a) ${student.name}.\n\nA FOA contém o detalhamento do comportamento, engajamento e desempenho nas disciplinas.\n\nAtenciosamente,\n${userName || 'Coordenação'}`;
+            } else {
+                // Generate real Report data for this student
+                const filteredSessions = allSessions.filter(s => s.className === targetClass);
+                const chartData = filteredSessions
+                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                    .map(session => {
+                        const studentRecord = session.records.find(r => r.studentId === student.id);
+                        const studentGrade = studentRecord ? StorageService.calculateGrade(studentRecord) : null;
+                        const classTotal = session.records.reduce((acc, r) => acc + StorageService.calculateGrade(r), 0);
+                        const classAvg = session.records.length > 0 ? classTotal / session.records.length : 0;
+                        return {
+                            date: format(new Date(session.date), 'dd/MM', { locale: ptBR }),
+                            aluno: studentGrade,
+                            mediaTurma: parseFloat(classAvg.toFixed(1)),
+                            teacherName: session.teacherName
+                        };
+                    })
+                    .filter(d => d.aluno !== null);
+
+                const avgGrade = chartData.length > 0
+                    ? (chartData.reduce((acc, d) => acc + (d.aluno || 0), 0) / chartData.length).toFixed(1)
+                    : '0.0';
+                const totalClasses = filteredSessions.length;
+
+                attachData = {
+                    type: 'relatorio_aluno',
+                    studentId: student.id,
+                    studentName: student.name,
+                    className: targetClass,
+                    avgGrade,
+                    totalClasses,
+                    chartData
+                };
+                msgSubject = `Relatório do Aluno — ${student.name}`;
+                msgBody = `Prezado(a) responsável,\n\nSegue o relatório detalhado do(a) aluno(a) ${student.name} (${targetClass}).\n\nO relatório contém informações sobre presença, desempenho e observações dos professores.\n\nAtenciosamente,\n${userName || 'Coordenação'}`;
+            }
+
+            const success = await SupabaseService.createMessage({
+                senderName: userName || userEmail || 'Coordenação',
+                senderEmail: userEmail,
+                senderRole: userRole || 'coordinator',
+                subject: msgSubject,
+                body: msgBody,
+                recipients: 'individual_parent' as any,
+                targetClass,
+                targetStudentId: student.id,
+                attachmentType,
+                attachmentData: attachData,
+                directImages: []
+            });
+
+            if (success) successCount++;
+        }
+
+        setMassSending(false);
+        onShowToast(`✅ Envio em massa concluído: ${successCount}/${classStudents.length} mensagens enviadas.`);
+        setShowCompose(false);
+        resetCompose();
+        loadMessages();
     };
 
     const handleDelete = async (id: string) => {
@@ -236,6 +471,8 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
             case 'parents': return 'Pais / Responsáveis';
             case 'both': return 'Alunos e Pais';
             case 'coordinator': return 'Coordenação';
+            case 'individual_student': return 'Aluno Individual';
+            case 'individual_parent': return 'Responsável Individual';
             default: return r;
         }
     };
@@ -246,6 +483,8 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
             case 'parents': return Users;
             case 'both': return UserCheck;
             case 'coordinator': return User;
+            case 'individual_student': return User;
+            case 'individual_parent': return UserCheck;
             default: return Users;
         }
     };
@@ -256,6 +495,8 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
             case 'parents': return 'text-purple-400 bg-purple-500/10';
             case 'both': return 'text-emerald-400 bg-emerald-500/10';
             case 'coordinator': return 'text-amber-400 bg-amber-500/10';
+            case 'individual_student': return 'text-blue-300 bg-blue-500/5';
+            case 'individual_parent': return 'text-purple-300 bg-purple-500/5';
             default: return 'text-gray-400 bg-gray-500/10';
         }
     };
@@ -265,6 +506,8 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
             case 'registro_aula': return 'Registro de Aula';
             case 'roteiro_estudos': return 'Roteiro de Estudos';
             case 'relatorio_aluno': return 'Relatório do Aluno';
+            case 'foa': return 'FOA';
+            case 'ocorrencia': return 'Ocorrência';
             default: return t;
         }
     };
@@ -328,7 +571,7 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
                             <div>
                                 <label className="text-xs text-gray-400 font-bold uppercase mb-2 block">Destinatários</label>
                                 <div className="grid grid-cols-2 gap-2">
-                                    {(['students', 'parents', 'both', 'coordinator'] as const).map(r => {
+                                    {(['students', 'parents', 'both', 'coordinator', 'individual_student', 'individual_parent'] as const).map(r => {
                                         const Icon = getRecipientIcon(r);
                                         return (
                                             <button key={r} onClick={() => setRecipients(r)}
@@ -364,6 +607,8 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
                                         { key: 'registro_aula', label: 'Registro de Aula', icon: BookOpen },
                                         { key: 'roteiro_estudos', label: 'Roteiro de Estudos', icon: ClipboardList },
                                         { key: 'relatorio_aluno', label: 'Relatório do Aluno', icon: BarChart3 },
+                                        { key: 'foa', label: 'FOA (Ficha Aluno)', icon: UserCheck },
+                                        { key: 'ocorrencia', label: 'Ocorrência', icon: AlertCircle },
                                     ].map(opt => (
                                         <button key={opt.key} onClick={() => setAttachmentType(opt.key)}
                                             className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition-all border ${attachmentType === opt.key ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' : 'border-gray-800 text-gray-500 hover:border-gray-600'}`}
@@ -437,10 +682,22 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
                                 </div>
                             )}
 
-                            {/* Relatório do Aluno Selector */}
-                            {attachmentType === 'relatorio_aluno' && targetClass && (
+                            {/* Relatório do Aluno / FOA Selector */}
+                            {(attachmentType === 'relatorio_aluno' || attachmentType === 'foa') && targetClass && (
                                 <div>
-                                    <label className="text-xs text-gray-400 font-bold uppercase mb-2 block">Selecionar Aluno</label>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-xs text-gray-400 font-bold uppercase block">Selecionar Aluno</label>
+                                        {attachmentType === 'foa' && (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-gray-500 font-bold">BIMESTRE:</span>
+                                                <select value={foaBimestre} onChange={e => setFoaBimestre(parseInt(e.target.value))}
+                                                    className="bg-gray-800 text-white text-[10px] rounded px-1 border border-gray-700 outline-none"
+                                                >
+                                                    {[1, 2, 3, 4].map(b => <option key={b} value={b}>{b}º</option>)}
+                                                </select>
+                                            </div>
+                                        )}
+                                    </div>
                                     {loadingLinked ? (
                                         <div className="text-center py-4"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div></div>
                                     ) : students.length === 0 ? (
@@ -459,6 +716,33 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
                                                         </div>
                                                     )}
                                                     <span className="font-medium text-white">{student.name}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Ocorrência Selector */}
+                            {attachmentType === 'ocorrencia' && targetClass && (
+                                <div>
+                                    <label className="text-xs text-gray-400 font-bold uppercase mb-2 block">Selecionar Ocorrência</label>
+                                    {loadingLinked ? (
+                                        <div className="text-center py-4"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div></div>
+                                    ) : occurrences.length === 0 ? (
+                                        <p className="text-xs text-gray-600 italic">Nenhuma ocorrência encontrada para esta turma.</p>
+                                    ) : (
+                                        <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+                                            {occurrences.map(occ => (
+                                                <button key={occ.id} onClick={() => handleSelectOccurrence(occ)}
+                                                    className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all border ${selectedOccurrence?.id === occ.id ? 'border-red-500 bg-red-500/10 text-red-400' : 'border-gray-800 text-gray-400 hover:border-gray-600'}`}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <AlertCircle size={12} className="text-red-500 shrink-0" />
+                                                        <span className="font-bold text-white">{format(new Date(occ.date), "dd/MM/yyyy")}</span>
+                                                        <span className="px-1.5 py-0.5 bg-gray-800 text-[9px] rounded uppercase">{occ.type}</span>
+                                                    </div>
+                                                    <p className="mt-1 text-[10px] text-gray-500 line-clamp-1 ml-5">{occ.description}</p>
                                                 </button>
                                             ))}
                                         </div>
@@ -492,33 +776,94 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
                                 />
                             </div>
 
+                            {/* Direct Images Upload */}
+                            <div>
+                                <label className="text-xs text-gray-400 font-bold uppercase mb-2 block flex items-center justify-between">
+                                    <span className="flex items-center gap-1"><ImageIcon size={12} /> Fotos Diretas</span>
+                                    <span className="text-[10px] font-normal lowercase italic text-gray-500">Opcional</span>
+                                </label>
+
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                    {directImages.map((url, i) => (
+                                        <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-gray-700 group">
+                                            <img src={url} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
+                                            <button onClick={() => removeDirectImage(i)}
+                                                className="absolute top-0.5 right-0.5 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <X size={10} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <label className={`w-16 h-16 rounded-lg border-2 border-dashed border-gray-700 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-blue-500 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                                        {uploading ? (
+                                            <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                        ) : (
+                                            <>
+                                                <PlusCircle size={14} className="text-gray-500" />
+                                                <span className="text-[9px] text-gray-500 font-bold">ADD</span>
+                                            </>
+                                        )}
+                                    </label>
+                                </div>
+                            </div>
+
                             {/* Linked data preview */}
-                            {selectedSession && selectedSession.photos && selectedSession.photos.length > 0 && (
+                            {(selectedSession || selectedOccurrence) && (
                                 <div>
                                     <label className="text-xs text-gray-400 font-bold uppercase mb-2 block flex items-center gap-1">
-                                        <Camera size={12} /> Fotos da Lousa ({selectedSession.photos.length})
+                                        <Camera size={12} /> Fotos do Anexo
                                     </label>
                                     <div className="flex gap-2 overflow-x-auto pb-2">
-                                        {selectedSession.photos.map((url, i) => (
+                                        {(selectedSession?.photos || selectedOccurrence?.photos || []).map((url: string, i: number) => (
                                             <img key={i} src={url} className="w-20 h-20 rounded-lg object-cover border border-gray-700 shrink-0" />
                                         ))}
+                                        {(selectedSession?.photos || selectedOccurrence?.photos || []).length === 0 && (
+                                            <span className="text-[10px] text-gray-600 italic">Nenhuma foto no registro original.</span>
+                                        )}
                                     </div>
                                 </div>
                             )}
                         </div>
 
+                        {/* Mass-send progress overlay */}
+                        {massSending && (
+                            <div className="p-4 bg-emerald-500/10 border-t border-emerald-500/20 flex items-center gap-3">
+                                <Loader2 size={18} className="text-emerald-400 animate-spin" />
+                                <div className="flex-1">
+                                    <p className="text-emerald-400 text-xs font-bold">Enviando em massa...</p>
+                                    <p className="text-emerald-300 text-[10px]">{massSendProgress.current} de {massSendProgress.total} mensagens</p>
+                                </div>
+                                <div className="w-24 bg-gray-800 rounded-full h-2">
+                                    <div className="bg-emerald-500 rounded-full h-2 transition-all" style={{ width: `${(massSendProgress.current / massSendProgress.total) * 100}%` }}></div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Actions */}
                         <div className="flex gap-3 p-5 border-t border-gray-800">
                             <button onClick={() => { setShowCompose(false); resetCompose(); }}
-                                className="flex-1 px-4 py-2.5 bg-gray-800 text-gray-400 hover:text-white rounded-lg font-bold text-sm transition-colors"
+                                className="px-4 py-2.5 bg-gray-800 text-gray-400 hover:text-white rounded-lg font-bold text-sm transition-colors"
+                                disabled={massSending}
                             >
                                 Cancelar
                             </button>
-                            <button onClick={handleSend} disabled={sending || !subject.trim() || !body.trim()}
+
+                            {/* Mass Send Button - visible for FOA/Relatório with class selected */}
+                            {(attachmentType === 'foa' || attachmentType === 'relatorio_aluno') && targetClass && !selectedStudent && (
+                                <button onClick={handleMassSend} disabled={massSending}
+                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-lg font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <UsersRound size={16} />
+                                    {massSending ? `${massSendProgress.current}/${massSendProgress.total}` : 'Enviar para Toda a Turma'}
+                                </button>
+                            )}
+
+                            <button onClick={handleSend} disabled={sending || massSending || !subject.trim() || !body.trim()}
                                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Send size={16} />
-                                {sending ? 'Enviando...' : 'Enviar'}
+                                {sending ? 'Enviando...' : 'Enviar Individual'}
                             </button>
                         </div>
                     </div>
@@ -658,10 +1003,75 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
 
                                         {att && att.type === 'relatorio_aluno' && (
                                             <div className="mt-4 bg-amber-500/5 border border-amber-500/20 rounded-xl p-4 space-y-2">
-                                                <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase">
-                                                    <BarChart3 size={14} />
-                                                    Relatório — {att.studentName} ({att.className})
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase">
+                                                        <BarChart3 size={14} />
+                                                        Relatório — {att.studentName}
+                                                    </div>
+                                                    <button onClick={() => PDFService.generateStudentReportPDF(att)}
+                                                        className="p-1 px-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-colors"
+                                                    >
+                                                        <FileText size={12} />
+                                                        PDF
+                                                    </button>
                                                 </div>
+                                                {att.avgGrade && (
+                                                    <p className="text-xs text-gray-400">Média: <span className="text-amber-300 font-bold">{att.avgGrade}</span> | Aulas: {att.totalClasses || 0}</p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {att && att.type === 'foa' && (
+                                            <div className="mt-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase">
+                                                        <UserCheck size={14} />
+                                                        FOA — {att.studentName} ({att.bimestre}º Bim)
+                                                    </div>
+                                                    <button onClick={() => PDFService.generateFOAPDF(att)}
+                                                        className="p-1 px-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-colors"
+                                                    >
+                                                        <FileText size={12} />
+                                                        PDF
+                                                    </button>
+                                                </div>
+                                                {att.rows && att.rows.length > 0 && (
+                                                    <p className="text-xs text-gray-400">{att.rows.length} disciplinas avaliadas</p>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {att && att.type === 'ocorrencia' && (
+                                            <div className="mt-4 bg-red-500/5 border border-red-500/20 rounded-xl p-4 space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2 text-red-400 text-xs font-bold uppercase">
+                                                        <AlertCircle size={14} />
+                                                        Ocorrência — {att.typeLabel}
+                                                    </div>
+                                                    <button onClick={() => PDFService.generateOccurrencePDF({ studentName: att.studentName, className: att.className, date: att.date, typeLabel: att.typeLabel, description: att.description })}
+                                                        className="p-1 px-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-colors"
+                                                    >
+                                                        <FileText size={12} />
+                                                        PDF
+                                                    </button>
+                                                </div>
+                                                <p className="text-sm text-gray-300 italic">"{att.description}"</p>
+                                                {att.photos && att.photos.length > 0 && (
+                                                    <div className="flex gap-2 overflow-x-auto pb-1">
+                                                        {att.photos.map((url: string, i: number) => (
+                                                            <img key={i} src={url} className="w-28 h-28 rounded-lg object-cover border border-gray-700 shrink-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => window.open(url, '_blank')} />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Direct Images Display in Message */}
+                                        {msg.directImages && msg.directImages.length > 0 && (
+                                            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                {msg.directImages.map((url, i) => (
+                                                    <img key={i} src={url} className="w-full aspect-square rounded-xl object-cover border border-gray-800 cursor-pointer hover:border-blue-500/50 transition-all" onClick={() => window.open(url, '_blank')} />
+                                                ))}
                                             </div>
                                         )}
 

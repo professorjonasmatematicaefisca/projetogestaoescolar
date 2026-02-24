@@ -190,10 +190,12 @@ export interface MessageItem {
   senderRole: string;
   subject: string;
   body: string;
-  recipients: 'students' | 'parents' | 'both' | 'coordinator';
+  recipients: 'students' | 'parents' | 'both' | 'coordinator' | 'individual_student' | 'individual_parent';
   targetClass?: string;
+  targetStudentId?: string; // New: For individual communications
   attachmentType?: string;
   attachmentData?: any;
+  directImages?: string[]; // New: For direct photo uploads
   isRead?: boolean;
   createdAt: string;
 }

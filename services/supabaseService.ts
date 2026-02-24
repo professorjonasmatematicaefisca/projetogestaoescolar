@@ -1035,8 +1035,10 @@ export const SupabaseService = {
             body: msg.body,
             recipients: msg.recipients,
             target_class: msg.targetClass,
+            target_student_id: msg.targetStudentId,
             attachment_type: msg.attachmentType,
-            attachment_data: msg.attachmentData
+            attachment_data: msg.attachmentData,
+            direct_images: msg.directImages || []
         });
         if (error) { console.error('createMessage error:', error); return false; }
         return true;
@@ -1057,8 +1059,10 @@ export const SupabaseService = {
             body: m.body,
             recipients: m.recipients,
             targetClass: m.target_class,
+            targetStudentId: m.target_student_id,
             attachmentType: m.attachment_type,
             attachmentData: m.attachment_data,
+            directImages: m.direct_images || [],
             isRead: m.is_read,
             createdAt: m.created_at
         }));
