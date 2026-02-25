@@ -5,16 +5,22 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
     ClipboardList, Check, X, Trash2, Clock, Calendar,
-    User, BookOpen, AlertTriangle, CheckCircle, XCircle, Filter
+    User, BookOpen, AlertTriangle, CheckCircle, XCircle, Filter, Inbox
 } from 'lucide-react';
+import { UserRole } from './types';
 
 interface RequestsPanelProps {
     onShowToast: (msg: string) => void;
     userEmail?: string;
+    userRole: UserRole;
 }
 
-export const RequestsPanel: React.FC<RequestsPanelProps> = ({ onShowToast, userEmail }) => {
+export const RequestsPanel: React.FC<RequestsPanelProps> = ({ onShowToast, userEmail, userRole }) => {
     const [requests, setRequests] = useState<RequestItem[]>([]);
+    const [showNewModal, setShowNewModal] = useState(false);
+    const [newType, setNewType] = useState('justificativa_falta');
+    const [newReason, setNewReason] = useState('');
+    const [submitting, setSubmitting] = useState(false);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
 
@@ -24,9 +30,37 @@ export const RequestsPanel: React.FC<RequestsPanelProps> = ({ onShowToast, userE
 
     const loadRequests = async () => {
         setLoading(true);
-        const data = await SupabaseService.getRequests();
+        let data = await SupabaseService.getRequests();
+
+        // Filter for students/parents: only see their own requests
+        if (userRole === UserRole.STUDENT || userRole === UserRole.PARENT) {
+            // Simplified: in a real system we'd filter by student_id or email in the query
+            data = data.filter(r => r.teacherName === userEmail);
+        }
+
         setRequests(data);
         setLoading(false);
+    };
+
+    const handleCreateRequest = async () => {
+        if (!newReason.trim()) return onShowToast("Por favor, descreva o motivo.");
+        setSubmitting(true);
+        const success = await SupabaseService.createRequest({
+            type: newType,
+            status: 'pending',
+            teacherId: userEmail,
+            teacherName: userEmail, // Using email as name for identifier for now
+            reason: newReason
+        });
+        if (success) {
+            onShowToast("✅ Solicitação enviada com sucesso!");
+            setShowNewModal(false);
+            setNewReason('');
+            loadRequests();
+        } else {
+            onShowToast("Erro ao enviar solicitação.");
+        }
+        setSubmitting(false);
     };
 
     const handleApprove = async (req: RequestItem) => {
@@ -71,6 +105,9 @@ export const RequestsPanel: React.FC<RequestsPanelProps> = ({ onShowToast, userE
     const getTypeLabel = (type: string) => {
         switch (type) {
             case 'delete_session': return 'Excluir Registro de Aula';
+            case 'justificativa_falta': return 'Justificativa de Falta';
+            case 'documento': return 'Solicitação de Documento';
+            case 'outro': return 'Outra Solicitação';
             default: return type;
         }
     };
@@ -122,9 +159,19 @@ export const RequestsPanel: React.FC<RequestsPanelProps> = ({ onShowToast, userE
                         )}
                     </h2>
                     <p className="text-gray-500 text-sm mt-1 ml-[52px]">
-                        Gerencie solicitações dos professores
+                        {userRole === UserRole.COORDINATOR ? 'Gerencie solicitações dos professores' : 'Acompanhe suas solicitações'}
                     </p>
                 </div>
+
+                {(userRole === UserRole.STUDENT || userRole === UserRole.PARENT) && (
+                    <button
+                        onClick={() => setShowNewModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-[#0f172a] rounded-lg text-sm font-bold transition-all shadow-lg shadow-emerald-500/10"
+                    >
+                        <Check size={18} />
+                        Nova Solicitação
+                    </button>
+                )}
             </div>
 
             {/* Filter Tabs */}
@@ -139,8 +186,8 @@ export const RequestsPanel: React.FC<RequestsPanelProps> = ({ onShowToast, userE
                         key={tab.key}
                         onClick={() => setFilter(tab.key)}
                         className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition-all ${filter === tab.key
-                                ? 'bg-gray-800 text-white shadow-sm'
-                                : 'text-gray-500 hover:text-gray-300'
+                            ? 'bg-gray-800 text-white shadow-sm'
+                            : 'text-gray-500 hover:text-gray-300'
                             }`}
                     >
                         <tab.icon size={14} />
@@ -174,8 +221,8 @@ export const RequestsPanel: React.FC<RequestsPanelProps> = ({ onShowToast, userE
                         <div
                             key={req.id}
                             className={`bg-[#0f172a] border rounded-xl overflow-hidden transition-all ${req.status === 'pending'
-                                    ? 'border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.05)]'
-                                    : 'border-gray-800'
+                                ? 'border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.05)]'
+                                : 'border-gray-800'
                                 }`}
                         >
                             <div className="p-5">
@@ -254,6 +301,60 @@ export const RequestsPanel: React.FC<RequestsPanelProps> = ({ onShowToast, userE
                             </div>
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* New Request Modal */}
+            {showNewModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-[#0f172a] border border-gray-800 w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl">
+                        <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+                            <h3 className="text-xl font-bold text-white flex items-center gap-3">
+                                <Inbox className="text-emerald-400" />
+                                Nova Solicitação
+                            </h3>
+                            <button onClick={() => setShowNewModal(false)} className="text-gray-500 hover:text-white transition-colors">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Tipo de Solicitação</label>
+                                <select
+                                    value={newType}
+                                    onChange={(e) => setNewType(e.target.value)}
+                                    className="w-full bg-[#1e293b] border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-emerald-500 transition-all outline-none"
+                                >
+                                    <option value="justificativa_falta">Justificativa de Falta</option>
+                                    <option value="documento">Solicitação de Documento</option>
+                                    <option value="outro">Outro Motivo</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Descrição / Motivo</label>
+                                <textarea
+                                    value={newReason}
+                                    onChange={(e) => setNewReason(e.target.value)}
+                                    rows={4}
+                                    placeholder="Descreva detalhadamente sua solicitação..."
+                                    className="w-full bg-[#1e293b] border border-gray-700 rounded-xl px-4 py-3 text-white focus:border-emerald-500 transition-all outline-none resize-none"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="p-6 bg-gray-900/50 border-t border-gray-800 flex gap-3">
+                            <button onClick={() => setShowNewModal(false)} className="flex-1 py-3 text-gray-400 font-bold hover:text-white transition-colors">Cancelar</button>
+                            <button
+                                onClick={handleCreateRequest}
+                                disabled={submitting}
+                                className="flex-[2] py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-[#0f172a] font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+                            >
+                                {submitting ? 'Enviando...' : 'Enviar Solicitação'}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

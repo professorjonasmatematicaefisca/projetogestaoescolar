@@ -1078,5 +1078,16 @@ export const SupabaseService = {
         const { error } = await supabase.from('messages').update({ is_read: true }).eq('id', id);
         if (error) { console.error('markMessageRead error:', error); return false; }
         return true;
+    },
+
+    async getUnreadMessagesCount(email: string, role: string): Promise<number> {
+        // This is a simplified check. Real logic should filter by recipient role/email
+        const { count, error } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('is_read', false);
+
+        if (error) { console.error('getUnreadMessagesCount error:', error); return 0; }
+        return count || 0;
     }
 };

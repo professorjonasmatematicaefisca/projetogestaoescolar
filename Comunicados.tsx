@@ -27,13 +27,13 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
     const [loading, setLoading] = useState(true);
     const [showCompose, setShowCompose] = useState(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
-    const [filter, setFilter] = useState<'all' | 'students' | 'parents' | 'both' | 'coordinator'>('all');
+    const [filter, setFilter] = useState<'all' | 'students' | 'parents' | 'both' | 'coordinator' | 'unread'>('all');
     const [classes, setClasses] = useState<string[]>([]);
 
     // Compose state
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
-    const [recipients, setRecipients] = useState<'students' | 'parents' | 'both' | 'coordinator'>('students');
+    const [recipients, setRecipients] = useState<'students' | 'parents' | 'both' | 'coordinator' | 'individual_student' | 'individual_parent'>('students');
     const [targetClass, setTargetClass] = useState('');
     const [attachmentType, setAttachmentType] = useState('');
     const [sending, setSending] = useState(false);
@@ -311,28 +311,40 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
             return;
         }
         setSending(true);
-        const attachData = buildAttachmentData();
-        const success = await SupabaseService.createMessage({
-            senderName: userName || userEmail || 'Usuário',
-            senderEmail: userEmail,
-            senderRole: userRole || 'teacher',
-            subject: subject.trim(),
-            body: body.trim(),
-            recipients,
-            targetClass: targetClass || undefined,
-            targetStudentId: selectedStudent?.id || selectedOccurrence?.studentIds?.[0] || undefined,
-            attachmentType: attachmentType || undefined,
-            attachmentData: attachData,
-            directImages: directImages
-        });
-        setSending(false);
-        if (success) {
-            onShowToast("✅ Mensagem enviada com sucesso!");
-            setShowCompose(false);
-            resetCompose();
-            loadMessages();
-        } else {
-            onShowToast("Erro ao enviar mensagem.");
+        try {
+            const attachData = buildAttachmentData();
+            // Auto-set recipients to parents for FOA/Report
+            const effectiveRecipients = (attachmentType === 'foa' || attachmentType === 'relatorio_aluno')
+                ? 'parents' : recipients;
+
+            console.log('📤 Enviando mensagem:', { attachmentType, effectiveRecipients, hasAttachData: !!attachData, studentId: selectedStudent?.id });
+
+            const success = await SupabaseService.createMessage({
+                senderName: userName || userEmail || 'Usuário',
+                senderEmail: userEmail,
+                senderRole: userRole || 'teacher',
+                subject: subject.trim(),
+                body: body.trim(),
+                recipients: effectiveRecipients,
+                targetClass: targetClass || undefined,
+                targetStudentId: selectedStudent?.id || selectedOccurrence?.studentIds?.[0] || undefined,
+                attachmentType: attachmentType || undefined,
+                attachmentData: attachData,
+                directImages: directImages
+            });
+            setSending(false);
+            if (success) {
+                onShowToast("✅ Mensagem enviada com sucesso!");
+                setShowCompose(false);
+                resetCompose();
+                loadMessages();
+            } else {
+                onShowToast("Erro ao enviar mensagem. Verifique os dados.");
+            }
+        } catch (err) {
+            console.error('❌ Erro no handleSend:', err);
+            setSending(false);
+            onShowToast("Erro inesperado ao processar o envio.");
         }
     };
 
@@ -887,6 +899,12 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
                             {tab.label}
                         </button>
                     ))}
+                    <button onClick={() => setFilter('unread')}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${filter === 'unread' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                        Não Lidas
+                    </button>
                 </div>
             )}
 
@@ -914,9 +932,19 @@ export const Comunicados: React.FC<ComunicadosProps> = ({ onShowToast, userEmail
                                 className={`bg-[#0f172a] border border-gray-800 rounded-xl overflow-hidden transition-all hover:border-gray-700 ${isExpanded ? 'shadow-lg shadow-blue-500/5' : ''}`}
                             >
                                 {/* Message Header */}
-                                <button onClick={() => setExpandedId(isExpanded ? null : msg.id)}
-                                    className="w-full p-4 flex items-center gap-3 text-left"
+                                <button onClick={() => {
+                                    setExpandedId(isExpanded ? null : msg.id);
+                                    if (!isExpanded && !msg.isRead) {
+                                        SupabaseService.markMessageRead(msg.id);
+                                        // Update local state to reflect read immediately
+                                        setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, isRead: true } : m));
+                                    }
+                                }}
+                                    className="w-full p-4 flex items-center gap-3 text-left relative"
                                 >
+                                    {!msg.isRead && (
+                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-500 rounded-r-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" />
+                                    )}
                                     <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${getRecipientColor(msg.recipients)}`}>
                                         <RecIcon size={16} />
                                     </div>

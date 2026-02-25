@@ -12,19 +12,22 @@ import { Planning } from './Planning';
 import { StudyGuide } from './StudyGuide';
 import { RequestsPanel } from './RequestsPanel';
 import { Comunicados } from './Comunicados';
+import { PortalDashboard } from './PortalDashboard';
 import { UserRole, ViewState } from './types';
 import { ErrorBoundary } from './ErrorBoundary';
 
 import { supabase } from './supabaseClient';
+import { SupabaseService } from './services/supabaseService';
 
 function App() {
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState<ViewState>('MONITORING');
-  const [userRole, setUserRole] = useState<UserRole>(UserRole.COORDINATOR);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
   const [userName, setUserName] = useState<string>('');
-  const [userPhoto, setUserPhoto] = useState<string | undefined>(undefined);
+  const [userPhoto, setUserPhoto] = useState<string>('');
+  const [unreadCount, setUnreadCount] = useState(0);
   const [targetStudentId, setTargetStudentId] = useState<string | undefined>(undefined);
   const [isDark, setIsDark] = useState(false);
   const [toast, setToast] = useState<{ msg: string, visible: boolean }>({ msg: '', visible: false });
@@ -63,6 +66,12 @@ function App() {
     setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 5000);
   };
 
+  useEffect(() => {
+    if (isAuthenticated && userEmail && userRole) {
+      SupabaseService.getUnreadMessagesCount(userEmail, userRole).then(setUnreadCount);
+    }
+  }, [isAuthenticated, userEmail, userRole, currentView]);
+
   const handleLogin = (role: UserRole, email: string, name?: string, photoUrl?: string) => {
     setUserRole(role);
     setUserEmail(email);
@@ -97,9 +106,10 @@ function App() {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    setUserRole(UserRole.COORDINATOR); // Reset
+    setUserRole(null); // Reset to null
     setUserEmail('');
     setUserName('');
+    setUserPhoto(''); // Reset photo
 
     // Clear Session
     localStorage.removeItem('educontrol_role');
@@ -110,18 +120,22 @@ function App() {
 
   const renderView = () => {
     switch (currentView) {
-      case 'MONITORING': return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole} />;
-      case 'DASHBOARD': return <Dashboard onNavigateToStudent={handleNavigateToStudent} />;
-      case 'REPORTS': return <StudentReport onShowToast={showToast} currentUserRole={userRole} initialStudentId={targetStudentId} />;
-      case 'PLANNING': return <Planning userEmail={userEmail} userRole={userRole} onShowToast={showToast} />;
-      case 'STUDY_GUIDE': return <StudyGuide userEmail={userEmail} userRole={userRole} onShowToast={showToast} />;
-      case 'FOA': return <FOA onShowToast={showToast} currentUserRole={userRole} userEmail={userEmail} userName={userName} />;
+      case 'MONITORING': return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole!} />;
+      case 'DASHBOARD':
+        if (userRole === UserRole.STUDENT || userRole === UserRole.PARENT) {
+          return <PortalDashboard userEmail={userEmail} userRole={userRole} onNavigate={handleViewChange} />;
+        }
+        return <Dashboard onNavigateToStudent={handleNavigateToStudent} />;
+      case 'REPORTS': return <StudentReport onShowToast={showToast} currentUserRole={userRole!} initialStudentId={targetStudentId} />;
+      case 'PLANNING': return <Planning userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
+      case 'STUDY_GUIDE': return <StudyGuide userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
+      case 'FOA': return <FOA onShowToast={showToast} currentUserRole={userRole!} userEmail={userEmail} userName={userName} />;
       case 'OCCURRENCES': return <Occurrences onShowToast={showToast} />;
       case 'ADMIN': return <AdminPanel onShowToast={showToast} />;
-      case 'REQUESTS': return <RequestsPanel onShowToast={showToast} userEmail={userEmail} />;
-      case 'MESSAGES': return <Comunicados onShowToast={showToast} userEmail={userEmail} userName={userName} userRole={userRole} />;
+      case 'REQUESTS': return <RequestsPanel onShowToast={showToast} userEmail={userEmail} userRole={userRole!} />;
+      case 'MESSAGES': return <Comunicados onShowToast={showToast} userEmail={userEmail} userName={userName} userRole={userRole!} />;
       case 'SETTINGS': return <ChangePassword userEmail={userEmail} onShowToast={showToast} />;
-      default: return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole} />;
+      default: return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole!} />;
     }
   };
 
@@ -139,13 +153,14 @@ function App() {
         <Layout
           currentView={currentView}
           onViewChange={handleViewChange}
-          role={userRole}
+          role={userRole!}
           onRoleChange={setUserRole}
           onLogout={handleLogout}
           isDark={isDark}
           toggleTheme={toggleTheme}
           userPhoto={userPhoto}
           userName={userName}
+          unreadMessagesCount={unreadCount}
         >
           {renderView()}
         </Layout>

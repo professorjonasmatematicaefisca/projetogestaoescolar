@@ -1391,7 +1391,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    {userRole === 'coordinator' ? (
+                                                    {userRole === UserRole.COORDINATOR ? (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleDeleteSession(sess); }}
                                                             className="p-2 rounded-lg text-gray-600 hover:text-red-500 hover:bg-red-500/10 transition-colors"

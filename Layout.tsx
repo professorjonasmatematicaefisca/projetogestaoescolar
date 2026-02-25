@@ -30,6 +30,7 @@ interface LayoutProps {
   toggleTheme: () => void;
   userPhoto?: string;
   userName?: string;
+  unreadMessagesCount?: number;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -39,7 +40,8 @@ export const Layout: React.FC<LayoutProps> = ({
   role,
   onLogout,
   userPhoto,
-  userName
+  userName,
+  unreadMessagesCount = 0
 }) => {
   const [isSidebarOpen, setSidebarOpen] = React.useState(false);
 
@@ -48,8 +50,8 @@ export const Layout: React.FC<LayoutProps> = ({
     [UserRole.COORDINATOR]: ['MONITORING', 'DASHBOARD', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'OCCURRENCES', 'REQUESTS', 'MESSAGES', 'ADMIN', 'SETTINGS', 'FOA'],
     [UserRole.TEACHER]: ['MONITORING', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'MESSAGES', 'SETTINGS', 'FOA'],
     [UserRole.MONITOR]: ['OCCURRENCES', 'SETTINGS'],
-    [UserRole.STUDENT]: ['MESSAGES', 'SETTINGS'],
-    [UserRole.PARENT]: ['MESSAGES', 'SETTINGS']
+    [UserRole.STUDENT]: ['DASHBOARD', 'REQUESTS', 'MESSAGES', 'SETTINGS'],
+    [UserRole.PARENT]: ['DASHBOARD', 'REQUESTS', 'MESSAGES', 'SETTINGS']
   };
 
   const menuItems = [
@@ -115,13 +117,22 @@ export const Layout: React.FC<LayoutProps> = ({
                     onViewChange(item.view);
                     setSidebarOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group ${active
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group relative ${active
                     ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-600/20 shadow-[0_0_20px_rgba(16,185,129,0.1)]'
                     : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200 border border-transparent'
                     }`}
                 >
-                  <item.icon size={20} className={active ? 'text-emerald-400' : 'text-gray-500 group-hover:text-gray-300'} />
-                  <span className="font-medium">{item.label}</span>
+                  {active && (
+                    <div className="absolute left-0 w-1 h-6 bg-emerald-500 rounded-r-full" />
+                  )}
+                  <item.icon className={`transition-colors ${active ? 'text-emerald-400' : 'text-gray-400 group-hover:text-gray-200'}`} size={20} />
+                  <span className="font-semibold">{item.label}</span>
+
+                  {item.view === 'MESSAGES' && unreadMessagesCount > 0 && (
+                    <span className="ml-auto w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                      {unreadMessagesCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
