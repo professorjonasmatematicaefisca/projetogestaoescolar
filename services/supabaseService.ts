@@ -273,12 +273,15 @@ export const SupabaseService = {
         });
     },
 
-    async getStudents(): Promise<Student[]> {
-        const { data, error } = await supabase.from('students').select('*').order('name', { ascending: true });
+    async getStudents(includeInactive = false): Promise<Student[]> {
+        let query = supabase.from('students').select('*');
+        if (!includeInactive) {
+            query = query.eq('status', 'ACTIVE');
+        }
+        const { data, error } = await query.order('name', { ascending: true });
+
         if (error) {
             console.error("Error fetching students:", error);
-            // Return empty array or throw error instead of silent fallback to SEED
-            // helping user realize connection issues.
             return [];
         }
         return data.map((s: any) => ({
@@ -286,17 +289,20 @@ export const SupabaseService = {
             name: s.name,
             photoUrl: s.photo_url,
             parentEmail: s.parent_email,
-            className: s.class_name
+            className: s.class_name,
+            status: s.status,
+            inactiveReason: s.inactive_reason,
+            inactiveDate: s.inactive_date
         }));
     },
 
     async createStudent(student: Omit<Student, 'id'>): Promise<boolean> {
-        const { error } = await supabase.from('students').insert({
+        const { data, error } = await supabase.from('students').insert({
             name: student.name,
             photo_url: student.photoUrl,
             parent_email: student.parentEmail,
             class_name: student.className
-        });
+        }).select().single();
 
         if (error) {
             console.error("Error creating student:", error);
@@ -321,7 +327,138 @@ export const SupabaseService = {
             }
         }
 
+        // Criar a matrícula primária
+        if (data && data.id) {
+            await supabase.from('enrollments').insert({
+                student_id: data.id,
+                class_name: student.className,
+                academic_year: new Date().getFullYear(),
+                status: 'ACTIVE'
+            });
+        }
+
         return true;
+    },
+
+    async deactivateStudent(id: string, reason: string): Promise<boolean> {
+        // 1. Marcar aluno como inativo
+        const { error: studentError } = await supabase
+            .from('students')
+            .update({
+                status: 'INACTIVE',
+                inactive_reason: reason,
+                inactive_date: new Date().toISOString()
+            })
+            .eq('id', id);
+
+        if (studentError) {
+            console.error("Error deactivating student:", studentError);
+            return false;
+        }
+
+        // 2. Encerrar a matrícula atual (fechar enrollment)
+        await supabase
+            .from('enrollments')
+            .update({
+                status: 'INACTIVE',
+                end_date: new Date().toISOString()
+            })
+            .eq('student_id', id)
+            .eq('status', 'ACTIVE')
+            .is('end_date', null);
+
+        return true;
+    },
+
+    async transferStudentClass(id: string, newClassName: string): Promise<boolean> {
+        // 1. Fechar a matrícula antiga
+        await supabase
+            .from('enrollments')
+            .update({
+                status: 'TRANSFERRED',
+                end_date: new Date().toISOString()
+            })
+            .eq('student_id', id)
+            .eq('status', 'ACTIVE')
+            .is('end_date', null);
+
+        // 2. Criar a nova matrícula
+        const currentYear = new Date().getFullYear();
+        await supabase.from('enrollments').insert({
+            student_id: id,
+            class_name: newClassName,
+            academic_year: currentYear,
+            status: 'ACTIVE'
+        });
+
+        // 3. Atualizar a ref base no estudante
+        const { error } = await supabase
+            .from('students')
+            .update({ class_name: newClassName })
+            .eq('id', id);
+
+        return !error;
+    },
+
+    async advanceStudentsYear(studentIds: string[], targetClassName: string, targetYear: number): Promise<boolean> {
+        if (studentIds.length === 0) return true;
+
+        // 1. Completar matrículas atuais destes alunos
+        await supabase
+            .from('enrollments')
+            .update({
+                status: 'COMPLETED',
+                end_date: new Date().toISOString()
+            })
+            .in('student_id', studentIds)
+            .eq('status', 'ACTIVE')
+            .is('end_date', null);
+
+        // 2. Criar novas matrículas para o novo ano
+        const newEnrollments = studentIds.map(id => ({
+            student_id: id,
+            class_name: targetClassName,
+            academic_year: targetYear,
+            status: 'ACTIVE'
+        }));
+
+        await supabase.from('enrollments').insert(newEnrollments);
+
+        // 3. Atualizar a base do aluno para aparecerem na nova classe no sistema atual
+        const { error } = await supabase
+            .from('students')
+            .update({ class_name: targetClassName })
+            .in('id', studentIds);
+
+        return !error;
+    },
+
+    async getEnrollments(year: number): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('enrollments')
+            .select(`
+                *,
+                student:student_id (id, name, photo_url, parent_email)
+            `)
+            .eq('academic_year', year);
+
+        if (error) {
+            console.error("Error fetching enrollments:", error);
+            return [];
+        }
+        return data;
+    },
+
+    async getStudentsByYear(year: number): Promise<Student[]> {
+        const enrollments = await this.getEnrollments(year);
+        return enrollments.map(e => ({
+            id: e.student.id,
+            name: e.student.name,
+            photoUrl: e.student.photo_url,
+            parentEmail: e.student.parent_email,
+            className: e.class_name, // Turma que ele estava NAQUELE ano
+            status: e.status
+        }));
     },
 
     async syncParentAccounts(): Promise<{ success: boolean, createdCount: number }> {
@@ -557,6 +694,9 @@ export const SupabaseService = {
 
     // --- STUDENT CRUD ---
     async updateStudent(student: Student): Promise<boolean> {
+        // Se a classe mudou e não é apenas edição de nome, lidamos com isso fora ou dentro?
+        // Neste sistema atual, a transferência invoca a lógica acima transferStudentClass diretamente.
+        // O `updateStudent` padrão só altera os metadados. Se for editar a turma, o caller decide.
         const { error } = await supabase
             .from('students')
             .update({

@@ -51,6 +51,9 @@ export interface Student {
   photoUrl: string;
   parentEmail: string;
   className: string; // Links to ClassRoom
+  status?: string; // 'ACTIVE' | 'INACTIVE'
+  inactiveReason?: string;
+  inactiveDate?: string;
 }
 
 export interface Counters {

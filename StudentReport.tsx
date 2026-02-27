@@ -26,13 +26,15 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
     const [sessions, setSessions] = useState<ClassSession[]>([]);
     const [classes, setClasses] = useState<ClassRoom[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
+    const [academicYear, setAcademicYear] = useState<number>(new Date().getFullYear());
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
+                // Ao buscar dados para um relatório histórico, usamos o getStudentsByYear
                 const [fetchedStudents, fetchedSessions, fetchedClasses] = await Promise.all([
-                    SupabaseService.getStudents(),
+                    SupabaseService.getStudentsByYear(academicYear),
                     SupabaseService.getSessions(),
                     SupabaseService.getClasses()
                 ]);
@@ -60,6 +62,18 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
     // Default to last 30 days
     const [startDate, setStartDate] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
     const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+
+    // Update dates when academicYear changes to covering the whole year
+    useEffect(() => {
+        if (academicYear !== new Date().getFullYear()) {
+            setStartDate(`${academicYear}-01-01`);
+            setEndDate(`${academicYear}-12-31`);
+        } else {
+            // Default to last 30 days for current year
+            setStartDate(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
+            setEndDate(format(new Date(), 'yyyy-MM-dd'));
+        }
+    }, [academicYear]);
 
     // -- STUDENT REPORT STATE --
     // Filter State for Student Report
@@ -408,6 +422,22 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 <div className="flex items-center gap-2 border-r border-gray-700 pr-4 mr-2">
                     <Filter size={16} className="text-emerald-500" />
                     <span className="text-sm font-bold text-white uppercase">Filtros</span>
+                </div>
+
+                {/* Academic Year Selector */}
+                <div className="flex flex-col border-r border-gray-700 pr-4 mr-2">
+                    <label className="text-[9px] font-bold text-gray-500 uppercase">Ano Letivo</label>
+                    <select
+                        value={academicYear}
+                        onChange={(e) => setAcademicYear(parseInt(e.target.value))}
+                        className="bg-[#1e293b] text-white border border-gray-700 rounded p-1.5 text-xs outline-none focus:border-emerald-500 font-bold"
+                    >
+                        {[0, 1, 2].map(offset => {
+                            const y = new Date().getFullYear() - offset;
+                            return <option key={y} value={y}>{y}</option>;
+                        })}
+                        <option value={new Date().getFullYear() + 1}>{new Date().getFullYear() + 1}</option>
+                    </select>
                 </div>
 
                 {/* Date Range Picker */}
