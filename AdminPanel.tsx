@@ -442,47 +442,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
         const finalDisplayName = disciplineForm.displayName || generateDisplayName(disciplineForm.name);
 
         let success = false;
-        if (!finalDisplayName) {
-            const name = disciplineForm.name;
-            const upperName = name.toUpperCase();
-            const isEM = upperName.includes('AEM') || upperName.includes('EM') || (upperName.includes('SÉRIE') && !upperName.includes('FUNDAMENTAL'));
-
-            // Basic mapping for uppercase codes if found in name
-            const discBaseNames: Record<string, string> = {
-                'ART': 'Arte', 'BIO': 'Biologia', 'FIL': 'Filosofia', 'FIS': 'Física',
-                'GEO': 'Geografia', 'GRA': 'Gramática', 'HIS': 'História', 'LES': 'Língua Espanhola',
-                'LIN': 'Língua Inglesa', 'LIT': 'Literatura', 'MAT': 'Matemática', 'PTX': 'Produção de Texto',
-                'QUI': 'Química', 'SOC': 'Sociologia'
-            };
-
-            let baseName = '';
-            let code = '';
-
-            if (name.includes('_')) {
-                const parts = name.split('_');
-                const lastPart = parts[parts.length - 1];
-                const midPart = parts[1];
-                baseName = discBaseNames[midPart?.toUpperCase()] || midPart || parts[0];
-                code = /^[0-9]{2}[A-Z]$/.test(lastPart) ? lastPart : '';
-            } else if (name.includes('-')) {
-                const firstPart = name.split('-')[0].trim();
-                const parts = firstPart.split(' ');
-                baseName = parts[0];
-                code = parts.find(p => /^[0-9]{2}[A-Z]$/.test(p)) || '';
-            } else {
-                const parts = name.split(' ');
-                baseName = parts[0];
-                code = parts.find(p => /^[0-9]{2}[A-Z]$/.test(p)) || '';
-            }
-
-            if (isEM && code) {
-                finalDisplayName = `${baseName} ${code}`;
-            } else {
-                finalDisplayName = baseName;
-            }
-        }
-
-        let success = false;
         if (editingDisciplineId) {
             success = await SupabaseService.updateDiscipline({
                 id: editingDisciplineId,
