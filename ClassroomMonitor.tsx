@@ -426,7 +426,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         setLoadingModules(true);
         try {
             const [mods, discs] = await Promise.all([
-                SupabaseService.getPlanningModules(),
+                SupabaseService.getPlanningModules({ unusedOnly: true }),
                 SupabaseService.getDisciplines()
             ]);
             setAllDisciplines(discs);
@@ -481,6 +481,10 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             setSession(updatedSession);
             const success = await SupabaseService.saveSession(updatedSession, userEmail);
             if (success) {
+                // Mark modules as used in the database
+                if (selectedContentIds.length > 0) {
+                    await SupabaseService.markModulesAsUsed(selectedContentIds);
+                }
                 onShowToast("Conteúdo de aula salvo no Supabase!");
                 setHasUnsavedChanges(false);
             } else {

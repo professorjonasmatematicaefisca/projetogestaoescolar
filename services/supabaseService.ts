@@ -3,14 +3,18 @@ import { Student, ClassRoom, Teacher, Occurrence, ClassSession, SessionRecord, U
 import { SEED_STUDENTS, SEED_CLASSES, SEED_TEACHERS, SEED_OCCURRENCES } from './mockData';
 
 export const SupabaseService = {
-    async getPlanningModules(filters?: { teacherId?: string, classId?: string, disciplineId?: string }): Promise<PlanningModule[]> {
+    async getPlanningModules(filters?: { teacherId?: string, classId?: string, disciplineId?: string, unusedOnly?: boolean }): Promise<PlanningModule[]> {
         let query = supabase.from('planning_modules').select('*');
 
         if (filters?.teacherId) query = query.eq('teacher_id', filters.teacherId);
         if (filters?.classId) query = query.eq('class_id', filters.classId);
         if (filters?.disciplineId) query = query.eq('discipline_id', filters.disciplineId);
+        if (filters?.unusedOnly) query = query.eq('is_used', false);
 
-        const { data, error } = await query.order('created_at', { ascending: false });
+        // Sort by chapter and module in ascending order
+        const { data, error } = await query
+            .order('chapter', { ascending: true })
+            .order('module', { ascending: true });
 
         if (error) {
             console.error("Error fetching planning modules:", error);
@@ -28,8 +32,24 @@ export const SupabaseService = {
             title: m.title,
             topic: m.topic,
             bimestre: m.bimestre || 1,
+            isUsed: m.is_used || false,
             createdAt: m.created_at
         }));
+    },
+
+    async markModulesAsUsed(moduleIds: string[]): Promise<boolean> {
+        if (moduleIds.length === 0) return true;
+
+        const { error } = await supabase
+            .from('planning_modules')
+            .update({ is_used: true })
+            .in('id', moduleIds);
+
+        if (error) {
+            console.error("Error marking modules as used:", error);
+            return false;
+        }
+        return true;
     },
 
     async deletePlanningModule(id: string): Promise<boolean> {

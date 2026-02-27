@@ -140,6 +140,7 @@ export interface PlanningModule {
   title: string;
   topic: string;
   bimestre: number;
+  isUsed?: boolean;
   createdAt?: string;
 }
 
