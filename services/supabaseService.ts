@@ -256,7 +256,7 @@ export const SupabaseService = {
     },
 
     async getStudents(): Promise<Student[]> {
-        const { data, error } = await supabase.from('students').select('*');
+        const { data, error } = await supabase.from('students').select('*').order('name', { ascending: true });
         if (error) {
             console.error("Error fetching students:", error);
             // Return empty array or throw error instead of silent fallback to SEED
@@ -337,7 +337,8 @@ export const SupabaseService = {
         const { data, error } = await supabase
             .from('users')
             .select('*')
-            .in('role', [UserRole.TEACHER, UserRole.COORDINATOR, UserRole.MONITOR]);
+            .in('role', [UserRole.TEACHER, UserRole.COORDINATOR, UserRole.MONITOR])
+            .order('name', { ascending: true });
 
         if (error) {
             console.error("Error fetching staff:", error);
