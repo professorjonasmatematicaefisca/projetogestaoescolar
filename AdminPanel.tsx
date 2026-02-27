@@ -387,6 +387,50 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
         }
     };
 
+    // Helper for automatic display name generation
+    const generateDisplayName = (name: string): string => {
+        if (!name) return '';
+        const upperName = name.toUpperCase();
+        const isEM = upperName.includes('AEM') || upperName.includes('EM') || (upperName.includes('SÉRIE') && !upperName.includes('FUNDAMENTAL'));
+
+        const discBaseNames: Record<string, string> = {
+            'ART': 'Arte', 'BIO': 'Biologia', 'FIL': 'Filosofia', 'FIS': 'Física',
+            'GEO': 'Geografia', 'GRA': 'Gramática', 'HIS': 'História', 'LES': 'Língua Espanhola',
+            'LIN': 'Língua Inglesa', 'LIT': 'Literatura', 'MAT': 'Matemática', 'PTX': 'Produção de Texto',
+            'QUI': 'Química', 'SOC': 'Sociologia', 'PORT': 'Português', 'PORTUGUÊS': 'Português'
+        };
+
+        let baseName = '';
+        let code = '';
+
+        if (name.includes('_')) {
+            const parts = name.split('_');
+            const lastPart = parts[parts.length - 1];
+            const midPart = parts[1];
+            baseName = discBaseNames[midPart?.toUpperCase()] || midPart || parts[0];
+            code = /^[0-9]{2}[A-Z]$/.test(lastPart) ? lastPart : '';
+        } else if (name.includes('-')) {
+            const firstPart = name.split('-')[0].trim();
+            const parts = firstPart.split(' ');
+            baseName = parts[0];
+            code = parts.find(p => /^[0-9]{2}[A-Z]$/.test(p)) || '';
+        } else {
+            const parts = name.split(' ');
+            baseName = parts[0];
+            code = parts.find(p => /^[0-9]{2}[A-Z]$/.test(p)) || '';
+        }
+
+        // Clean baseName from numbers if it's EF (e.g. "Português 9º" -> "Português")
+        if (!isEM) {
+            baseName = baseName.replace(/[0-9]º/g, '').trim();
+        }
+
+        if (isEM && code) {
+            return `${baseName} ${code}`;
+        }
+        return baseName;
+    };
+
     // Discipline Handlers
     const handleDisciplineSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -395,9 +439,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
             return;
         }
 
-        let finalDisplayName = disciplineForm.displayName;
+        const finalDisplayName = disciplineForm.displayName || generateDisplayName(disciplineForm.name);
 
-        // Auto-generate displayName if empty
+        let success = false;
         if (!finalDisplayName) {
             const name = disciplineForm.name;
             const upperName = name.toUpperCase();
@@ -1316,7 +1360,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                                     <input
                                         type="text"
                                         value={disciplineForm.name}
-                                        onChange={(e) => setDisciplineForm({ ...disciplineForm, name: e.target.value })}
+                                        onChange={(e) => {
+                                            const newName = e.target.value;
+                                            const autoDisplay = generateDisplayName(newName);
+                                            setDisciplineForm({
+                                                ...disciplineForm,
+                                                name: newName,
+                                                displayName: autoDisplay
+                                            });
+                                        }}
                                         className="w-full bg-[#0f172a] border border-gray-700 rounded-lg px-4 py-3 text-white outline-none focus:border-emerald-500"
                                         required
                                     />
