@@ -473,7 +473,16 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     const handleSaveClassInfo = async () => {
         if (session) {
-            const contentStr = buildContentString();
+            let contentStr = buildContentString();
+
+            // Add coordinator OBS if a coordinator is registering for another teacher
+            if (userRole === UserRole.COORDINATOR) {
+                const currentUser = teachers.find(t => t.email === userEmail);
+                if (!currentUser || currentUser.id !== selectedTeacherId) {
+                    contentStr += " | OBS: Lançado pela Coordenação";
+                }
+            }
+
             const updatedSession = {
                 ...session,
                 generalNotes: contentStr,
@@ -488,6 +497,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                     const classObj = allClasses.find(c => c.name === selectedClassId);
                     if (classObj) {
                         await SupabaseService.markModulesAsUsed(selectedContentIds, classObj.id);
+                        // Reload modules so they disappear from the list immediately
+                        await loadContentModules();
                     }
                 }
                 onShowToast("Conteúdo de aula salvo no Supabase!");
@@ -626,8 +637,20 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
     const handleOpenHistory = async () => {
         checkUnsavedAndProceed(async () => {
             const all = await SupabaseService.getSessions();
-            const history = all.filter(s => s.teacherId === selectedTeacherId)
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+            // Filter based on user role and permissions
+            let history = all;
+            if (userRole === UserRole.TEACHER) {
+                // Teachers only see their own sessions
+                history = all.filter(s => s.teacherId === selectedTeacherId);
+            } else {
+                // Coordinators see all but can filter by selected teacher if desired
+                // For now, we show all sessions for the history view, sorted by date
+                history = all;
+            }
+
+            history = history.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
             setHistorySessions(history);
             setHistoryModalOpen(true);
         });
@@ -746,6 +769,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                     type="date"
                                     value={selectedDate}
                                     onChange={(e) => checkUnsavedAndProceed(() => setSelectedDate(e.target.value))}
+                                    max={new Date().toISOString().split('T')[0]}
                                     className="bg-[#1e293b] text-white text-sm border border-gray-700 rounded-lg p-2 pl-8 outline-none focus:border-emerald-500"
                                 />
                                 <Calendar size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
