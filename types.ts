@@ -38,11 +38,13 @@ export interface ClassRoom {
   id: string;
   name: string; // e.g. "9º Ano A"
   period: string; // e.g. "Matutino"
+  disciplineIds?: string[];
 }
 
 export interface Discipline {
   id: string;
-  name: string; // e.g. "Matemática", "História"
+  name: string; // e.g. "Matemática 9º EFII"
+  displayName?: string; // e.g. "Matemática"
 }
 
 export interface Student {
@@ -132,8 +134,8 @@ export interface StudentExit {
 export interface PlanningModule {
   id: string;
   disciplineId: string;
-  teacherId: string;
-  classId: string;
+  teacherId?: string;
+  classId?: string;
   front: string;
   chapter: string;
   module: string;

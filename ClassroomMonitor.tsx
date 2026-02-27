@@ -113,15 +113,17 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
     useEffect(() => {
         const loadInitialData = async () => {
             try {
-                const [loadedStudents, loadedTeachers, loadedClasses] = await Promise.all([
+                const [loadedStudents, loadedTeachers, loadedClasses, loadedDisciplines] = await Promise.all([
                     SupabaseService.getStudents(),
                     SupabaseService.getTeachers(),
-                    SupabaseService.getClasses()
+                    SupabaseService.getClasses(),
+                    SupabaseService.getDisciplines()
                 ]);
 
                 setAllStudents(loadedStudents);
                 setTeachers(loadedTeachers);
                 setAllClasses(loadedClasses);
+                setAllDisciplines(loadedDisciplines);
 
                 if (loadedTeachers.length > 0) {
                     let initialTeacher = loadedTeachers[0];
@@ -193,16 +195,19 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             if (validSelected.length > 0) setSelectedBlocks(validSelected);
             else setSelectedBlocks([newBlocks[0]]);
 
-            // 2. Update Subjects based on Teacher + Class Assignment
+            // 2. Update Subjects based on Class-Discipline assignments
             let subjs: string[] = [];
-            if (teacher.assignments && teacher.assignments.length > 0) {
+
+            if (selectedClass && selectedClass.disciplineIds && selectedClass.disciplineIds.length > 0) {
+                // Link based on explicitly assigned disciplines to this class
+                subjs = allDisciplines
+                    .filter(d => selectedClass.disciplineIds?.includes(d.id))
+                    .map(d => d.name);
+            } else if (teacher.assignments && teacher.assignments.length > 0) {
+                // Fallback to teacher assignments
                 subjs = teacher.assignments
                     .filter(a => a.classId === selectedClassId)
                     .map(a => a.subject);
-            }
-
-            if (subjs.length === 0 && teacher.subject) {
-                subjs = [teacher.subject];
             }
 
             subjs = [...new Set(subjs)];
@@ -425,22 +430,19 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
     const loadContentModules = async () => {
         setLoadingModules(true);
         try {
-            const [mods, discs] = await Promise.all([
-                SupabaseService.getPlanningModules({ unusedOnly: true }),
+            const discObj = allDisciplines.find(d => d.name === selectedSubject);
+
+            const [mods, discsList] = await Promise.all([
+                SupabaseService.getPlanningModules({
+                    unusedOnly: true,
+                    classId: allClasses.find(c => c.name === selectedClassId)?.id,
+                    disciplineId: discObj?.id
+                }),
                 SupabaseService.getDisciplines()
             ]);
-            setAllDisciplines(discs);
+            setAllDisciplines(discsList);
 
-            // Find class ID and discipline ID from current selection
-            const classObj = allClasses.find(c => c.name === selectedClassId);
-            const discObj = discs.find(d => d.name === selectedSubject);
-
-            const filtered = mods.filter(m => {
-                const classMatch = classObj ? m.classId === classObj.id : false;
-                const discMatch = discObj ? m.disciplineId === discObj.id : false;
-                return classMatch && discMatch;
-            });
-            setContentModules(filtered);
+            setContentModules(mods);
         } catch (err) {
             console.error('Error loading planning modules:', err);
         }
@@ -481,9 +483,12 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             setSession(updatedSession);
             const success = await SupabaseService.saveSession(updatedSession, userEmail);
             if (success) {
-                // Mark modules as used in the database
+                // Mark modules as used in the database for the SPECIFIC CLASS
                 if (selectedContentIds.length > 0) {
-                    await SupabaseService.markModulesAsUsed(selectedContentIds);
+                    const classObj = allClasses.find(c => c.name === selectedClassId);
+                    if (classObj) {
+                        await SupabaseService.markModulesAsUsed(selectedContentIds, classObj.id);
+                    }
                 }
                 onShowToast("Conteúdo de aula salvo no Supabase!");
                 setHasUnsavedChanges(false);
@@ -775,7 +780,10 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                 onChange={(e) => checkUnsavedAndProceed(() => setSelectedSubject(e.target.value))}
                                 className="bg-[#1e293b] text-white text-sm border border-gray-700 rounded-lg p-2 outline-none focus:border-emerald-500 w-[130px]"
                             >
-                                {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                                {availableSubjects.map(s => {
+                                    const disc = allDisciplines.find(d => d.name === s);
+                                    return <option key={s} value={s}>{disc?.displayName || s}</option>;
+                                })}
                             </select>
                         </div>
                         <div className="flex flex-col relative" ref={timeDropdownRef}>
@@ -1200,7 +1208,9 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                             </div>
                                             <div className="bg-[#0f172a] p-3 rounded-lg border border-gray-700">
                                                 <span className="text-xs text-gray-500 uppercase font-bold block mb-1">Disciplina</span>
-                                                <span className="text-white font-bold">{selectedSubject}</span>
+                                                <span className="text-white font-bold">
+                                                    {allDisciplines.find(d => d.name === selectedSubject)?.displayName || selectedSubject}
+                                                </span>
                                             </div>
                                         </div>
 

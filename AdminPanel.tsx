@@ -51,8 +51,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
         photoUrl: '',
         assignments: [] as TeacherClassAssignment[]
     });
-    const [classForm, setClassForm] = useState({ name: '', period: 'Matutino' });
-    const [disciplineForm, setDisciplineForm] = useState({ name: '' });
+    const [classForm, setClassForm] = useState({ name: '', period: 'Matutino', disciplineIds: [] as string[] });
+    const [disciplineForm, setDisciplineForm] = useState({ name: '', displayName: '' });
 
     // Deactivation State
     const [showDeactivateModal, setShowDeactivateModal] = useState(false);
@@ -340,18 +340,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                 name: classForm.name,
                 period: classForm.period
             });
+            if (success) {
+                await SupabaseService.setClassDisciplines(editingClassId, classForm.disciplineIds);
+            }
         } else {
-            success = await SupabaseService.createClass({
+            const classId = await SupabaseService.createClass({
                 name: classForm.name,
                 period: classForm.period
             });
+
+            if (classId) {
+                success = true;
+                await SupabaseService.setClassDisciplines(classId, classForm.disciplineIds);
+            }
         }
 
         if (success) {
             onShowToast(editingClassId ? 'Turma atualizada com sucesso!' : 'Turma cadastrada com sucesso!');
             setShowClassModal(false);
             setEditingClassId(null);
-            setClassForm({ name: '', period: 'Matutino' });
+            setClassForm({ name: '', period: 'Matutino', disciplineIds: [] });
             loadData();
         } else {
             onShowToast(editingClassId ? 'Erro ao atualizar turma' : 'Erro ao cadastrar turma');
@@ -362,7 +370,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
         setEditingClassId(cls.id);
         setClassForm({
             name: cls.name,
-            period: cls.period
+            period: cls.period,
+            disciplineIds: cls.disciplineIds || []
         });
         setShowClassModal(true);
     };
@@ -390,11 +399,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
         if (editingDisciplineId) {
             success = await SupabaseService.updateDiscipline({
                 id: editingDisciplineId,
-                name: disciplineForm.name
+                name: disciplineForm.name,
+                displayName: disciplineForm.displayName
             });
         } else {
             success = await SupabaseService.createDiscipline({
-                name: disciplineForm.name
+                name: disciplineForm.name,
+                displayName: disciplineForm.displayName
             });
         }
 
@@ -402,7 +413,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
             onShowToast(editingDisciplineId ? 'Disciplina atualizada com sucesso!' : 'Disciplina cadastrada com sucesso!');
             setShowDisciplineModal(false);
             setEditingDisciplineId(null);
-            setDisciplineForm({ name: '' });
+            setDisciplineForm({ name: '', displayName: '' });
             loadData();
         } else {
             onShowToast(editingDisciplineId ? 'Erro ao atualizar disciplina' : 'Erro ao cadastrar disciplina');
@@ -412,7 +423,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
     const startEditDiscipline = (disc: Discipline) => {
         setEditingDisciplineId(disc.id);
         setDisciplineForm({
-            name: disc.name
+            name: disc.name,
+            displayName: disc.displayName || ''
         });
         setShowDisciplineModal(true);
     };
@@ -1174,7 +1186,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                     <div className="bg-[#1e293b] rounded-xl border border-gray-700 p-6 max-w-md w-full">
                         <div className="flex justify-between items-center mb-6">
                             <h2 className="text-xl font-bold text-white">{editingClassId ? 'Editar Turma' : 'Cadastrar Turma'}</h2>
-                            <button onClick={() => { setShowClassModal(false); setEditingClassId(null); setClassForm({ name: '', period: 'Matutino' }); }} className="text-gray-400 hover:text-white">
+                            <button onClick={() => { setShowClassModal(false); setEditingClassId(null); setClassForm({ name: '', period: 'Matutino', disciplineIds: [] }); }} className="text-gray-400 hover:text-white">
                                 <X size={24} />
                             </button>
                         </div>
@@ -1204,39 +1216,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                                 </select>
                             </div>
 
-                            <button
-                                type="submit"
-                                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
-                            >
-                                <BookOpen size={20} />
-                                Salvar
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Discipline Modal */}
-            {showDisciplineModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-[#1e293b] rounded-xl border border-gray-700 p-6 max-w-md w-full">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-xl font-bold text-white">{editingDisciplineId ? 'Editar Disciplina' : 'Cadastrar Disciplina'}</h2>
-                            <button onClick={() => { setShowDisciplineModal(false); setEditingDisciplineId(null); setDisciplineForm({ name: '' }); }} className="text-gray-400 hover:text-white">
-                                <X size={24} />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleDisciplineSubmit} className="space-y-4">
                             <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Nome da Disciplina (EX: MATEMÁTICA)</label>
-                                <input
-                                    type="text"
-                                    value={disciplineForm.name}
-                                    onChange={(e) => setDisciplineForm({ ...disciplineForm, name: e.target.value })}
-                                    className="w-full bg-[#0f172a] border border-gray-700 rounded-lg px-4 py-3 text-white outline-none focus:border-emerald-500"
-                                    required
-                                />
+                                <label className="text-xs font-bold text-emerald-400 uppercase flex items-center gap-2 mb-2">
+                                    <BookOpen size={14} />
+                                    Disciplinas Vinculadas
+                                </label>
+                                <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto p-2 bg-[#0f172a] rounded-lg border border-gray-700">
+                                    {disciplines.map(disc => (
+                                        <label key={disc.id} className="flex items-center gap-3 p-2 hover:bg-gray-800 rounded cursor-pointer transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={classForm.disciplineIds.includes(disc.id)}
+                                                onChange={(e) => {
+                                                    const newIds = e.target.checked
+                                                        ? [...classForm.disciplineIds, disc.id]
+                                                        : classForm.disciplineIds.filter(id => id !== disc.id);
+                                                    setClassForm({ ...classForm, disciplineIds: newIds });
+                                                }}
+                                                className="w-4 h-4 rounded border-gray-600 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0 bg-transparent"
+                                            />
+                                            <span className="text-sm text-gray-300">
+                                                {disc.name} {disc.displayName ? `(${disc.displayName})` : ''}
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
                             </div>
 
                             <button
@@ -1248,8 +1252,56 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onShowToast }) => {
                             </button>
                         </form>
                     </div>
-                </div>
+                </div >
             )}
-        </div>
+
+            {/* Discipline Modal */}
+            {
+                showDisciplineModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-[#1e293b] rounded-xl border border-gray-700 p-6 max-w-md w-full">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-bold text-white">{editingDisciplineId ? 'Editar Disciplina' : 'Cadastrar Disciplina'}</h2>
+                                <button onClick={() => { setShowDisciplineModal(false); setEditingDisciplineId(null); setDisciplineForm({ name: '', displayName: '' }); }} className="text-gray-400 hover:text-white">
+                                    <X size={24} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleDisciplineSubmit} className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Nome da Disciplina (EX: MATEMÁTICA 9º ANO EFII)</label>
+                                    <input
+                                        type="text"
+                                        value={disciplineForm.name}
+                                        onChange={(e) => setDisciplineForm({ ...disciplineForm, name: e.target.value })}
+                                        className="w-full bg-[#0f172a] border border-gray-700 rounded-lg px-4 py-3 text-white outline-none focus:border-emerald-500"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-gray-400 uppercase block mb-2">Nome para Exibição (EX: MATEMÁTICA)</label>
+                                    <input
+                                        type="text"
+                                        value={disciplineForm.displayName}
+                                        onChange={(e) => setDisciplineForm({ ...disciplineForm, displayName: e.target.value })}
+                                        className="w-full bg-[#0f172a] border border-gray-700 rounded-lg px-4 py-3 text-white outline-none focus:border-emerald-500"
+                                        placeholder="Como aparecerá nos registros..."
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2"
+                                >
+                                    <BookOpen size={20} />
+                                    Salvar
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 };

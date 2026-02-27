@@ -1,17 +1,17 @@
 import { supabase } from '../supabaseClient';
-import { Student, ClassRoom, Teacher, Occurrence, ClassSession, SessionRecord, UserRole, StudentExit, PlanningModule, PlanningSchedule, StudyGuideItem, RequestItem } from '../types';
+import { Student, ClassRoom, Discipline, Teacher, Occurrence, ClassSession, SessionRecord, UserRole, StudentExit, PlanningModule, PlanningSchedule, StudyGuideItem, RequestItem } from '../types';
 import { SEED_STUDENTS, SEED_CLASSES, SEED_TEACHERS, SEED_OCCURRENCES } from './mockData';
 
 export const SupabaseService = {
     async getPlanningModules(filters?: { teacherId?: string, classId?: string, disciplineId?: string, unusedOnly?: boolean }): Promise<PlanningModule[]> {
         let query = supabase.from('planning_modules').select('*');
 
-        if (filters?.teacherId) query = query.eq('teacher_id', filters.teacherId);
-        if (filters?.classId) query = query.eq('class_id', filters.classId);
+        // Note: For shared planning, we mainly filter by disciplineId
         if (filters?.disciplineId) query = query.eq('discipline_id', filters.disciplineId);
-        if (filters?.unusedOnly) query = query.eq('is_used', false);
 
-        // Sort by chapter and module in ascending order
+        // If unusedOnly is true and classId is provided, filter out modules used by this specific class
+        let dataToReturn: any[] = [];
+
         const { data, error } = await query
             .order('chapter', { ascending: true })
             .order('module', { ascending: true });
@@ -21,7 +21,26 @@ export const SupabaseService = {
             return [];
         }
 
-        return data.map((m: any) => ({
+        dataToReturn = data;
+
+        if (filters?.unusedOnly && filters?.classId) {
+            const { data: usageData } = await supabase
+                .from('planning_usage')
+                .select('module_id')
+                .eq('class_id', filters.classId);
+
+            if (usageData) {
+                const usedIds = new Set(usageData.map((u: any) => u.module_id));
+                dataToReturn = data.filter((m: any) => !usedIds.has(m.id));
+            }
+        }
+
+        if (error) {
+            console.error("Error fetching planning modules:", error);
+            return [];
+        }
+
+        return dataToReturn.map((m: any) => ({
             id: m.id,
             disciplineId: m.discipline_id,
             teacherId: m.teacher_id,
@@ -32,18 +51,23 @@ export const SupabaseService = {
             title: m.title,
             topic: m.topic,
             bimestre: m.bimestre || 1,
-            isUsed: m.is_used || false,
+            isUsed: false, // Usage is handled by filtering above
             createdAt: m.created_at
         }));
     },
 
-    async markModulesAsUsed(moduleIds: string[]): Promise<boolean> {
-        if (moduleIds.length === 0) return true;
+    async markModulesAsUsed(moduleIds: string[], classId?: string): Promise<boolean> {
+        if (moduleIds.length === 0 || !classId) return true;
+
+        const usageToInsert = moduleIds.map(id => ({
+            class_id: classId,
+            module_id: id,
+            is_used: true
+        }));
 
         const { error } = await supabase
-            .from('planning_modules')
-            .update({ is_used: true })
-            .in('id', moduleIds);
+            .from('planning_usage')
+            .upsert(usageToInsert, { onConflict: 'class_id, module_id' });
 
         if (error) {
             console.error("Error marking modules as used:", error);
@@ -79,6 +103,49 @@ export const SupabaseService = {
             return null;
         }
         return data.id;
+    },
+
+    async getClassDisciplines(classId: string): Promise<string[]> {
+        const { data, error } = await supabase
+            .from('class_disciplines')
+            .select('discipline_id')
+            .eq('class_id', classId);
+
+        if (error) {
+            console.error("Error fetching class disciplines:", error);
+            return [];
+        }
+        return data.map((d: any) => d.discipline_id);
+    },
+
+    async setClassDisciplines(classId: string, disciplineIds: string[]): Promise<boolean> {
+        // Delete existing
+        const { error: delError } = await supabase
+            .from('class_disciplines')
+            .delete()
+            .eq('class_id', classId);
+
+        if (delError) {
+            console.error("Error deleting old class disciplines:", delError);
+            return false;
+        }
+
+        if (disciplineIds.length === 0) return true;
+
+        const toInsert = disciplineIds.map(dId => ({
+            class_id: classId,
+            discipline_id: dId
+        }));
+
+        const { error: insError } = await supabase
+            .from('class_disciplines')
+            .insert(toInsert);
+
+        if (insError) {
+            console.error("Error inserting class disciplines:", insError);
+            return false;
+        }
+        return true;
     },
 
     async getPlanningSchedule(filters?: { moduleId?: string, teacherId?: string }): Promise<(PlanningSchedule & { module?: PlanningModule })[]> {
@@ -266,15 +333,21 @@ export const SupabaseService = {
         const { data, error } = await supabase.from('classes').select('*');
         if (error) {
             console.error("Error fetching classes:", error);
-            // Return empty array or throw error instead of silent fallback to SEED
-            // helping user realize connection issues.
             return [];
         }
+
+        const { data: assignments } = await supabase.from('class_disciplines').select('class_id, discipline_id');
+        const assignmentsMap: Record<string, string[]> = {};
+        assignments?.forEach(a => {
+            if (!assignmentsMap[a.class_id]) assignmentsMap[a.class_id] = [];
+            assignmentsMap[a.class_id].push(a.discipline_id);
+        });
 
         const classes = data.map((c: any) => ({
             id: c.id,
             name: c.name,
-            period: c.period
+            period: c.period,
+            disciplineIds: assignmentsMap[c.id] || []
         }));
 
         const classOrder: Record<string, number> = {
@@ -687,6 +760,19 @@ export const SupabaseService = {
         }));
     },
 
+    async getDisciplines(): Promise<Discipline[]> {
+        const { data, error } = await supabase.from('disciplines').select('*').order('name', { ascending: true });
+        if (error) {
+            console.error("Error fetching disciplines:", error);
+            return [];
+        }
+        return data.map((d: any) => ({
+            id: d.id,
+            name: d.name,
+            displayName: d.display_name
+        }));
+    },
+
     async getOccurrences(): Promise<Occurrence[]> {
         const { data, error } = await supabase
             .from('occurrences')
@@ -861,17 +947,17 @@ export const SupabaseService = {
     },
 
     // --- CLASS CRUD ---
-    async createClass(classRoom: Omit<ClassRoom, 'id'>): Promise<boolean> {
-        const { error } = await supabase.from('classes').insert({
+    async createClass(classRoom: Omit<ClassRoom, 'id'>): Promise<string | null> {
+        const { data, error } = await supabase.from('classes').insert({
             name: classRoom.name,
             period: classRoom.period
-        });
+        }).select().single();
 
         if (error) {
             console.error("Error creating class:", error);
-            return false;
+            return null;
         }
-        return true;
+        return data?.id || null;
     },
 
     async updateClass(classRoom: ClassRoom): Promise<boolean> {
@@ -903,32 +989,6 @@ export const SupabaseService = {
         return true;
     },
 
-    // --- DISCIPLINE CRUD ---
-    async getDisciplines(): Promise<any[]> {
-        // Note: You may need to create a 'disciplines' table in Supabase
-        // For now, returning a hardcoded list as fallback
-        const { data, error } = await supabase.from('disciplines').select('*');
-
-        if (error) {
-            console.error("Error fetching disciplines:", error);
-            // Return common disciplines as fallback
-            return [
-                { id: 'disc-mat', name: 'Matemática' },
-                { id: 'disc-port', name: 'Português' },
-                { id: 'disc-hist', name: 'História' },
-                { id: 'disc-geo', name: 'Geografia' },
-                { id: 'disc-bio', name: 'Biologia' },
-                { id: 'disc-fis', name: 'Física' },
-                { id: 'disc-quim', name: 'Química' },
-                { id: 'disc-ing', name: 'Inglês' }
-            ];
-        }
-
-        return data.map((d: any) => ({
-            id: d.id,
-            name: d.name
-        }));
-    },
 
     async createDiscipline(discipline: Omit<any, 'id'>): Promise<boolean> {
         const { error } = await supabase.from('disciplines').insert({
