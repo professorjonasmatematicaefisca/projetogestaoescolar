@@ -26,7 +26,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
     const [sessions, setSessions] = useState<ClassSession[]>([]);
     const [classes, setClasses] = useState<ClassRoom[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
-    const [academicYear, setAcademicYear] = useState<number>(new Date().getFullYear());
+    const [academicYear, setAcademicYear] = useState<number>(2026);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -432,11 +432,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                         onChange={(e) => setAcademicYear(parseInt(e.target.value))}
                         className="bg-[#1e293b] text-white border border-gray-700 rounded p-1.5 text-xs outline-none focus:border-emerald-500 font-bold"
                     >
-                        {[0, 1, 2].map(offset => {
-                            const y = new Date().getFullYear() - offset;
-                            return <option key={y} value={y}>{y}</option>;
-                        })}
-                        <option value={new Date().getFullYear() + 1}>{new Date().getFullYear() + 1}</option>
+                        <option value={2026}>2026</option>
                     </select>
                 </div>
 

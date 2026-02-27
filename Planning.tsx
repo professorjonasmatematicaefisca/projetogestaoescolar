@@ -97,12 +97,20 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
             if (currentTeacher) setCurrentTeacherId(currentTeacher.id);
 
             const mods = await SupabaseService.getPlanningModules();
-            setAllModules(mods);
+
+            // Numerically sort modules: Chapter first, then Module
+            const sortedMods = [...mods].sort((a, b) => {
+                const chapterComparison = String(a.chapter).localeCompare(String(b.chapter), undefined, { numeric: true });
+                if (chapterComparison !== 0) return chapterComparison;
+                return String(a.module).localeCompare(String(b.module), undefined, { numeric: true });
+            });
+
+            setAllModules(sortedMods);
 
             // Filter modules for teacher
-            let filteredMods = mods;
+            let filteredMods = sortedMods;
             if (userRole === UserRole.TEACHER) {
-                filteredMods = mods.filter(m => {
+                filteredMods = sortedMods.filter(m => {
                     return actualAssignments.some(assign => {
                         const matchClass = allClasses.find(c => c.id === assign.classId || c.name === assign.classId);
                         const classMatch = matchClass ? m.classId === matchClass.id : m.classId === assign.classId;
@@ -289,7 +297,10 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
     };
 
     const getClassName = (id: string | unknown) => classes.find(c => c.id === id)?.name || (id as string);
-    const getDisciplineName = (id: string | unknown) => disciplines.find(d => d.id === id)?.name || (id as string);
+    const getDisciplineName = (id: string | unknown) => {
+        const disc = disciplines.find(d => d.id === id);
+        return disc?.displayName || disc?.name || (id as string);
+    };
 
     // Calendar Helpers
     const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -439,7 +450,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                             >
                                                 <option value="">Selecione a Disciplina</option>
                                                 {userRole === UserRole.COORDINATOR ? (
-                                                    disciplines.map(d => <option key={d.id as string} value={d.id as string}>{d.name}</option>)
+                                                    disciplines.map(d => <option key={d.id as string} value={d.id as string}>{d.displayName || d.name}</option>)
                                                 ) : (
                                                     Array.from(new Set(teacherAssignments
                                                         .filter(a => {
@@ -452,7 +463,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                             const val = matchedD ? matchedD.id : subject;
                                                             return (
                                                                 <option key={`${subject}-${idx}`} value={val}>
-                                                                    {subject}
+                                                                    {matchedD?.displayName || subject}
                                                                 </option>
                                                             );
                                                         })

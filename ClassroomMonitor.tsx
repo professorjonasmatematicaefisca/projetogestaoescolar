@@ -442,7 +442,13 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             ]);
             setAllDisciplines(discsList);
 
-            setContentModules(mods);
+            // Numerically sort modules: Chapter first, then Module
+            const sorted = [...mods].sort((a, b) => {
+                const chapterComparison = String(a.chapter).localeCompare(String(b.chapter), undefined, { numeric: true });
+                if (chapterComparison !== 0) return chapterComparison;
+                return String(a.module).localeCompare(String(b.module), undefined, { numeric: true });
+            });
+            setContentModules(sorted);
         } catch (err) {
             console.error('Error loading planning modules:', err);
         }

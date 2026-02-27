@@ -72,10 +72,16 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
                 setFormTeacherId(currentTeacher.id);
             }
 
-            // Load planning modules
+            // Load and sort planning modules
             const mods = await SupabaseService.getPlanningModules();
+            const sortedMods = [...mods].sort((a, b) => {
+                const chapterComparison = String(a.chapter).localeCompare(String(b.chapter), undefined, { numeric: true });
+                if (chapterComparison !== 0) return chapterComparison;
+                return String(a.module).localeCompare(String(b.module), undefined, { numeric: true });
+            });
+
             if (userRole === UserRole.TEACHER && currentTeacher) {
-                setPlanningModules(mods.filter(m => {
+                setPlanningModules(sortedMods.filter(m => {
                     return actualAssignments.some(assign => {
                         const matchClass = allClasses.find(c => c.id === assign.classId || c.name === assign.classId);
                         const classMatch = matchClass ? m.classId === matchClass.id : m.classId === assign.classId;
@@ -85,7 +91,7 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
                     });
                 }));
             } else {
-                setPlanningModules(mods);
+                setPlanningModules(sortedMods);
             }
 
             // Load guide items
@@ -99,7 +105,10 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
     };
 
     const getClassName = (classId?: string) => classes.find(c => c.id === classId)?.name || classId || '';
-    const getDisciplineName = (discId?: string) => disciplines.find(d => d.id === discId)?.name || discId || '';
+    const getDisciplineName = (discId?: string) => {
+        const disc = disciplines.find(d => d.id === discId);
+        return disc?.displayName || disc?.name || discId || '';
+    };
     const getTeacherName = (teacherId?: string) => allTeachers.find(t => t.id === teacherId)?.name || '';
 
     const getTeacherColor = (teacherId?: string) => {
@@ -227,12 +236,17 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
         return Object.values(groups).sort((a, b) => a.teacherName.localeCompare(b.teacherName));
     })();
 
-    // Teacher's own disciplines from assignments
+    // Teacher's own disciplines from assignments (filtered by selected class)
     const myDisciplines = (() => {
         const discIds = new Set<string>();
         teacherAssignments.forEach(a => {
-            const disc = disciplines.find(d => d.name === a.subject || d.id === a.subject);
-            if (disc) discIds.add(disc.id);
+            const matchClass = classes.find(c => c.id === a.classId || c.name === a.classId);
+            const classMatches = !formClassId || (matchClass?.id === formClassId);
+
+            if (classMatches) {
+                const disc = disciplines.find(d => d.name === a.subject || d.id === a.subject);
+                if (disc) discIds.add(disc.id);
+            }
         });
         return disciplines.filter(d => discIds.has(d.id));
     })();
@@ -240,8 +254,13 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
     const myClasses = (() => {
         const classIds = new Set<string>();
         teacherAssignments.forEach(a => {
-            const cls = classes.find(c => c.id === a.classId || c.name === a.classId);
-            if (cls) classIds.add(cls.id);
+            const matchDisc = disciplines.find(d => d.id === a.subject || d.name === a.subject);
+            const discMatches = !formDisciplineId || (matchDisc?.id === formDisciplineId);
+
+            if (discMatches) {
+                const cls = classes.find(c => c.id === a.classId || c.name === a.classId);
+                if (cls) classIds.add(cls.id);
+            }
         });
         return classes.filter(c => classIds.has(c.id));
     })();
@@ -466,14 +485,14 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
                                 <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2">Turma</label>
                                 <select className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-indigo-500/50 transition-all outline-none font-bold text-sm" value={formClassId} onChange={e => setFormClassId(e.target.value)}>
                                     <option value="">Selecione...</option>
-                                    {(userRole === UserRole.TEACHER ? (myClasses.length > 0 ? myClasses : classes) : classes).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    {(userRole === UserRole.TEACHER ? myClasses : classes).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
                             </div>
                             <div>
                                 <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2">Disciplina</label>
                                 <select className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-indigo-500/50 transition-all outline-none font-bold text-sm" value={formDisciplineId} onChange={e => setFormDisciplineId(e.target.value)}>
                                     <option value="">Selecione...</option>
-                                    {(userRole === UserRole.TEACHER ? (myDisciplines.length > 0 ? myDisciplines : disciplines) : disciplines).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                    {(userRole === UserRole.TEACHER ? myDisciplines : disciplines).map(d => <option key={d.id} value={d.id}>{d.displayName || d.name}</option>)}
                                 </select>
                             </div>
                         </div>
