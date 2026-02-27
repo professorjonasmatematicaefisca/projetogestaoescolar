@@ -246,13 +246,31 @@ export const SupabaseService = {
         const { data, error } = await supabase.from('classes').select('*');
         if (error) {
             console.error("Error fetching classes:", error);
-            return SEED_CLASSES; // Fallback
+            // Return empty array or throw error instead of silent fallback to SEED
+            // helping user realize connection issues.
+            return [];
         }
-        return data.map((c: any) => ({
+
+        const classes = data.map((c: any) => ({
             id: c.id,
             name: c.name,
             period: c.period
         }));
+
+        const classOrder: Record<string, number> = {
+            '9º A EFII': 1,
+            '9º B EFII': 2,
+            '1º AEM': 3,
+            '2º AEM': 4,
+            '3º AEM': 5,
+        };
+
+        return classes.sort((a, b) => {
+            const orderA = classOrder[a.name] || 99;
+            const orderB = classOrder[b.name] || 99;
+            if (orderA === orderB) return a.name.localeCompare(b.name);
+            return orderA - orderB;
+        });
     },
 
     async getStudents(): Promise<Student[]> {
