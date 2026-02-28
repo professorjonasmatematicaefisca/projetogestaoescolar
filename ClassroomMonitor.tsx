@@ -440,7 +440,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             const [mods, discsList] = await Promise.all([
                 SupabaseService.getPlanningModules({
                     unusedOnly: true,
-                    classId: allClasses.find(c => c.name === selectedClassId)?.id,
+                    classId: allClasses.find(c => normalize(c.name) === normalize(selectedClassId))?.id,
                     disciplineId: discObj?.id
                 }),
                 SupabaseService.getDisciplines()
@@ -611,6 +611,11 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         const success = await SupabaseService.deleteSession(sess.id, classObj?.id);
         if (success) {
             setHistorySessions(prev => prev.filter(s => s.id !== sess.id));
+            // If the deleted session is the one currently on screen, clear it
+            if (session?.id === sess.id) {
+                setSession(null);
+                clearScreenData();
+            }
             onShowToast("Registro de aula excluído com sucesso.");
         } else {
             onShowToast("Erro ao excluir registro. Tente novamente.");

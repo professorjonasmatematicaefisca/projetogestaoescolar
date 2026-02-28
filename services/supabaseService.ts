@@ -754,14 +754,16 @@ export const SupabaseService = {
         if (sessionData?.module_ids && sessionData.module_ids.length > 0) {
             let finalClassId = classId;
 
-            // If classId wasn't passed, try to look it up by name (legacy/fallback)
+            // If classId wasn't passed, try to look it up by name with normalization
             if (!finalClassId && sessionData.class_name) {
-                const { data: classData } = await supabase
-                    .from('classes')
-                    .select('id')
-                    .eq('name', sessionData.class_name)
-                    .single();
-                if (classData) finalClassId = classData.id;
+                const normalize = (s: string) => s.replace(/[º°]/g, 'o').trim().toLowerCase();
+                const sessionClassName = normalize(sessionData.class_name);
+
+                const { data: allClasses } = await supabase.from('classes').select('id, name');
+                if (allClasses) {
+                    const match = allClasses.find(c => normalize(c.name) === sessionClassName);
+                    if (match) finalClassId = match.id;
+                }
             }
 
             if (finalClassId) {
