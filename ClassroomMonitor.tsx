@@ -6,7 +6,7 @@ import { SupabaseService } from './services/supabaseService';
 import {
     MessageSquare, Moon, Smartphone, Book,
     Zap, Save, RefreshCw, Check, X, Tag,
-    MoreVertical, Search, Bell, AlertCircle, Clock, ChevronDown, Calendar, FileText, Hand, Plus, Camera, Trash2, BookOpen, History, ArrowRight, Upload
+    MoreVertical, Search, Bell, AlertCircle, Clock, ChevronDown, Calendar, FileText, Hand, Plus, Camera, Trash2, BookOpen, History, ArrowRight, Upload, Users
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -710,8 +710,9 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     // --- Clear/Reset Screen Data ---
     const clearScreenData = () => {
-        setSelectedClassId('');
-        setSelectedSubject('');
+        // Keep selectedClassId and selectedSubject for continuity as requested
+        // setSelectedClassId('');
+        // setSelectedSubject('');
         setSelectedDate(new Date().toISOString().split('T')[0]);
         // setSelectedBlocks stays as is or resets to default
 
@@ -909,7 +910,12 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 </div>
 
                 {/* Grid of Students (unchanged logic, just rendering) */}
-                {!session ? (
+                {!selectedClassId ? (
+                    <div className="text-center p-12 bg-[#0f172a] rounded-xl border border-gray-800 border-dashed">
+                        <Users size={48} className="mx-auto text-gray-700 mb-4 opacity-20" />
+                        <p className="text-gray-400 font-medium">Selecione uma turma para carregar os alunos.</p>
+                    </div>
+                ) : !session ? (
                     <div className="flex items-center justify-center p-12 bg-[#0f172a] rounded-xl border border-gray-800 border-dashed">
                         <div className="text-center">
                             <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
