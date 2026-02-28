@@ -605,7 +605,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         const confirmed = window.confirm(`Tem certeza que deseja EXCLUIR o registro de ${format(new Date(sess.date), "dd/MM/yyyy")} — ${sess.className} (${sess.subject})?\n\nEsta ação não pode ser desfeita.`);
         if (!confirmed) return;
 
-        const classObj = allClasses.find(c => c.name === sess.className);
+        const normalize = (s: string) => s.replace(/[º°]/g, 'o').trim().toLowerCase();
+        const classObj = allClasses.find(c => normalize(c.name) === normalize(sess.className));
         const success = await SupabaseService.deleteSession(sess.id, classObj?.id);
         if (success) {
             setHistorySessions(prev => prev.filter(s => s.id !== sess.id));
@@ -784,7 +785,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 ...session,
                 block: compositeBlock,
                 blocksCount: selectedBlocks.length,
-                moduleIds: session.moduleIds // Keep existing if any, or we could try to sync with selectedContentIds if it was active
+                moduleIds: selectedContentIds // Sync with the latest selection logic
             };
 
             const result = await SupabaseService.saveSession(updatedSession, userEmail);
