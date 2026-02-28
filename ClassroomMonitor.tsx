@@ -235,6 +235,9 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
             // Check Supabase for existing session for this Day/Class/Teacher/Subject combo
             const fetchExistingSession = async () => {
+                // Clear current session while fetching to avoid showing old data
+                setSession(null);
+
                 const existingSession = await SupabaseService.findSession({
                     date: selectedDate,
                     className: selectedClassId,
@@ -264,7 +267,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             };
             fetchExistingSession();
         }
-    }, [selectedClassId, allStudents, selectedTeacherId, selectedSubject, selectedDate]); // Removed selectedBlocks dependency to avoid reset loop
+    }, [selectedClassId, selectedTeacherId, selectedSubject, selectedDate]); // Removed allStudents from deps to avoid excessive resets, filtered is derived here anyway
 
     // Sync Class Register State when session changes
     useEffect(() => {
@@ -497,8 +500,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 moduleIds: selectedContentIds
             };
             setSession(updatedSession);
-            const success = await SupabaseService.saveSession(updatedSession, userEmail);
-            if (success) {
+            const result = await SupabaseService.saveSession(updatedSession, userEmail);
+            if (result.success) {
                 // Mark modules as used in the database for the SPECIFIC CLASS
                 if (selectedContentIds.length > 0) {
                     const classObj = allClasses.find(c => c.name === selectedClassId);
@@ -511,7 +514,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 onShowToast("Conteúdo de aula salvo no Supabase!");
                 setHasUnsavedChanges(false);
             } else {
-                onShowToast("Aviso: Falha ao salvar no servidor. Verifique sua conexão.");
+                onShowToast(`Erro ao salvar: ${result.error || 'Falha no servidor'}. Backup salvo localmente.`);
                 StorageService.saveSession(updatedSession);
                 setHasUnsavedChanges(false);
             }
@@ -749,13 +752,13 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 moduleIds: session.moduleIds // Keep existing if any, or we could try to sync with selectedContentIds if it was active
             };
 
-            const success = await SupabaseService.saveSession(updatedSession, userEmail);
-            if (success) {
+            const result = await SupabaseService.saveSession(updatedSession, userEmail);
+            if (result.success) {
                 setSession(updatedSession);
                 onShowToast("Aula salva no Supabase com sucesso!");
                 setHasUnsavedChanges(false);
             } else {
-                onShowToast("Erro ao salvar no Supabase. Salvando localmente como backup.");
+                onShowToast(`Erro ao salvar no Supabase: ${result.error || 'Falha no servidor'}. Backup salvo localmente.`);
                 StorageService.saveSession(updatedSession);
                 setHasUnsavedChanges(false);
             }

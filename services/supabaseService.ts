@@ -611,7 +611,7 @@ export const SupabaseService = {
     },
 
     // --- SESSION MANAGEMENT ---
-    async saveSession(session: ClassSession, userEmail?: string): Promise<boolean> {
+    async saveSession(session: ClassSession, userEmail?: string): Promise<{ success: boolean, error?: string }> {
         let teacherId = session.teacherId;
 
         // Try to resolve teacher ID from email if it's a mock ID or missing
@@ -621,7 +621,7 @@ export const SupabaseService = {
         }
 
         const { date, subject, className, block, blocksCount, generalNotes, homework, photos } = session;
-        const sessionPayload = {
+        const sessionPayload: any = {
             date,
             teacher_id: teacherId && !teacherId.startsWith('prof-') ? teacherId : null,
             subject,
@@ -636,45 +636,36 @@ export const SupabaseService = {
 
         let sessionId: string;
 
-        // Check if it's an existing session from Supabase (UUID)
-        const isExistingUUID = session.id.length > 20 && !session.id.startsWith('sess-');
+        // Upsert strategy based on (date, teacher_id, subject, class_name)
+        // This ensures uniqueness even if finding existing session fails client-side
+        const { data: upsertData, error: upsertError } = await supabase
+            .from('sessions')
+            .upsert(sessionPayload, {
+                onConflict: 'date, teacher_id, subject, class_name',
+                ignoreDuplicates: false
+            })
+            .select()
+            .single();
 
-        if (isExistingUUID) {
-            // Update
-            const { error } = await supabase
-                .from('sessions')
-                .update(sessionPayload)
-                .eq('id', session.id);
+        if (upsertError || !upsertData) {
+            console.error("Error upserting session:", upsertError);
+            return {
+                success: false,
+                error: upsertError ? `${upsertError.code}: ${upsertError.message}` : "Falha ao salvar sessão"
+            };
+        }
 
-            if (error) {
-                console.error("Error updating session:", error);
-                return false;
-            }
-            sessionId = session.id;
+        sessionId = upsertData.id;
 
-            // Delete existing records to replace them
-            const { error: deleteError } = await supabase
-                .from('session_records')
-                .delete()
-                .eq('session_id', sessionId);
+        // Delete existing records to replace them (Clean-up before re-insert)
+        const { error: deleteError } = await supabase
+            .from('session_records')
+            .delete()
+            .eq('session_id', sessionId);
 
-            if (deleteError) {
-                console.error("Error clearing old records:", deleteError);
-                return false;
-            }
-        } else {
-            // Insert
-            const { data: sessionData, error: sessionError } = await supabase
-                .from('sessions')
-                .insert(sessionPayload)
-                .select()
-                .single();
-
-            if (sessionError || !sessionData) {
-                console.error("Error inserting session:", sessionError);
-                return false;
-            }
-            sessionId = sessionData.id;
+        if (deleteError) {
+            console.error("Error clearing old records:", deleteError);
+            return { success: false, error: `Delete Error: ${deleteError.message}` };
         }
 
         // Insert Records
@@ -694,10 +685,10 @@ export const SupabaseService = {
 
         if (recordsError) {
             console.error("Error saving session records:", recordsError);
-            return false;
+            return { success: false, error: `Records Error: ${recordsError.message}` };
         }
 
-        return true;
+        return { success: true };
     },
 
     async findSession(filters: { date: string, teacherId: string, subject: string, className: string }): Promise<ClassSession | null> {
