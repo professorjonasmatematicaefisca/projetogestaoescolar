@@ -235,13 +235,12 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
             // Check Supabase for existing session for this Day/Class/Teacher/Subject combo
             const fetchExistingSession = async () => {
-                const allSessions = await SupabaseService.getSessions();
-                const existingSession = allSessions.find(s =>
-                    s.date.startsWith(selectedDate) &&
-                    s.className === selectedClassId &&
-                    s.teacherId === selectedTeacherId &&
-                    s.subject === selectedSubject
-                );
+                const existingSession = await SupabaseService.findSession({
+                    date: selectedDate,
+                    className: selectedClassId,
+                    teacherId: selectedTeacherId,
+                    subject: selectedSubject
+                });
 
                 if (existingSession) {
                     setSession(existingSession);
@@ -258,6 +257,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                     } else if (existingSession.block && availableBlocks.includes(existingSession.block)) {
                         setSelectedBlocks([existingSession.block]);
                     }
+                    onShowToast("Registro existente carregado para edição.");
                 } else {
                     initializeSession(filtered);
                 }

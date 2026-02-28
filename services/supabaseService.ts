@@ -700,6 +700,52 @@ export const SupabaseService = {
         return true;
     },
 
+    async findSession(filters: { date: string, teacherId: string, subject: string, className: string }): Promise<ClassSession | null> {
+        // Find session for a specific day/teacher/subject/class
+        // Note: we look for sessions where date starts with the YYYY-MM-DD string
+        const { data, error } = await supabase
+            .from('sessions')
+            .select(`
+                *,
+                teacher:teacher_id (name),
+                session_records (*)
+            `)
+            .eq('class_name', filters.className)
+            .eq('subject', filters.subject)
+            .eq('teacher_id', filters.teacherId)
+            // Use date range to capture all times within that day in UTC/ISO
+            .gte('date', `${filters.date}T00:00:00Z`)
+            .lte('date', `${filters.date}T23:59:59Z`)
+            .maybeSingle();
+
+        if (error || !data) return null;
+
+        return {
+            id: data.id,
+            date: data.date,
+            teacherId: data.teacher_id,
+            teacherName: data.teacher?.name,
+            subject: data.subject,
+            className: data.class_name,
+            block: data.block,
+            blocksCount: data.blocks_count,
+            generalNotes: data.general_notes,
+            homework: data.homework,
+            photos: data.photos,
+            moduleIds: data.module_ids,
+            records: data.session_records.map((r: any) => ({
+                studentId: r.student_id,
+                present: r.present,
+                present2: r.present2,
+                justifiedAbsence: r.justified_absence,
+                phoneConfiscated: r.phone_confiscated,
+                counters: r.counters,
+                notes: r.notes,
+                photos: r.photos
+            }))
+        };
+    },
+
     async deleteSession(sessionId: string): Promise<boolean> {
         // 1. Fetch session to get moduleIds and class_name
         const { data: sessionData, error: fetchError } = await supabase

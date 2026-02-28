@@ -44,6 +44,7 @@ function App() {
     const storedEmail = localStorage.getItem('educontrol_email');
     const storedName = localStorage.getItem('educontrol_name');
     const storedPhoto = localStorage.getItem('educontrol_photo');
+    const storedView = localStorage.getItem('educontrol_view');
 
     if (storedRole && storedEmail) {
       setUserRole(storedRole as UserRole);
@@ -51,11 +52,16 @@ function App() {
       if (storedName) setUserName(storedName);
       if (storedPhoto) setUserPhoto(storedPhoto);
       setIsAuthenticated(true);
-      // Only set default view if not already set (though re-render might reset state, view persistence is optional)
-      if (storedRole === UserRole.COORDINATOR) setCurrentView('DASHBOARD');
-      else if (storedRole === UserRole.TEACHER) setCurrentView('MONITORING');
-      else if (storedRole === UserRole.STUDENT || storedRole === UserRole.PARENT) setCurrentView('MESSAGES');
-      else setCurrentView('OCCURRENCES');
+
+      // Restore view if stored, otherwise use role-based default
+      if (storedView) {
+        setCurrentView(storedView as ViewState);
+      } else {
+        if (storedRole === UserRole.COORDINATOR) setCurrentView('DASHBOARD');
+        else if (storedRole === UserRole.TEACHER) setCurrentView('MONITORING');
+        else if (storedRole === UserRole.STUDENT || storedRole === UserRole.PARENT) setCurrentView('MESSAGES');
+        else setCurrentView('OCCURRENCES');
+      }
     }
   }, []);
 
@@ -86,10 +92,14 @@ function App() {
     if (photoUrl) localStorage.setItem('educontrol_photo', photoUrl);
 
     // Set initial view based on role
-    if (role === UserRole.COORDINATOR) setCurrentView('DASHBOARD');
-    else if (role === UserRole.TEACHER) setCurrentView('MONITORING');
-    else if (role === UserRole.STUDENT || role === UserRole.PARENT) setCurrentView('MESSAGES');
-    else setCurrentView('OCCURRENCES');
+    let initialView: ViewState = 'MONITORING';
+    if (role === UserRole.COORDINATOR) initialView = 'DASHBOARD';
+    else if (role === UserRole.TEACHER) initialView = 'MONITORING';
+    else if (role === UserRole.STUDENT || role === UserRole.PARENT) initialView = 'MESSAGES';
+    else initialView = 'OCCURRENCES';
+
+    setCurrentView(initialView);
+    localStorage.setItem('educontrol_view', initialView);
   };
 
   // Helper to switch view and select student
@@ -102,6 +112,7 @@ function App() {
   const handleViewChange = (view: ViewState) => {
     if (view !== 'REPORTS') setTargetStudentId(undefined);
     setCurrentView(view);
+    localStorage.setItem('educontrol_view', view);
   };
 
   const handleLogout = () => {
@@ -116,6 +127,7 @@ function App() {
     localStorage.removeItem('educontrol_email');
     localStorage.removeItem('educontrol_name');
     localStorage.removeItem('educontrol_photo');
+    localStorage.removeItem('educontrol_view');
   };
 
   const renderView = () => {
