@@ -704,12 +704,34 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         onShowToast(`Aula de ${format(new Date(sess.date), "dd/MM")} — ${sess.className} carregada.`);
     };
 
+    // --- Clear/Reset Screen Data ---
+    const clearScreenData = () => {
+        setSelectedClassId('');
+        setSelectedSubject('');
+        setSelectedDate(new Date().toISOString().split('T')[0]);
+        // setSelectedBlocks stays as is or resets to default
+
+        setSession(null);
+        setClassTopic('');
+        setClassHomework('');
+        setClassPhotos([]);
+        setSelectedContentIds([]);
+        setHasUnsavedChanges(false);
+
+        // Scroll to top for visual feedback
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     // --- Confirmation Helper ---
     const checkUnsavedAndProceed = async (callback: () => void) => {
         if (hasUnsavedChanges) {
             const shouldSave = window.confirm("Você tem alterações não salvas nesta turma. Deseja SALVAR antes de prosseguir?");
             if (shouldSave) {
-                await handleSave();
+                const saveResult = await handleSave();
+                if (!saveResult) {
+                    const proceedAnyway = window.confirm("O salvamento falhou ou foi cancelado. Deseja realmente prosseguir SEM SALVAR as alterações atuais?");
+                    if (!proceedAnyway) return;
+                }
             } else {
                 const proceedAnyway = window.confirm("Deseja realmente prosseguir SEM SALVAR as alterações atuais?");
                 if (!proceedAnyway) return;
@@ -726,10 +748,11 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             const shouldSave = window.confirm("Você tem alterações não salvas. Deseja SALVAR antes de iniciar um novo registro?");
             if (shouldSave) {
                 const saveResult = await handleSave();
-                // If save was aborted or failed, we stay here unless user explicitly wants to discard
                 if (saveResult === false) {
                     const discardInstead = window.confirm("O salvamento não foi concluído. Deseja DESCARTAR as alterações e iniciar um novo registro mesmo assim?");
                     if (!discardInstead) return;
+                } else {
+                    return;
                 }
             } else {
                 const discard = window.confirm("Deseja realmente DESCARTAR as alterações atuais e iniciar um novo registro?");
@@ -738,23 +761,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         }
 
         onShowToast("Iniciando novo registro...");
-
-        // --- Full State Reset ---
-        setSelectedClassId('');
-        setSelectedSubject('');
-        setSelectedDate(new Date().toISOString().split('T')[0]);
-        // Keep teacher selection as it is likely the same person
-
-        // Clear all session-specific data
-        setSession(null);
-        setClassTopic('');
-        setClassHomework('');
-        setClassPhotos([]);
-        setSelectedContentIds([]);
-        setHasUnsavedChanges(false);
-
-        // Scroll to top for visual feedback of fresh start
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        clearScreenData();
     };
 
     // --- Main Save ---
@@ -783,6 +790,12 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 setSession(updatedSession);
                 onShowToast("Aula salva no Supabase com sucesso!");
                 setHasUnsavedChanges(false);
+
+                // Clear screen to start fresh as requested
+                setTimeout(() => {
+                    clearScreenData();
+                }, 1500); // Small delay to let user see success toast
+
                 return true;
             } else {
                 onShowToast(`Erro ao salvar no Supabase: ${result.error || 'Falha no servidor'}. Backup salvo localmente.`);
@@ -1141,7 +1154,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                         className="flex-1 sm:flex-none min-w-[120px] px-6 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-[#0f172a] rounded-lg font-bold shadow-[0_0_15px_rgba(16,185,129,0.4)] transition-all flex items-center justify-center gap-2"
                     >
                         <Save size={18} />
-                        Salvar
+                        {session && session.id && !session.id.startsWith('sess-') ? "Salvar Alteração" : "Salvar Aula"}
                     </button>
                 </div>
             </div >
