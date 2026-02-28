@@ -260,11 +260,56 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
             onShowToast("⛔ Planejamento bloqueado pelo coordenador.");
             return;
         }
-        if (confirm("Deseja remover este agendamento?")) {
-            const success = await SupabaseService.deletePlanningSchedule(id);
-            if (success) {
-                onShowToast("Agendamento removido");
-                loadData();
+
+        const sch = schedules.find(s => s.id === id);
+        if (!sch) return;
+
+        // Check if executed
+        const isExecuted = sessions.some(s =>
+            s.date?.split('T')[0] === sch.plannedDate &&
+            s.moduleIds?.includes(sch.moduleId)
+        );
+
+        if (isExecuted) {
+            onShowToast("⛔ Esta aula já foi registrada como ministrada e não pode ser excluída.");
+            return;
+        }
+
+        if (userRole === UserRole.COORDINATOR) {
+            if (confirm("Deseja remover este agendamento (Ação de Coordenador)?")) {
+                const success = await SupabaseService.deletePlanningSchedule(id);
+                if (success) {
+                    onShowToast("Agendamento removido");
+                    loadData();
+                }
+            }
+        } else {
+            // Teacher flow
+            if (confirm("Deseja solicitar ao Coordenador a exclusão desta aula do seu planejamento?")) {
+                const teacher = allTeachers.find(t => t.id === currentTeacherId);
+                const className = getClassName(sch.module?.classId);
+                const discName = getDisciplineName(sch.module?.disciplineId);
+
+                const success = await SupabaseService.createRequest({
+                    type: 'schedule_deletion',
+                    status: 'pending',
+                    teacherId: currentTeacherId,
+                    teacherName: teacher?.name || userEmail,
+                    sessionId: id, // Using sessionId field to store schedule ID for reference
+                    sessionInfo: {
+                        date: sch.plannedDate,
+                        className: className,
+                        subject: discName,
+                        block: `Módulo ${formatModule(sch.module?.module)}`
+                    },
+                    reason: "Solicitação de exclusão de aula agendada pelo professor."
+                });
+
+                if (success) {
+                    onShowToast("✅ Pedido de exclusão enviado ao coordenador.");
+                } else {
+                    onShowToast("Erro ao enviar pedido de exclusão.");
+                }
             }
         }
     };
@@ -284,6 +329,17 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
         // Verify the schedule actually exists and date is different
         const sched = schedules.find(s => s.id === scheduleId);
         if (!sched || sched.plannedDate === targetDate) return;
+
+        // Check if executed before allowing move
+        const isExecuted = sessions.some(s =>
+            s.date?.split('T')[0] === sched.plannedDate &&
+            s.moduleIds?.includes(sched.moduleId)
+        );
+
+        if (isExecuted) {
+            onShowToast("⛔ Não é possível mover uma aula que já foi executada.");
+            return;
+        }
 
         const success = await SupabaseService.updatePlanningSchedule(scheduleId, { plannedDate: targetDate });
         if (success) {
@@ -767,30 +823,56 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                             >
                                                 <span className={`text-xs font-black ${isToday ? 'text-emerald-500' : 'text-gray-500'}`}>{day}</span>
                                                 <div className="mt-1 space-y-1 overflow-y-auto max-h-[80%] scrollbar-hide">
-                                                    {daySchedules.map(sch => (
-                                                        <div
-                                                            key={sch.id}
-                                                            draggable={!isLockedForMe}
-                                                            onDragStart={(e) => { e.dataTransfer.setData('scheduleId', sch.id); }}
-                                                            className={`text-[9px] border px-1.5 py-0.5 rounded-md font-bold truncate flex items-center gap-1 group/item ${!isLockedForMe ? 'cursor-move' : ''}`}
-                                                            style={{
-                                                                backgroundColor: `${getTeacherColor(sch.module?.teacherId)}15`,
-                                                                color: getTeacherColor(sch.module?.teacherId),
-                                                                borderColor: `${getTeacherColor(sch.module?.teacherId)}30`
-                                                            }}
-                                                        >
-                                                            <div className="w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: getTeacherColor(sch.module?.teacherId) }} />
-                                                            {scheduleFilterClass === 'all' ? `${getClassName(sch.module?.classId)}: ` : ''}{getDisciplineName(sch.module?.disciplineId)} - M{formatModule(sch.module?.module)}
-                                                            {!isLockedForMe && (
-                                                                <button
-                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(sch.id); }}
-                                                                    className="ml-auto opacity-0 group-hover/item:opacity-100 hover:text-red-400"
-                                                                >
-                                                                    <Trash2 size={10} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    ))}
+                                                    {daySchedules.map(sch => {
+                                                        const isExecuted = sessions.some(s =>
+                                                            s.date?.split('T')[0] === sch.plannedDate &&
+                                                            s.moduleIds?.includes(sch.moduleId)
+                                                        );
+
+                                                        return (
+                                                            <div
+                                                                key={sch.id}
+                                                                draggable={!isLockedForMe && !isExecuted}
+                                                                onDragStart={(e) => { e.dataTransfer.setData('scheduleId', sch.id); }}
+                                                                className={`text-[9px] border px-1.5 py-0.5 rounded-md font-bold truncate flex items-center gap-1 group/item ${(!isLockedForMe && !isExecuted) ? 'cursor-move' : ''} ${isExecuted ? 'opacity-60 grayscale-[0.5]' : ''}`}
+                                                                style={{
+                                                                    backgroundColor: `${getTeacherColor(sch.module?.teacherId)}15`,
+                                                                    color: getTeacherColor(sch.module?.teacherId),
+                                                                    borderColor: isExecuted ? 'rgba(156, 163, 175, 0.3)' : `${getTeacherColor(sch.module?.teacherId)}30`
+                                                                }}
+                                                            >
+                                                                <div className="w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: isExecuted ? '#9ca3af' : getTeacherColor(sch.module?.teacherId) }} />
+                                                                {scheduleFilterClass === 'all' ? `${getClassName(sch.module?.classId)}: ` : ''}{getDisciplineName(sch.module?.disciplineId)} - M{formatModule(sch.module?.module)}
+                                                                {isExecuted && <CheckCircle2 size={8} className="text-emerald-500 ml-1 shrink-0" />}
+                                                                {!isLockedForMe && !isExecuted && (
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(sch.id); }}
+                                                                        className="ml-auto opacity-0 group-hover/item:opacity-100 hover:text-red-400"
+                                                                    >
+                                                                        <Trash2 size={10} />
+                                                                    </button>
+                                                                )}
+                                                                {!isLockedForMe && isExecuted && userRole === UserRole.COORDINATOR && (
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(sch.id); }}
+                                                                        className="ml-auto opacity-0 group-hover/item:opacity-100 hover:text-red-400"
+                                                                        title="Coordenador: Excluir mesmo executada"
+                                                                    >
+                                                                        <Trash2 size={10} />
+                                                                    </button>
+                                                                )}
+                                                                {!isLockedForMe && !isExecuted && userRole === UserRole.TEACHER && (
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(sch.id); }}
+                                                                        className="ml-auto opacity-0 group-hover/item:opacity-100 hover:text-amber-400"
+                                                                        title="Solicitar exclusão ao coordenador"
+                                                                    >
+                                                                        <Trash2 size={10} />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         );
@@ -837,22 +919,32 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
 
                                         return sideSchedules.length === 0 ? (
                                             <p className="text-xs text-center text-gray-600 italic py-10">Nenhuma aula agendada para as próximas 2 semanas.</p>
-                                        ) : sideSchedules.map(sch => (
-                                            <div
-                                                key={sch.id}
-                                                draggable={!isLockedForMe}
-                                                onDragStart={(e) => { e.dataTransfer.setData('scheduleId', sch.id); }}
-                                                className={`bg-gray-900/50 p-3 rounded-xl border flex flex-col gap-2 transition-colors ${!isLockedForMe ? 'cursor-move hover:bg-gray-800' : ''}`}
-                                                style={{ borderLeft: `4px solid ${getTeacherColor(sch.module?.teacherId)}`, borderColor: `${getTeacherColor(sch.module?.teacherId)}20` }}
-                                            >
-                                                <div className="flex justify-between items-start">
-                                                    <span className="text-[10px] font-black uppercase" style={{ color: getTeacherColor(sch.module?.teacherId) }}>{sch.plannedDate.split('-').reverse().join('/')}</span>
-                                                    <span className="text-[9px] bg-gray-800 px-1.5 py-0.5 rounded text-gray-400 font-bold">{getClassName(sch.module?.classId)}</span>
+                                        ) : sideSchedules.map(sch => {
+                                            const isExecuted = sessions.some(s =>
+                                                s.date?.split('T')[0] === sch.plannedDate &&
+                                                s.moduleIds?.includes(sch.moduleId)
+                                            );
+
+                                            return (
+                                                <div
+                                                    key={sch.id}
+                                                    draggable={!isLockedForMe && !isExecuted}
+                                                    onDragStart={(e) => { e.dataTransfer.setData('scheduleId', sch.id); }}
+                                                    className={`bg-gray-900/50 p-3 rounded-xl border flex flex-col gap-2 transition-colors ${(!isLockedForMe && !isExecuted) ? 'cursor-move hover:bg-gray-800' : ''} ${isExecuted ? 'opacity-60' : ''}`}
+                                                    style={{ borderLeft: `4px solid ${isExecuted ? '#9ca3af' : getTeacherColor(sch.module?.teacherId)}`, borderColor: `${getTeacherColor(sch.module?.teacherId)}20` }}
+                                                >
+                                                    <div className="flex justify-between items-start">
+                                                        <span className="text-[10px] font-black uppercase flex items-center gap-1" style={{ color: isExecuted ? '#9ca3af' : getTeacherColor(sch.module?.teacherId) }}>
+                                                            {sch.plannedDate.split('-').reverse().join('/')}
+                                                            {isExecuted && <CheckCircle2 size={10} className="text-emerald-500" />}
+                                                        </span>
+                                                        <span className="text-[9px] bg-gray-800 px-1.5 py-0.5 rounded text-gray-400 font-bold">{getClassName(sch.module?.classId)}</span>
+                                                    </div>
+                                                    <p className="text-xs font-bold text-gray-200 truncate">{sch.module?.title}</p>
+                                                    <p className="text-[10px] text-gray-500">{getDisciplineName(sch.module?.disciplineId)} - M{formatModule(sch.module?.module)}</p>
                                                 </div>
-                                                <p className="text-xs font-bold text-gray-200 truncate">{sch.module?.title}</p>
-                                                <p className="text-[10px] text-gray-500">{getDisciplineName(sch.module?.disciplineId)} - M{formatModule(sch.module?.module)}</p>
-                                            </div>
-                                        ));
+                                            );
+                                        });
                                     })()}
                                 </div>
                             </div>

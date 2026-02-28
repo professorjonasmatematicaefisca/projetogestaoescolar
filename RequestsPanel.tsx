@@ -80,6 +80,15 @@ export const RequestsPanel: React.FC<RequestsPanelProps> = ({ onShowToast, userE
             }
         }
 
+        // If it's a schedule_deletion request, delete from planning_schedule
+        if (req.type === 'schedule_deletion' && req.sessionId) {
+            const deleted = await SupabaseService.deletePlanningSchedule(req.sessionId);
+            if (!deleted) {
+                onShowToast("Erro ao excluir o agendamento no cronograma.");
+                return;
+            }
+        }
+
         const success = await SupabaseService.updateRequestStatus(req.id, 'approved', userEmail);
         if (success) {
             onShowToast("✅ Solicitação aprovada com sucesso.");
@@ -119,6 +128,7 @@ export const RequestsPanel: React.FC<RequestsPanelProps> = ({ onShowToast, userE
     const getTypeLabel = (type: string) => {
         switch (type) {
             case 'delete_session': return 'Excluir Registro de Aula';
+            case 'schedule_deletion': return 'Excluir Agendamento (Cronograma)';
             case 'justificativa_falta': return 'Justificativa de Falta';
             case 'documento': return 'Solicitação de Documento';
             case 'outro': return 'Outra Solicitação';
