@@ -239,7 +239,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 // Show as deductions/bonuses
                 talk: count ? -((sumTalk / count) * 2.0) : 0,
                 sleep: count ? -((sumSleep / count) * 2.0) : 0,
-                bathroom: count ? -((sumBathroom / count) * 1.0) : 0,
+                bathroom: count ? -((sumBathroom / count) * 2.0) : 0,
                 material: count ? -(((count - sumMaterial) / count) * 0.5) : 0,
                 activity: count ? -(((count * 3 - sumActivity) / count) * 0.5) : 0,
                 phone: count ? -((sumPhone / count) * 5.0) : 0,

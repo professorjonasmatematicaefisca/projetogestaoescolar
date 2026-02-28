@@ -142,7 +142,7 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                 if (value <= 1.2) return 'S';
                 return 'I';
 
-            case 'atencao': // Banheiro (Higher is worse) - Now -1.0 each
+            case 'atencao': // Banheiro (Higher is worse) - Now -2.0 each
                 if (value <= 0.1) return 'O';
                 if (value <= 0.5) return 'B';
                 if (value <= 1.5) return 'S';

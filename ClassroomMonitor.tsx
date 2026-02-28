@@ -350,12 +350,12 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             // Apply Constraints based on rules
             if (type === 'material' || type === 'homework') {
                 newVal = Math.max(0, Math.min(1, newVal)); // 0 or 1 for Toggles
-            } else if (type === 'activity') {
-                newVal = Math.max(0, Math.min(3, newVal)); // 0 to 3 for Activity Ticks
+            } else if (type === 'activity' || type === 'talk' || type === 'bathroom' || type === 'sleep') {
+                newVal = Math.max(0, Math.min(3, newVal)); // 0 to 3 for Activity, Talk, Bathroom, Sleep
             } else if (type === 'participation') {
                 newVal = Math.max(0, Math.min(10, newVal)); // 0 to 10 for Participation Ticks
             } else {
-                newVal = Math.max(0, newVal); // No hard upper limit for penalties
+                newVal = Math.max(0, newVal); // No hard upper limit for other penalties
             }
 
             return {
