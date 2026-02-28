@@ -26,7 +26,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
 
     // Content states
     const [showAddForm, setShowAddForm] = useState(false);
-    const [selectedClass, setSelectedClass] = useState('');
+    const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
     const [selectedDiscipline, setSelectedDiscipline] = useState('');
     const [formData, setFormData] = useState({ chapter: '', moduleNumber: '', title: '', topic: '', bimestre: '1' });
     const [filterClass, setFilterClass] = useState('all');
@@ -53,6 +53,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
 
     // Schedule filter
     const [scheduleFilterTeacher, setScheduleFilterTeacher] = useState('all');
+    const [scheduleFilterClass, setScheduleFilterClass] = useState('all');
 
     const getTeacherColor = (teacherId?: string) => {
         const colors = [
@@ -157,8 +158,8 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
 
     const handleSaveModule = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedClass || !selectedDiscipline) {
-            onShowToast("Selecione Turma e Disciplina");
+        if (selectedClasses.length === 0 || !selectedDiscipline) {
+            onShowToast("Selecione ao menos uma Turma e a Disciplina");
             return;
         }
         if (isLockedForMe) {
@@ -173,22 +174,27 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
         const matchedDisc = disciplines.find(d => d.name === selectedDiscipline || d.id === selectedDiscipline);
         const finalDisciplineId = matchedDisc?.id || selectedDiscipline;
 
-        // Resolve class to UUID
-        const matchedClass = classes.find(c => c.name === selectedClass || c.id === selectedClass);
-        const finalClassId = matchedClass?.id || selectedClass;
+        let allSuccess = true;
 
-        const savedId = await SupabaseService.savePlanningModule({
-            disciplineId: finalDisciplineId,
-            teacherId: currentTeacher?.id || '',
-            classId: finalClassId,
-            front: '-',
-            chapter: formData.chapter,
-            module: formData.moduleNumber,
-            title: formData.title,
-            topic: formData.topic,
-            bimestre: parseInt(formData.bimestre) || 1
-        });
-        const success = savedId !== null;
+        for (const classStr of selectedClasses) {
+            const matchedClass = classes.find(c => c.name === classStr || c.id === classStr);
+            const finalClassId = matchedClass?.id || classStr;
+
+            const savedId = await SupabaseService.savePlanningModule({
+                disciplineId: finalDisciplineId,
+                teacherId: currentTeacher?.id || '',
+                classId: finalClassId,
+                front: '-',
+                chapter: formData.chapter,
+                module: formData.moduleNumber,
+                title: formData.title,
+                topic: formData.topic,
+                bimestre: parseInt(formData.bimestre) || 1
+            });
+            if (!savedId) allSuccess = false;
+        }
+
+        const success = allSuccess;
 
         if (success) {
             onShowToast("Módulo salvo com sucesso!");
@@ -418,27 +424,44 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                 <div className="space-y-5">
                                     <div className="bg-gray-900/50 p-4 rounded-2xl border border-gray-800/50 space-y-4">
                                         <div>
-                                            <label className="block text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-2 ml-1">Turma Atribuída</label>
-                                            <select
-                                                className="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3 text-gray-200 focus:ring-2 focus:ring-emerald-500/50 transition-all outline-none font-bold text-sm"
-                                                value={selectedClass}
-                                                onChange={(e) => setSelectedClass(e.target.value)}
-                                                required
-                                            >
-                                                <option value="">Selecione a Turma</option>
+                                            <label className="block text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-2 ml-1">Turmas Atribuídas</label>
+                                            <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 max-h-32 overflow-y-auto space-y-2">
                                                 {userRole === UserRole.COORDINATOR ? (
-                                                    classes.map(c => <option key={c.id as string} value={c.id as string}>{c.name}</option>)
+                                                    classes.map(c => (
+                                                        <label key={c.id as string} className="flex items-center gap-2 cursor-pointer group">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="w-4 h-4 rounded border-gray-700 text-emerald-500 bg-gray-900 focus:ring-emerald-500/50 focus:ring-offset-gray-950"
+                                                                checked={selectedClasses.includes(c.id as string)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) setSelectedClasses([...selectedClasses, c.id as string]);
+                                                                    else setSelectedClasses(selectedClasses.filter(id => id !== c.id as string));
+                                                                }}
+                                                            />
+                                                            <span className="text-sm font-bold text-gray-400 group-hover:text-gray-200 transition-colors">{c.name}</span>
+                                                        </label>
+                                                    ))
                                                 ) : (
                                                     Array.from(new Set(teacherAssignments.map(a => a.classId))).map(cId => {
                                                         const matchedClass = classes.find(c => c.id === cId || c.name === cId);
+                                                        const val = matchedClass?.id || cId as string;
                                                         return (
-                                                            <option key={cId as string} value={matchedClass?.id || cId as string}>
-                                                                {matchedClass?.name || cId}
-                                                            </option>
+                                                            <label key={val} className="flex items-center gap-2 cursor-pointer group">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="w-4 h-4 rounded border-gray-700 text-emerald-500 bg-gray-900 focus:ring-emerald-500/50 focus:ring-offset-gray-950"
+                                                                    checked={selectedClasses.includes(val)}
+                                                                    onChange={(e) => {
+                                                                        if (e.target.checked) setSelectedClasses([...selectedClasses, val]);
+                                                                        else setSelectedClasses(selectedClasses.filter(id => id !== val));
+                                                                    }}
+                                                                />
+                                                                <span className="text-sm font-bold text-gray-400 group-hover:text-gray-200 transition-colors">{matchedClass?.name || cId}</span>
+                                                            </label>
                                                         );
                                                     })
                                                 )}
-                                            </select>
+                                            </div>
                                         </div>
                                         <div>
                                             <label className="block text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-2 ml-1">Disciplina</label>
@@ -455,7 +478,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                     Array.from(new Set(teacherAssignments
                                                         .filter(a => {
                                                             const matchedClass = classes.find(c => c.id === a.classId || c.name === a.classId);
-                                                            return matchedClass?.id === selectedClass || a.classId === selectedClass;
+                                                            return selectedClasses.includes(matchedClass?.id as string) || selectedClasses.includes(a.classId);
                                                         })
                                                         .map(a => a.subject)))
                                                         .map((subject, idx) => {
@@ -646,6 +669,14 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                     <option value="all">Todos os Professores</option>
                                     {allTeachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                 </select>
+                                <select
+                                    className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-xs font-bold text-gray-200 outline-none focus:ring-2 focus:ring-emerald-500/30"
+                                    value={scheduleFilterClass}
+                                    onChange={(e) => setScheduleFilterClass(e.target.value)}
+                                >
+                                    <option value="all">Todas as Turmas</option>
+                                    {classes.map(c => <option key={c.id as string} value={c.id as string}>{c.name}</option>)}
+                                </select>
                             </div>
 
                             <div className="p-4">
@@ -661,10 +692,19 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                     {Array.from({ length: days }).map((_, i) => {
                                         const day = i + 1;
                                         const fullDate = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                                        const filteredScheds = scheduleFilterTeacher === 'all' ? schedules : schedules.filter(s => {
-                                            const mod = s.module || allModules.find(m => m.id === s.moduleId);
-                                            return mod?.teacherId === scheduleFilterTeacher;
-                                        });
+                                        let filteredScheds = schedules;
+                                        if (scheduleFilterTeacher !== 'all') {
+                                            filteredScheds = filteredScheds.filter(s => {
+                                                const mod = s.module || allModules.find(m => m.id === s.moduleId);
+                                                return mod?.teacherId === scheduleFilterTeacher;
+                                            });
+                                        }
+                                        if (scheduleFilterClass !== 'all') {
+                                            filteredScheds = filteredScheds.filter(s => {
+                                                const mod = s.module || allModules.find(m => m.id === s.moduleId);
+                                                return mod?.classId === scheduleFilterClass;
+                                            });
+                                        }
                                         const daySchedules = filteredScheds.filter(s => s.plannedDate === fullDate);
                                         const isToday = new Date().toDateString() === new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
 
@@ -687,7 +727,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                             }}
                                                         >
                                                             <div className="w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: getTeacherColor(sch.module?.teacherId) }} />
-                                                            {getDisciplineName(sch.module?.disciplineId)} - M{formatModule(sch.module?.module)}
+                                                            {scheduleFilterClass === 'all' ? `${getClassName(sch.module?.classId)}: ` : ''}{getDisciplineName(sch.module?.disciplineId)} - M{formatModule(sch.module?.module)}
                                                             {!isLockedForMe && (
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(sch.id); }}
@@ -1117,6 +1157,18 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
 
                         <div className="space-y-6">
                             <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Filtrar por Turma</label>
+                                <select
+                                    className="w-full bg-gray-900 border border-gray-800 rounded-2xl px-4 py-3 text-sm font-bold text-gray-100 focus:ring-2 focus:ring-emerald-500/50 transition-all outline-none"
+                                    value={scheduleFilterClass}
+                                    onChange={(e) => setScheduleFilterClass(e.target.value)}
+                                >
+                                    <option value="all">Todas as Turmas (Selecione para filtrar os módulos abaixo)</option>
+                                    {classes.map(c => <option key={c.id as string} value={c.id as string}>{c.name}</option>)}
+                                </select>
+                            </div>
+
+                            <div>
                                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Módulo Planejado</label>
                                 <select
                                     className="w-full bg-gray-900 border border-gray-800 rounded-2xl px-4 py-3 text-sm font-bold text-gray-100 focus:ring-2 focus:ring-emerald-500/50 transition-all outline-none"
@@ -1125,11 +1177,13 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                 >
                                     <option value="">Selecione um tópico...</option>
                                     {/* Teachers only see modules they created; coordinators see all */}
-                                    {(userRole === UserRole.TEACHER ? myCreatedModules : modules).map(m => (
-                                        <option key={m.id as string} value={m.id as string}>
-                                            {getDisciplineName(m.disciplineId)} - Cap.{formatModule(m.chapter)} Mod.{formatModule(m.module)} - {m.title}
-                                        </option>
-                                    ))}
+                                    {(userRole === UserRole.TEACHER ? myCreatedModules : modules)
+                                        .filter(m => scheduleFilterClass === 'all' || m.classId === scheduleFilterClass)
+                                        .map(m => (
+                                            <option key={m.id as string} value={m.id as string}>
+                                                {scheduleFilterClass === 'all' ? `[${getClassName(m.classId)}] ` : ''}{getDisciplineName(m.disciplineId)} - Cap.{formatModule(m.chapter)} Mod.{formatModule(m.module)} - {m.title}
+                                            </option>
+                                        ))}
                                 </select>
                                 {userRole === UserRole.TEACHER && myCreatedModules.length === 0 && (
                                     <p className="text-xs text-amber-400 mt-2 italic">Você ainda não criou nenhum módulo. Crie primeiro na aba "Conteúdo".</p>

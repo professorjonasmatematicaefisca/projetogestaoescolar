@@ -436,19 +436,43 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         setLoadingModules(true);
         try {
             const discObj = allDisciplines.find(d => d.name === selectedSubject);
+            const targetClassId = allClasses.find(c => normalize(c.name) === normalize(selectedClassId))?.id;
 
-            const [mods, discsList] = await Promise.all([
+            // 1) Find the week boundaries (Mon-Sun)
+            const dDate = new Date(`${selectedDate}T12:00:00`);
+            const dayOfWeek = dDate.getDay();
+            const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+            const startD = new Date(dDate); startD.setDate(dDate.getDate() + diffToMonday);
+            const endD = new Date(startD); endD.setDate(startD.getDate() + 6);
+            const startDateStr = startD.toISOString().split('T')[0];
+            const endDateStr = endD.toISOString().split('T')[0];
+
+            const [mods, discsList, allSchedules] = await Promise.all([
                 SupabaseService.getPlanningModules({
                     unusedOnly: true,
-                    classId: allClasses.find(c => normalize(c.name) === normalize(selectedClassId))?.id,
+                    classId: targetClassId,
                     disciplineId: discObj?.id
                 }),
-                SupabaseService.getDisciplines()
+                SupabaseService.getDisciplines(),
+                SupabaseService.getPlanningSchedule()
             ]);
             setAllDisciplines(discsList);
 
+            // 3) Filter the schedules to find which modules are planned for THIS week and THIS class!
+            const allowedModuleIds = new Set<string>();
+            allSchedules.forEach(s => {
+                if (s.plannedDate >= startDateStr && s.plannedDate <= endDateStr) {
+                    if (s.module && s.module.classId === targetClassId) {
+                        allowedModuleIds.add(s.moduleId.toString());
+                    }
+                }
+            });
+
+            // 4) Intersect unused modules with scheduled modules
+            const weekModules = mods.filter(m => allowedModuleIds.has(m.id as string));
+
             // Numerically sort modules: Chapter first, then Module
-            const sorted = [...mods].sort((a, b) => {
+            const sorted = [...weekModules].sort((a, b) => {
                 const chapterComparison = String(a.chapter).localeCompare(String(b.chapter), undefined, { numeric: true });
                 if (chapterComparison !== 0) return chapterComparison;
                 return String(a.module).localeCompare(String(b.module), undefined, { numeric: true });
