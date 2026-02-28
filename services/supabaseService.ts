@@ -194,6 +194,19 @@ export const SupabaseService = {
         return true;
     },
 
+    async updatePlanningSchedule(id: string, updates: Partial<Omit<PlanningSchedule, 'id'>>): Promise<boolean> {
+        const payload: any = {};
+        if (updates.moduleId !== undefined) payload.module_id = updates.moduleId;
+        if (updates.plannedDate !== undefined) payload.planned_date = updates.plannedDate;
+
+        const { error } = await supabase.from('planning_schedule').update(payload).eq('id', id);
+        if (error) {
+            console.error("Error updating schedule:", error);
+            return false;
+        }
+        return true;
+    },
+
     // --- PLANNING LOCKS ---
     async getPlanningLocks(): Promise<{ globalLocked: boolean; teacherLocks: { teacherId: string; locked: boolean }[] }> {
         const { data, error } = await supabase.from('planning_locks').select('*');

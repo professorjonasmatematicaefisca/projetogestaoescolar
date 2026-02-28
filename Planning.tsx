@@ -55,6 +55,9 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
     const [scheduleFilterTeacher, setScheduleFilterTeacher] = useState('all');
     const [scheduleFilterClass, setScheduleFilterClass] = useState('all');
 
+    // Sidebar Schedule filter
+    const [sideScheduleFilterClass, setSideScheduleFilterClass] = useState('all');
+
     const getTeacherColor = (teacherId?: string) => {
         const colors = [
             '#6366f1', // indigo-500
@@ -112,13 +115,17 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
             let filteredMods = sortedMods;
             if (userRole === UserRole.TEACHER) {
                 filteredMods = sortedMods.filter(m => {
-                    return actualAssignments.some(assign => {
+                    const isMyModule = m.teacherId === currentTeacher?.id;
+                    const matchesAssignment = actualAssignments.some(assign => {
                         const matchClass = allClasses.find(c => c.id === assign.classId || c.name === assign.classId);
                         const classMatch = matchClass ? m.classId === matchClass.id : m.classId === assign.classId;
                         const matchDisc = allDisciplines.find(d => d.name === assign.subject || d.id === assign.subject);
                         const discMatch = matchDisc ? m.disciplineId === matchDisc.id : m.disciplineId === assign.subject;
                         return classMatch && discMatch;
                     });
+                    // Only see modules you own OR if you have assignments for them
+                    // Since privacy is highly demanded: only modules I own AND in my assignments.
+                    return isMyModule && matchesAssignment;
                 });
             }
             setModules(filteredMods);
@@ -259,6 +266,31 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                 onShowToast("Agendamento removido");
                 loadData();
             }
+        }
+    };
+
+    const handleDropOnCalendar = async (e: React.DragEvent, targetDate: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (isLockedForMe) {
+            onShowToast("⛔ Planejamento bloqueado pelo coordenador.");
+            return;
+        }
+
+        const scheduleId = e.dataTransfer.getData('scheduleId');
+        if (!scheduleId) return;
+
+        // Verify the schedule actually exists and date is different
+        const sched = schedules.find(s => s.id === scheduleId);
+        if (!sched || sched.plannedDate === targetDate) return;
+
+        const success = await SupabaseService.updatePlanningSchedule(scheduleId, { plannedDate: targetDate });
+        if (success) {
+            onShowToast("Aula remanejada para o dia " + targetDate.split('-').reverse().join('/'));
+            loadData();
+        } else {
+            onShowToast("Erro ao remanejar a aula.");
         }
     };
 
@@ -729,6 +761,8 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                             <div
                                                 key={day}
                                                 onClick={() => !isLockedForMe && setShowScheduleModal({ day, open: true })}
+                                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                                onDrop={(e) => handleDropOnCalendar(e, fullDate)}
                                                 className={`aspect-square p-2 border border-gray-800/50 rounded-2xl transition-all relative flex flex-col group ${isToday ? 'bg-emerald-500/5 ring-1 ring-emerald-500/20' : 'bg-gray-900/20'} ${isLockedForMe ? 'cursor-default' : 'cursor-pointer hover:bg-emerald-500/5 hover:border-emerald-500/30'}`}
                                             >
                                                 <span className={`text-xs font-black ${isToday ? 'text-emerald-500' : 'text-gray-500'}`}>{day}</span>
@@ -736,7 +770,9 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                     {daySchedules.map(sch => (
                                                         <div
                                                             key={sch.id}
-                                                            className="text-[9px] border px-1.5 py-0.5 rounded-md font-bold truncate flex items-center gap-1 group/item"
+                                                            draggable={!isLockedForMe}
+                                                            onDragStart={(e) => { e.dataTransfer.setData('scheduleId', sch.id); }}
+                                                            className={`text-[9px] border px-1.5 py-0.5 rounded-md font-bold truncate flex items-center gap-1 group/item ${!isLockedForMe ? 'cursor-move' : ''}`}
                                                             style={{
                                                                 backgroundColor: `${getTeacherColor(sch.module?.teacherId)}15`,
                                                                 color: getTeacherColor(sch.module?.teacherId),
@@ -766,25 +802,58 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                         {/* Sidebar de Informações */}
                         <div className="w-full lg:w-80 space-y-6">
                             <div className="bg-[#0f172a] rounded-3xl border border-gray-800 p-6 shadow-xl">
-                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                    <Clock size={16} className="text-emerald-500" />
-                                    Aulas Agendadas
-                                </h3>
-                                <div className="space-y-4">
-                                    {schedules.length === 0 ? (
-                                        <p className="text-xs text-center text-gray-600 italic py-10">Nenhuma aula agendada para este período.</p>
-                                    ) : (
-                                        schedules.slice(0, 5).map(sch => (
-                                            <div key={sch.id} className="bg-gray-900/50 p-3 rounded-xl border flex flex-col gap-2" style={{ borderLeft: `4px solid ${getTeacherColor(sch.module?.teacherId)}`, borderColor: `${getTeacherColor(sch.module?.teacherId)}20` }}>
+                                <div className="flex flex-col gap-2 mb-4">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                            <Clock size={16} className="text-emerald-500" />
+                                            Aulas Agendadas
+                                        </h3>
+                                    </div>
+                                    <select
+                                        className="bg-gray-800 border border-gray-700 text-gray-300 text-[10px] font-bold rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-emerald-500 outline-none w-full"
+                                        value={sideScheduleFilterClass}
+                                        onChange={(e) => setSideScheduleFilterClass(e.target.value)}
+                                    >
+                                        <option value="all">Todas as Turmas (Próximas 2 Semanas)</option>
+                                        {classes.map(c => <option key={c.id as string} value={c.id as string}>{c.name}</option>)}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-4 max-h-[400px] overflow-y-auto scrollbar-hide">
+                                    {(() => {
+                                        const today = new Date();
+                                        today.setHours(0, 0, 0, 0);
+                                        const twoWeeksFromNow = new Date(today);
+                                        twoWeeksFromNow.setDate(today.getDate() + 14);
+
+                                        let sideSchedules = schedules.filter(s => {
+                                            const sDate = new Date(s.plannedDate + 'T12:00:00');
+                                            return sDate >= today && sDate <= twoWeeksFromNow;
+                                        });
+
+                                        if (sideScheduleFilterClass !== 'all') {
+                                            sideSchedules = sideSchedules.filter(s => s.module?.classId === sideScheduleFilterClass);
+                                        }
+
+                                        return sideSchedules.length === 0 ? (
+                                            <p className="text-xs text-center text-gray-600 italic py-10">Nenhuma aula agendada para as próximas 2 semanas.</p>
+                                        ) : sideSchedules.map(sch => (
+                                            <div
+                                                key={sch.id}
+                                                draggable={!isLockedForMe}
+                                                onDragStart={(e) => { e.dataTransfer.setData('scheduleId', sch.id); }}
+                                                className={`bg-gray-900/50 p-3 rounded-xl border flex flex-col gap-2 transition-colors ${!isLockedForMe ? 'cursor-move hover:bg-gray-800' : ''}`}
+                                                style={{ borderLeft: `4px solid ${getTeacherColor(sch.module?.teacherId)}`, borderColor: `${getTeacherColor(sch.module?.teacherId)}20` }}
+                                            >
                                                 <div className="flex justify-between items-start">
                                                     <span className="text-[10px] font-black uppercase" style={{ color: getTeacherColor(sch.module?.teacherId) }}>{sch.plannedDate.split('-').reverse().join('/')}</span>
                                                     <span className="text-[9px] bg-gray-800 px-1.5 py-0.5 rounded text-gray-400 font-bold">{getClassName(sch.module?.classId)}</span>
                                                 </div>
                                                 <p className="text-xs font-bold text-gray-200 truncate">{sch.module?.title}</p>
-                                                <p className="text-[10px] text-gray-500">{getDisciplineName(sch.module?.disciplineId)}</p>
+                                                <p className="text-[10px] text-gray-500">{getDisciplineName(sch.module?.disciplineId)} - M{formatModule(sch.module?.module)}</p>
                                             </div>
-                                        ))
-                                    )}
+                                        ));
+                                    })()}
                                 </div>
                             </div>
 
@@ -811,10 +880,14 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                         <div className="p-6 space-y-4">
                             {(() => {
                                 // Build per-teacher stats
-                                const teacherIds = Array.from(new Set(allSchedules.map(s => {
+                                let teacherIds = Array.from(new Set(allSchedules.map(s => {
                                     const mod = s.module || allModules.find(m => m.id === s.moduleId);
                                     return mod?.teacherId || '';
                                 }).filter(Boolean)));
+
+                                if (userRole === UserRole.TEACHER) {
+                                    teacherIds = teacherIds.filter(id => id === currentTeacherId);
+                                }
 
                                 if (teacherIds.length === 0) return <p className="text-center text-gray-600 italic py-10 text-sm">Nenhum agendamento encontrado.</p>;
 
