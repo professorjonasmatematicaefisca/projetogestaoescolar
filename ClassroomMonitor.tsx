@@ -721,24 +721,50 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     // --- New Class Logic ---
 
-    const handleNewClass = () => {
-        checkUnsavedAndProceed(() => {
-            onShowToast("Iniciando novo registro...");
-            // Reset Class Selection to force user to pick a new one, triggering initialization
-            setSelectedClassId('');
-            // Reset date to today
-            setSelectedDate(new Date().toISOString().split('T')[0]);
-        });
+    const handleNewClass = async () => {
+        if (hasUnsavedChanges) {
+            const shouldSave = window.confirm("Você tem alterações não salvas. Deseja SALVAR antes de iniciar um novo registro?");
+            if (shouldSave) {
+                const saveResult = await handleSave();
+                // If save was aborted or failed, we stay here unless user explicitly wants to discard
+                if (saveResult === false) {
+                    const discardInstead = window.confirm("O salvamento não foi concluído. Deseja DESCARTAR as alterações e iniciar um novo registro mesmo assim?");
+                    if (!discardInstead) return;
+                }
+            } else {
+                const discard = window.confirm("Deseja realmente DESCARTAR as alterações atuais e iniciar um novo registro?");
+                if (!discard) return;
+            }
+        }
+
+        onShowToast("Iniciando novo registro...");
+
+        // --- Full State Reset ---
+        setSelectedClassId('');
+        setSelectedSubject('');
+        setSelectedDate(new Date().toISOString().split('T')[0]);
+        // Keep teacher selection as it is likely the same person
+
+        // Clear all session-specific data
+        setSession(null);
+        setClassTopic('');
+        setClassHomework('');
+        setClassPhotos([]);
+        setSelectedContentIds([]);
+        setHasUnsavedChanges(false);
+
+        // Scroll to top for visual feedback of fresh start
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     // --- Main Save ---
 
-    const handleSave = async () => {
+    const handleSave = async (): Promise<boolean> => {
         if (session) {
             // Validation: require content before saving
             if (!session.generalNotes || session.generalNotes.trim() === '') {
                 onShowToast("⚠️ Você precisa registrar o conteúdo ministrado antes de salvar! Clique no botão 'Registro de Aula' para adicionar.");
-                return;
+                return false;
             }
 
             // Sync the block info with current selected blocks before saving
@@ -757,12 +783,15 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 setSession(updatedSession);
                 onShowToast("Aula salva no Supabase com sucesso!");
                 setHasUnsavedChanges(false);
+                return true;
             } else {
                 onShowToast(`Erro ao salvar no Supabase: ${result.error || 'Falha no servidor'}. Backup salvo localmente.`);
                 StorageService.saveSession(updatedSession);
                 setHasUnsavedChanges(false);
+                return false;
             }
         }
+        return false;
     };
 
     if (!session) return <div className="text-white p-6">Carregando dados... Certifique-se de que há turmas e alunos cadastrados.</div>;
