@@ -688,6 +688,12 @@ export const SupabaseService = {
             return { success: false, error: `Records Error: ${recordsError.message}` };
         }
 
+        // --- NEW: Repair orphans for this class immediately after saving ---
+        const { data: classData } = await supabase.from('classes').select('id').eq('name', session.className).maybeSingle();
+        if (classData) {
+            await SupabaseService.repairPlanningUsage(classData.id, session.className);
+        }
+
         return { success: true };
     },
 
@@ -750,32 +756,30 @@ export const SupabaseService = {
             // We proceed anyway to try and delete the session itself
         }
 
+        let finalClassId = classId;
+
         // 2. Restore modules if they exist
-        if (sessionData?.module_ids && sessionData.module_ids.length > 0) {
-            let finalClassId = classId;
+        // If classId wasn't passed, try to look it up by name with normalization
+        if (!finalClassId && sessionData?.class_name) {
+            const normalize = (s: string) => s.replace(/[º°]/g, 'o').trim().toLowerCase();
+            const sessionClassName = normalize(sessionData.class_name);
 
-            // If classId wasn't passed, try to look it up by name with normalization
-            if (!finalClassId && sessionData.class_name) {
-                const normalize = (s: string) => s.replace(/[º°]/g, 'o').trim().toLowerCase();
-                const sessionClassName = normalize(sessionData.class_name);
-
-                const { data: allClasses } = await supabase.from('classes').select('id, name');
-                if (allClasses) {
-                    const match = allClasses.find(c => normalize(c.name) === sessionClassName);
-                    if (match) finalClassId = match.id;
-                }
+            const { data: allClasses } = await supabase.from('classes').select('id, name');
+            if (allClasses) {
+                const match = allClasses.find(c => normalize(c.name) === sessionClassName);
+                if (match) finalClassId = match.id;
             }
+        }
 
-            if (finalClassId) {
-                const { error: usageError } = await supabase
-                    .from('planning_usage')
-                    .delete()
-                    .eq('class_id', finalClassId)
-                    .in('module_id', sessionData.module_ids);
+        if (finalClassId && sessionData?.module_ids && sessionData.module_ids.length > 0) {
+            const { error: usageError } = await supabase
+                .from('planning_usage')
+                .delete()
+                .eq('class_id', finalClassId)
+                .in('module_id', sessionData.module_ids);
 
-                if (usageError) {
-                    console.error("Error restoring planning modules:", usageError);
-                }
+            if (usageError) {
+                console.error("Error restoring planning modules:", usageError);
             }
         }
 
@@ -798,7 +802,61 @@ export const SupabaseService = {
             console.error("Error deleting session:", error);
             return false;
         }
+
+        // --- NEW: Repair orphans after deletion ---
+        if (finalClassId && sessionData?.class_name) {
+            await SupabaseService.repairPlanningUsage(finalClassId, sessionData.class_name);
+        }
+
         return true;
+    },
+
+    /**
+     * AUTO-CURE: Ensures planning_usage only contains modules that ARE actually
+     * referenced in at least one session for that class.
+     */
+    async repairPlanningUsage(classId: string, className: string): Promise<void> {
+        try {
+            // 1. Get all session module_ids for this class
+            const { data: sessions } = await supabase
+                .from('sessions')
+                .select('module_ids')
+                .eq('class_name', className);
+
+            if (!sessions) return;
+
+            // 2. Consolidate ALL IDs actually used in sessions
+            const usedIds = new Set<string>();
+            sessions.forEach(s => {
+                if (Array.isArray(s.module_ids)) {
+                    s.module_ids.forEach(id => usedIds.add(id));
+                }
+            });
+
+            // 3. Get all IDs marked as used in planning_usage for this class
+            const { data: usageData } = await supabase
+                .from('planning_usage')
+                .select('module_id')
+                .eq('class_id', classId);
+
+            if (!usageData) return;
+
+            // 4. Identify Orphans: marked as used but NOT in any session
+            const orphans = usageData
+                .filter(u => !usedIds.has(u.module_id))
+                .map(u => u.module_id);
+
+            if (orphans.length > 0) {
+                console.log(`[Auto-Cure] Repairing ${orphans.length} orphan modules for class ${className}`);
+                await supabase
+                    .from('planning_usage')
+                    .delete()
+                    .eq('class_id', classId)
+                    .in('module_id', orphans);
+            }
+        } catch (err) {
+            console.error("Error in repairPlanningUsage:", err);
+        }
     },
 
     async getSessions(): Promise<ClassSession[]> {

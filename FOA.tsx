@@ -519,7 +519,7 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                             </div>
                             <div>
                                 <span className="font-bold text-gray-900">Falta Autogestão:</span>
-                                <span className="ml-1">Registro de uso não autorizado de celular (Nota -1,0).</span>
+                                <span className="ml-1">Registro de uso não autorizado de celular (Nota -5,0).</span>
                             </div>
                             <div>
                                 <span className="font-bold text-gray-900">Participação:</span>
