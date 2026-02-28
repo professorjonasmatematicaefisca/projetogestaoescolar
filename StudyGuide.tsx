@@ -31,6 +31,7 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
     const [teacherAssignments, setTeacherAssignments] = useState<TeacherClassAssignment[]>([]);
     const [planningModules, setPlanningModules] = useState<PlanningModule[]>([]);
     const [guideItems, setGuideItems] = useState<StudyGuideItem[]>([]);
+    const [usedModuleIds, setUsedModuleIds] = useState<string[]>([]);
 
     // Launch form
     const [formBimestre, setFormBimestre] = useState('1');
@@ -98,6 +99,16 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
             const items = await SupabaseService.getStudyGuideItems();
             setGuideItems(items);
 
+            // Load sessions to know which modules have actually been taught
+            const sessions = await SupabaseService.getSessions(2000); // arbitrarily large limit to ensure we get all
+            const taughtModuleIds = new Set<string>();
+            sessions.forEach(s => {
+                if (s.moduleIds) {
+                    s.moduleIds.forEach(id => taughtModuleIds.add(id));
+                }
+            });
+            setUsedModuleIds(Array.from(taughtModuleIds));
+
         } catch (err) {
             console.error('StudyGuide loadData error:', err);
         }
@@ -137,6 +148,10 @@ export const StudyGuide: React.FC<StudyGuideProps> = ({ userEmail, userRole, onS
         if (formClassId && m.classId !== formClassId) return false;
         if (formDisciplineId && m.disciplineId !== formDisciplineId) return false;
         if (formBimestre && m.bimestre !== parseInt(formBimestre)) return false;
+
+        // **NEW RULE**: Must have been taught in class
+        if (!usedModuleIds.includes(m.id)) return false;
+
         // Don't show already selected
         if (selectedModules.some(sm => sm.moduleId === m.id)) return false;
         // Don't show already saved for same bimestre + exam type

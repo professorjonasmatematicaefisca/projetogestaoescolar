@@ -89,6 +89,7 @@ export interface ClassSession {
   block: string;
   blocksCount?: number; // New: Number of time blocks (e.g., 2 for double class)
   records: SessionRecord[];
+  topic?: string;
   generalNotes?: string;
   homework?: string;
   photos?: string[]; // URLs (Class generic photos)

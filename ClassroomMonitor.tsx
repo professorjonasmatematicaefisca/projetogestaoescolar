@@ -75,7 +75,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     // --- Modal State for Class Register (General) ---
     const [classModalOpen, setClassModalOpen] = useState(false);
-    const [classTopic, setClassTopic] = useState(''); // General Notes
+    const [classTopic, setClassTopic] = useState(''); // Deprecated logic, now used as derived string
+    const [classGeneralNotes, setClassGeneralNotes] = useState('');
     const [classHomework, setClassHomework] = useState('');
     const [classPhotos, setClassPhotos] = useState<string[]>([]);
 
@@ -249,6 +250,18 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
                 if (existingSession) {
                     setSession(existingSession);
+                    // classTopic was used for generalNotes before, so we map it correctly
+                    setClassTopic(existingSession.topic || '');
+                    setClassGeneralNotes(existingSession.generalNotes || '');
+                    setClassHomework(existingSession.homework || '');
+                    setClassPhotos(existingSession.photos || []);
+
+                    // Map saved modules to state
+                    if (existingSession.moduleIds && existingSession.moduleIds.length > 0) {
+                        setSelectedContentIds(existingSession.moduleIds);
+                    } else {
+                        setSelectedContentIds([]);
+                    }
                     // Restore multiple blocks from composite block label
                     if (existingSession.blocksCount && existingSession.blocksCount > 1 && existingSession.block) {
                         const matchingBlocks = availableBlocks.filter(b => {
@@ -747,6 +760,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
         setSession(null);
         setClassTopic('');
+        setClassGeneralNotes('');
         setClassHomework('');
         setClassPhotos([]);
         setSelectedContentIds([]);
@@ -803,8 +817,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
     const handleSave = async (): Promise<boolean> => {
         if (session) {
             // Validation: require content before saving
-            if (!session.generalNotes || session.generalNotes.trim() === '') {
-                onShowToast("⚠️ Você precisa registrar o conteúdo ministrado antes de salvar! Clique no botão 'Registro de Aula' para adicionar.");
+            if (selectedContentIds.length === 0) {
+                onShowToast("⚠️ Você precisa registrar o conteúdo ministrado antes de salvar!");
                 return false;
             }
 
@@ -812,11 +826,22 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             const compositeBlock = selectedBlocks.length > 1
                 ? `${selectedBlocks[0].split(' - ')[0]} - ${selectedBlocks[selectedBlocks.length - 1].split(' - ')[1]}`
                 : selectedBlocks[0];
+
+            // Generate the topic string automatically from selected modules
+            const derivedTopic = selectedContentIds.map(id => {
+                const mod = contentModules.find(m => m.id === id);
+                return mod ? `Cap. ${mod.chapter} - Mod. ${mod.module} - ${mod.title}` : '';
+            }).filter(Boolean).join('; ');
+
             const updatedSession: ClassSession = {
                 ...session,
                 block: compositeBlock,
                 blocksCount: selectedBlocks.length,
-                moduleIds: selectedContentIds // Sync with the latest selection logic
+                moduleIds: selectedContentIds, // Sync with the latest selection logic
+                topic: derivedTopic,
+                generalNotes: classGeneralNotes,
+                homework: classHomework,
+                photos: classPhotos
             };
 
             const result = await SupabaseService.saveSession(updatedSession, userEmail);
@@ -1381,11 +1406,30 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                                     </div>
                                                 </div>
                                             )}
+
+                                            <div className="w-full min-h-16 bg-[#0f172a] border border-gray-700 rounded-lg p-3 text-white text-xs whitespace-pre-wrap leading-relaxed opacity-80 cursor-not-allowed">
+                                                {selectedContentIds.length > 0 ? (
+                                                    selectedContentIds.map((id, index) => {
+                                                        const mod = contentModules.find(m => m.id === id);
+                                                        return mod ? (
+                                                            <div key={id} className="mb-1">
+                                                                {index + 1}. Cap. {mod.chapter} — Razão e proporção — Mod. {mod.module} — {mod.title}
+                                                            </div>
+                                                        ) : null;
+                                                    })
+                                                ) : (
+                                                    <span className="text-gray-500 italic">Nenhum módulo selecionado... os conteúdos aparecerão aqui automaticamente.</span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-emerald-400 uppercase mb-2 mt-4">Observações Gerais (Opcional)</label>
                                             <textarea
-                                                value={classTopic}
-                                                onChange={(e) => setClassTopic(e.target.value)}
-                                                className="w-full h-16 bg-[#0f172a] border border-gray-700 rounded-lg p-3 text-white placeholder-gray-600 outline-none focus:border-blue-500 text-xs"
-                                                placeholder="Observações adicionais sobre o conteúdo (opcional)..."
+                                                value={classGeneralNotes}
+                                                onChange={(e) => setClassGeneralNotes(e.target.value)}
+                                                className="w-full h-20 bg-[#0f172a] border border-emerald-500/30 rounded-lg p-3 text-white placeholder-gray-600 outline-none focus:border-emerald-500 text-xs"
+                                                placeholder="Observações adicionais, problemas técnicos, recados para a coordenação..."
                                             ></textarea>
                                         </div>
 

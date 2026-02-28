@@ -35,7 +35,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
     // Calendar states
     const [currentDate, setCurrentDate] = useState(new Date());
     const [showScheduleModal, setShowScheduleModal] = useState<{ day: number, open: boolean }>({ day: 0, open: false });
-    const [selectedModuleForSchedule, setSelectedModuleForSchedule] = useState('');
+    const [selectedModulesForSchedule, setSelectedModulesForSchedule] = useState<string[]>([]);
 
     // Lock states
     const [globalLocked, setGlobalLocked] = useState(false);
@@ -207,7 +207,10 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
     };
 
     const handleSaveSchedule = async () => {
-        if (!selectedModuleForSchedule || showScheduleModal.day === 0) return;
+        if (selectedModulesForSchedule.length === 0) {
+            onShowToast("Selecione pelo menos um módulo.");
+            return;
+        }
         if (isLockedForMe) {
             onShowToast("⛔ Planejamento bloqueado pelo coordenador.");
             return;
@@ -216,19 +219,33 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
         const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), showScheduleModal.day);
         const isoDate = date.toISOString().split('T')[0];
 
-        const success = await SupabaseService.savePlanningSchedule({
-            moduleId: selectedModuleForSchedule,
-            plannedDate: isoDate
-        });
+        let successCount = 0;
 
-        if (success) {
-            onShowToast("Aula agendada!");
-            setShowScheduleModal({ day: 0, open: false });
-            setSelectedModuleForSchedule('');
+        for (const moduleId of selectedModulesForSchedule) {
+            const mod = allModules.find(m => m.id === moduleId);
+            if (!mod) continue;
+
+            const sched = {
+                moduleId: moduleId,
+                plannedDate: isoDate,
+            };
+
+            const success = await SupabaseService.savePlanningSchedule(sched);
+            if (success) successCount++;
+        }
+
+        if (successCount > 0) {
+            onShowToast(`${successCount} módulo(s) agendado(s) com sucesso!`);
+            handleCloseScheduleModal();
             loadData();
         } else {
-            onShowToast("Erro ao agendar aula");
+            onShowToast("Erro ao agendar as aulas.");
         }
+    };
+
+    const handleCloseScheduleModal = () => {
+        setShowScheduleModal({ day: 0, open: false });
+        setSelectedModulesForSchedule([]);
     };
 
     const handleDeleteSchedule = async (id: string) => {
@@ -1143,7 +1160,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
             {/* Modal de Agendamento */}
             {showScheduleModal.open && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-gray-950/80 backdrop-blur-sm" onClick={() => setShowScheduleModal({ day: 0, open: false })} />
+                    <div className="absolute inset-0 bg-gray-950/80 backdrop-blur-sm" onClick={() => handleCloseScheduleModal()} />
                     <div className="relative bg-[#0f172a] w-full max-w-md rounded-3xl border border-gray-800 shadow-2xl p-8 animate-in zoom-in-95 duration-200">
                         <div className="flex items-center gap-3 mb-6">
                             <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center">
@@ -1169,38 +1186,88 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Módulo Planejado</label>
-                                <select
-                                    className="w-full bg-gray-900 border border-gray-800 rounded-2xl px-4 py-3 text-sm font-bold text-gray-100 focus:ring-2 focus:ring-emerald-500/50 transition-all outline-none"
-                                    value={selectedModuleForSchedule}
-                                    onChange={(e) => setSelectedModuleForSchedule(e.target.value)}
-                                >
-                                    <option value="">Selecione um tópico...</option>
-                                    {/* Teachers only see modules they created; coordinators see all */}
-                                    {(userRole === UserRole.TEACHER ? myCreatedModules : modules)
-                                        .filter(m => scheduleFilterClass === 'all' || m.classId === scheduleFilterClass)
-                                        .map(m => (
-                                            <option key={m.id as string} value={m.id as string}>
-                                                {scheduleFilterClass === 'all' ? `[${getClassName(m.classId)}] ` : ''}{getDisciplineName(m.disciplineId)} - Cap.{formatModule(m.chapter)} Mod.{formatModule(m.module)} - {m.title}
-                                            </option>
-                                        ))}
-                                </select>
-                                {userRole === UserRole.TEACHER && myCreatedModules.length === 0 && (
-                                    <p className="text-xs text-amber-400 mt-2 italic">Você ainda não criou nenhum módulo. Crie primeiro na aba "Conteúdo".</p>
-                                )}
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1 flex items-center justify-between">
+                                    <span>Módulo Planejado</span>
+                                    <span className="text-emerald-500">{selectedModulesForSchedule.length} / 4 Selecionados</span>
+                                </label>
+
+                                <div className="space-y-4">
+                                    <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 max-h-64 overflow-y-auto space-y-2 relative">
+                                        {(userRole === UserRole.TEACHER ? myCreatedModules : modules)
+                                            .filter(m => scheduleFilterClass === 'all' || m.classId === scheduleFilterClass)
+                                            // Filter out modules already scheduled ANYWHERE for this class (not just this day)?
+                                            // The user asked: "Caso ele já tenha registrado em aula esse módulo, não deve mais aparecer" -> We can filter by `planning_usage` or `allSchedules`?
+                                            // we filter out modules that are ALREADY in `allSchedules` where the `classId` matches the module's classId.
+                                            // allSchedules has the module object, so we look at s.module?.classId
+                                            .filter(m => !allSchedules.some(s => s.moduleId === m.id && s.module?.classId === m.classId))
+                                            .map(m => {
+                                                const isSelected = selectedModulesForSchedule.includes(m.id as string);
+                                                const isDisabled = !isSelected && selectedModulesForSchedule.length >= 4;
+                                                return (
+                                                    <label
+                                                        key={m.id as string}
+                                                        className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${isSelected
+                                                            ? 'bg-emerald-500/10 border-emerald-500/30'
+                                                            : isDisabled
+                                                                ? 'bg-gray-950 border-gray-800/50 opacity-50 cursor-not-allowed'
+                                                                : 'bg-gray-950 border-gray-800 hover:border-emerald-500/30 group'
+                                                            }`}
+                                                    >
+                                                        <div className="pt-0.5">
+                                                            <input
+                                                                type="checkbox"
+                                                                disabled={isDisabled}
+                                                                checked={isSelected}
+                                                                className="w-4 h-4 rounded border-gray-700 text-emerald-500 bg-gray-900 focus:ring-emerald-500/50"
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        if (selectedModulesForSchedule.length < 4) {
+                                                                            setSelectedModulesForSchedule([...selectedModulesForSchedule, m.id as string]);
+                                                                        }
+                                                                    } else {
+                                                                        setSelectedModulesForSchedule(selectedModulesForSchedule.filter(id => id !== m.id as string));
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <p className={`text-xs font-bold leading-tight ${isSelected ? 'text-emerald-400' : 'text-gray-300 group-hover:text-emerald-300'}`}>
+                                                                {scheduleFilterClass === 'all' ? `[${getClassName(m.classId)}] ` : ''}
+                                                                {getDisciplineName(m.disciplineId)}
+                                                            </p>
+                                                            <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-bold">
+                                                                Cap.{formatModule(m.chapter)} Mod.{formatModule(m.module)} — {m.title}
+                                                            </p>
+                                                        </div>
+                                                    </label>
+                                                );
+                                            })}
+
+                                        {userRole === UserRole.TEACHER && myCreatedModules.length === 0 && (
+                                            <p className="text-xs text-amber-400 mt-2 italic text-center py-4">Você ainda não criou nenhum módulo. Crie primeiro na aba "Conteúdo".</p>
+                                        )}
+                                        {userRole === UserRole.TEACHER && myCreatedModules.length > 0 &&
+                                            myCreatedModules.filter(m => scheduleFilterClass === 'all' || m.classId === scheduleFilterClass).filter(m => !allSchedules.some(s => s.moduleId === m.id && s.module?.classId === m.classId)).length === 0 && (
+                                                <p className="text-xs text-gray-500 mt-2 italic text-center py-4">Nenhum módulo novo disponível para esta turma.</p>
+                                            )}
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="flex gap-3">
+                            <div className="flex gap-3 pt-4 border-t border-gray-800">
                                 <button
-                                    onClick={() => setShowScheduleModal({ day: 0, open: false })}
-                                    className="flex-1 px-6 py-3.5 rounded-2xl font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all text-sm"
+                                    onClick={() => {
+                                        setShowScheduleModal({ day: 0, open: false });
+                                        setSelectedModulesForSchedule([]);
+                                    }}
+                                    className="flex-1 py-3 text-xs font-bold text-gray-400 hover:text-white transition-colors"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     onClick={handleSaveSchedule}
-                                    disabled={!selectedModuleForSchedule}
-                                    className="flex-1 px-6 py-3.5 rounded-2xl font-black bg-emerald-600 text-white hover:bg-emerald-500 shadow-lg shadow-emerald-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-[10px] uppercase tracking-widest"
+                                    disabled={selectedModulesForSchedule.length === 0}
+                                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl disabled:opacity-50 transition-all text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/20"
                                 >
                                     Confirmar
                                 </button>

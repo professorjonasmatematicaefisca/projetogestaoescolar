@@ -859,8 +859,8 @@ export const SupabaseService = {
         }
     },
 
-    async getSessions(): Promise<ClassSession[]> {
-        const { data: sessions, error } = await supabase
+    async getSessions(limit?: number): Promise<ClassSession[]> {
+        let query = supabase
             .from('sessions')
             .select(`
                 *,
@@ -868,6 +868,12 @@ export const SupabaseService = {
                 session_records (*)
             `)
             .order('date', { ascending: false });
+
+        if (limit) {
+            query = query.limit(limit);
+        }
+
+        const { data: sessions, error } = await query;
 
         if (error) {
             console.error("Error fetching sessions:", error);
