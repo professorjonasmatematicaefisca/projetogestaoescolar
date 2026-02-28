@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Plus, Search, Calendar, ChevronRight, ChevronLeft, Save, Trash2, Filter, List, CheckCircle2, Clock, Lock, Unlock, Users, Eye, ShieldAlert, BarChart3, AlertTriangle, MessageSquare } from 'lucide-react';
+import { BookOpen, Plus, Search, Calendar, ChevronRight, ChevronLeft, Save, Trash2, Filter, List, CheckCircle2, Clock, Lock, Unlock, Users, Eye, ShieldAlert, BarChart3, AlertTriangle, MessageSquare, AlertCircle } from 'lucide-react';
 import { SupabaseService } from './services/supabaseService';
 import { UserRole, PlanningModule, ClassRoom, Discipline, TeacherClassAssignment, PlanningSchedule, Teacher, ClassSession } from './types';
 
@@ -847,25 +847,17 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                                 {!isLockedForMe && !isExecuted && (
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(sch.id); }}
-                                                                        className="ml-auto opacity-0 group-hover/item:opacity-100 hover:text-red-400"
+                                                                        className={`ml-auto opacity-0 group-hover/item:opacity-100 transition-all ${userRole === UserRole.TEACHER ? 'text-amber-400 hover:text-amber-300' : 'text-red-400 hover:text-red-300'}`}
+                                                                        title={userRole === UserRole.TEACHER ? "Solicitar exclusão ao coordenador" : "Excluir agendamento"}
                                                                     >
-                                                                        <Trash2 size={10} />
+                                                                        {userRole === UserRole.TEACHER ? <AlertCircle size={10} /> : <Trash2 size={10} />}
                                                                     </button>
                                                                 )}
                                                                 {!isLockedForMe && isExecuted && userRole === UserRole.COORDINATOR && (
                                                                     <button
                                                                         onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(sch.id); }}
-                                                                        className="ml-auto opacity-0 group-hover/item:opacity-100 hover:text-red-400"
+                                                                        className="ml-auto opacity-0 group-hover/item:opacity-100 text-red-400 hover:text-red-300"
                                                                         title="Coordenador: Excluir mesmo executada"
-                                                                    >
-                                                                        <Trash2 size={10} />
-                                                                    </button>
-                                                                )}
-                                                                {!isLockedForMe && !isExecuted && userRole === UserRole.TEACHER && (
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(sch.id); }}
-                                                                        className="ml-auto opacity-0 group-hover/item:opacity-100 hover:text-amber-400"
-                                                                        title="Solicitar exclusão ao coordenador"
                                                                     >
                                                                         <Trash2 size={10} />
                                                                     </button>
@@ -938,7 +930,27 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                             {sch.plannedDate.split('-').reverse().join('/')}
                                                             {isExecuted && <CheckCircle2 size={10} className="text-emerald-500" />}
                                                         </span>
-                                                        <span className="text-[9px] bg-gray-800 px-1.5 py-0.5 rounded text-gray-400 font-bold">{getClassName(sch.module?.classId)}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[9px] bg-gray-800 px-1.5 py-0.5 rounded text-gray-400 font-bold">{getClassName(sch.module?.classId)}</span>
+                                                            {!isLockedForMe && !isExecuted && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(sch.id); }}
+                                                                    className={`p-1 rounded transition-all ${userRole === UserRole.TEACHER ? 'text-amber-400 hover:bg-amber-400/10' : 'text-red-400 hover:bg-red-400/10'}`}
+                                                                    title={userRole === UserRole.TEACHER ? "Solicitar exclusão ao coordenador" : "Excluir agendamento"}
+                                                                >
+                                                                    {userRole === UserRole.TEACHER ? <AlertCircle size={14} /> : <Trash2 size={14} />}
+                                                                </button>
+                                                            )}
+                                                            {!isLockedForMe && isExecuted && userRole === UserRole.COORDINATOR && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(sch.id); }}
+                                                                    className="p-1 text-red-500 hover:bg-red-500/10 rounded transition-all"
+                                                                    title="Coordenador: Excluir aula executada"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                     <p className="text-xs font-bold text-gray-200 truncate">{sch.module?.title}</p>
                                                     <p className="text-[10px] text-gray-500">{getDisciplineName(sch.module?.disciplineId)} - M{formatModule(sch.module?.module)}</p>
