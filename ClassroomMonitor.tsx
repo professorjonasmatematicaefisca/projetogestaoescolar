@@ -605,7 +605,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         const confirmed = window.confirm(`Tem certeza que deseja EXCLUIR o registro de ${format(new Date(sess.date), "dd/MM/yyyy")} — ${sess.className} (${sess.subject})?\n\nEsta ação não pode ser desfeita.`);
         if (!confirmed) return;
 
-        const success = await SupabaseService.deleteSession(sess.id);
+        const classObj = allClasses.find(c => c.name === sess.className);
+        const success = await SupabaseService.deleteSession(sess.id, classObj?.id);
         if (success) {
             setHistorySessions(prev => prev.filter(s => s.id !== sess.id));
             onShowToast("Registro de aula excluído com sucesso.");
@@ -677,6 +678,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         setSelectedDate(sess.date.split('T')[0]);
         setSelectedClassId(sess.className);
         setSelectedSubject(sess.subject);
+        setSelectedContentIds(sess.moduleIds || []);
 
         // Restore block selection from the session's block field
         if (sess.blocksCount && sess.blocksCount > 1 && sess.block) {

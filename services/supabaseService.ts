@@ -737,7 +737,7 @@ export const SupabaseService = {
         };
     },
 
-    async deleteSession(sessionId: string): Promise<boolean> {
+    async deleteSession(sessionId: string, classId?: string): Promise<boolean> {
         // 1. Fetch session to get moduleIds and class_name
         const { data: sessionData, error: fetchError } = await supabase
             .from('sessions')
@@ -752,17 +752,23 @@ export const SupabaseService = {
 
         // 2. Restore modules if they exist
         if (sessionData?.module_ids && sessionData.module_ids.length > 0) {
-            const { data: classData } = await supabase
-                .from('classes')
-                .select('id')
-                .eq('name', sessionData.class_name)
-                .single();
+            let finalClassId = classId;
 
-            if (classData) {
+            // If classId wasn't passed, try to look it up by name (legacy/fallback)
+            if (!finalClassId && sessionData.class_name) {
+                const { data: classData } = await supabase
+                    .from('classes')
+                    .select('id')
+                    .eq('name', sessionData.class_name)
+                    .single();
+                if (classData) finalClassId = classData.id;
+            }
+
+            if (finalClassId) {
                 const { error: usageError } = await supabase
                     .from('planning_usage')
                     .delete()
-                    .eq('class_id', classData.id)
+                    .eq('class_id', finalClassId)
                     .in('module_id', sessionData.module_ids);
 
                 if (usageError) {
@@ -1402,5 +1408,18 @@ export const SupabaseService = {
 
         if (error) { console.error('getUnreadMessagesCount error:', error); return 0; }
         return count || 0;
+    },
+
+    async deleteAllRequests(): Promise<boolean> {
+        const { error } = await supabase
+            .from('requests')
+            .delete()
+            .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+        if (error) {
+            console.error('deleteAllRequests error:', error);
+            return false;
+        }
+        return true;
     }
 };

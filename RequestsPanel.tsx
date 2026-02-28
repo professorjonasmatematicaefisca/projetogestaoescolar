@@ -102,6 +102,20 @@ export const RequestsPanel: React.FC<RequestsPanelProps> = ({ onShowToast, userE
         }
     };
 
+    const handleClearAll = async () => {
+        if (!window.confirm("Atenção: Tem certeza que deseja LIMPAR TODAS as solicitações do banco de dados? Esta ação é irreversível.")) return;
+
+        setLoading(true);
+        const success = await SupabaseService.deleteAllRequests();
+        if (success) {
+            onShowToast("✅ Todas as solicitações foram limpas.");
+            loadRequests();
+        } else {
+            onShowToast("Erro ao limpar solicitações.");
+        }
+        setLoading(false);
+    };
+
     const getTypeLabel = (type: string) => {
         switch (type) {
             case 'delete_session': return 'Excluir Registro de Aula';
@@ -170,6 +184,16 @@ export const RequestsPanel: React.FC<RequestsPanelProps> = ({ onShowToast, userE
                     >
                         <Check size={18} />
                         Nova Solicitação
+                    </button>
+                )}
+
+                {userRole === UserRole.COORDINATOR && (
+                    <button
+                        onClick={handleClearAll}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border border-red-500/20 rounded-lg text-sm font-bold transition-all"
+                    >
+                        <Trash2 size={18} />
+                        Limpar Todas
                     </button>
                 )}
             </div>
