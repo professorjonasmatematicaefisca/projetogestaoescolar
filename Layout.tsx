@@ -170,7 +170,7 @@ export const Layout: React.FC<LayoutProps> = ({
               }`}
           >
             <Lock size={16} />
-            <span className="text-xs font-bold">Minha Senha</span>
+            <span className="text-xs font-bold">Configurações</span>
           </button>
 
           <div className="flex items-center gap-3 mb-2 p-2">

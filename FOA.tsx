@@ -51,9 +51,12 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
     const [selectedClassId, setSelectedClassId] = useState<string>('');
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
     const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+    const [selectedBimestre, setSelectedBimestre] = useState<string>('ANUAL');
     const [soeConsiderations, setSoeConsiderations] = useState<string>('');
+    const [newObservation, setNewObservation] = useState<string>('');
     const [lastSignedBy, setLastSignedBy] = useState<string>('');
     const [saving, setSaving] = useState(false);
+    const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
 
     // Generate available years based on session history + current year
     const availableYears = Array.from(new Set([
@@ -66,6 +69,9 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
         const fetchData = async () => {
             setLoading(true);
             try {
+                const logo = localStorage.getItem('educontrol_school_logo');
+                if (logo) setSchoolLogoUrl(logo);
+
                 const [sc, ss, sl, st, so] = await Promise.all([
                     SupabaseService.getClasses(),
                     SupabaseService.getStudents(),
@@ -116,10 +122,28 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
         setSaving(true);
         // Signature: if userName exists, use it.
         const signature = userName || userEmail || "Sistema";
-        const success = await SupabaseService.saveStudentSOENote(selectedStudentId, selectedYear, soeConsiderations, signature);
+
+        let payloadNote = soeConsiderations;
+
+        // Se NÃO FOR Coordenador, faz o Append-Only da nova observação
+        if (currentUserRole !== UserRole.COORDINATOR) {
+            if (!newObservation.trim()) {
+                setSaving(false);
+                return;
+            }
+            const dateStr = format(new Date(), "dd/MM/yyyy");
+            const roleStr = currentUserRole === UserRole.TEACHER ? "Prof." : "Usuário";
+            const signatureTitle = userName ? `${roleStr} ${userName.split(' ')[0]}` : signature;
+            const prependedNote = `[${dateStr} - ${signatureTitle}]: ${newObservation.trim()}`;
+            payloadNote = soeConsiderations ? `${soeConsiderations}\n\n${prependedNote}` : prependedNote;
+        }
+
+        const success = await SupabaseService.saveStudentSOENote(selectedStudentId, selectedYear, payloadNote, signature);
         if (success) {
             onShowToast("Considerações salvas com sucesso!");
             setLastSignedBy(signature);
+            setSoeConsiderations(payloadNote);
+            setNewObservation(''); // Limpa o campo menor de inserção
         } else {
             onShowToast("Erro ao salvar considerações.");
         }
@@ -182,6 +206,22 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
         }
     };
 
+    const isDateInBimestre = (dateStr: string, bimestre: string, year: number) => {
+        if (bimestre === 'ANUAL') return new Date(dateStr).getFullYear() === year;
+
+        const d = new Date(dateStr);
+        if (d.getFullYear() !== year) return false;
+
+        const month = d.getMonth() + 1; // 1-12
+        switch (bimestre) {
+            case '1': return month >= 1 && month <= 4;  // Jan - Abr
+            case '2': return month >= 5 && month <= 6;  // Mai - Jun
+            case '3': return month >= 7 && month <= 9;  // Jul - Set
+            case '4': return month >= 10 && month <= 12; // Out - Dez
+            default: return true;
+        }
+    };
+
     const generateFOAData = (): { rows: DisciplineRowData[], observations: ObservationLog[] } => {
         const rows: DisciplineRowData[] = [];
         const observations: ObservationLog[] = [];
@@ -208,7 +248,7 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
 
         // 1.5. Add formal occurrences to observations
         occurrences.forEach(occ => {
-            if (occ.studentIds.includes(selectedStudentId) && new Date(occ.date).getFullYear() === selectedYear) {
+            if (occ.studentIds.includes(selectedStudentId) && isDateInBimestre(occ.date, selectedBimestre, selectedYear)) {
                 observations.push({
                     date: occ.date,
                     subject: 'OCORRÊNCIA',
@@ -221,11 +261,11 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
 
         // 2. Process Stats per Subject
         uniqueCurriculum.forEach(curr => {
-            // Filter sessions for this subject, student AND SELECTED YEAR
+            // Filter sessions for this subject, student AND SELECTED YEAR/BIMESTRE
             const subjectSessions = sessions.filter(s =>
                 s.className === selectedClassId &&
                 s.subject === curr.subject &&
-                new Date(s.date).getFullYear() === selectedYear
+                isDateInBimestre(s.date, selectedBimestre, selectedYear)
             );
 
             let recordsCount = 0;
@@ -353,6 +393,22 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
 
                     <div className="flex items-center gap-2 bg-[#1e293b] px-3 py-2 rounded-lg border border-gray-700">
                         <Filter size={16} className="text-gray-400" />
+                        <span className="text-xs font-bold text-gray-500 uppercase mr-2">Bimestre:</span>
+                        <select
+                            value={selectedBimestre}
+                            onChange={(e) => setSelectedBimestre(e.target.value)}
+                            className="bg-[#0f172a] text-white text-sm border border-gray-700 rounded-md p-1 outline-none focus:border-emerald-500 min-w-[100px]"
+                        >
+                            <option value="ANUAL">Anual</option>
+                            <option value="1">1º Bimestre</option>
+                            <option value="2">2º Bimestre</option>
+                            <option value="3">3º Bimestre</option>
+                            <option value="4">4º Bimestre</option>
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-[#1e293b] px-3 py-2 rounded-lg border border-gray-700">
+                        <Filter size={16} className="text-gray-400" />
                         <span className="text-xs font-bold text-gray-500 uppercase mr-2">Turma:</span>
                         <select
                             value={selectedClassId}
@@ -398,12 +454,17 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                 <div className="bg-white text-black p-6 md:p-8 min-h-[1000px] shadow-2xl print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none max-w-[210mm] mx-auto overflow-visible">
 
                     {/* Header Info */}
-                    <div className="flex justify-between items-end border-b-2 border-emerald-800 pb-2 mb-4">
-                        <div>
-                            <h1 className="text-3xl font-bold uppercase text-emerald-900 tracking-tight">Ficha de Observação do Aluno</h1>
-                            <div className="flex flex-col md:flex-row md:gap-8 mt-2 text-sm text-gray-800">
-                                <p><strong className="text-emerald-800">ALUNO:</strong> {selectedStudent?.name.toUpperCase()}</p>
-                                <p><strong className="text-emerald-800">TURMA:</strong> {selectedStudent?.className}</p>
+                    <div className="flex justify-between items-end border-b-2 border-emerald-800 pb-2 mb-4 gap-4">
+                        <div className="flex items-center gap-4">
+                            {schoolLogoUrl && (
+                                <img src={schoolLogoUrl} alt="Logo" className="max-h-16 object-contain" />
+                            )}
+                            <div>
+                                <h1 className="text-3xl font-bold uppercase text-emerald-900 tracking-tight">Ficha de Observação do Aluno</h1>
+                                <div className="flex flex-col md:flex-row md:gap-8 mt-2 text-sm text-gray-800">
+                                    <p><strong className="text-emerald-800">ALUNO:</strong> {selectedStudent?.name.toUpperCase()}</p>
+                                    <p><strong className="text-emerald-800">TURMA:</strong> {selectedStudent?.className}</p>
+                                </div>
                             </div>
                         </div>
                         <div className="text-right">
@@ -566,27 +627,69 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                                 <h3 className="font-bold text-sm uppercase text-gray-800">Considerações Gerais / SOE</h3>
                                 {lastSignedBy && (
                                     <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
-                                        Assinado por: {lastSignedBy}
+                                        Última Edição: {lastSignedBy}
                                     </span>
                                 )}
                             </div>
-                            <div className="flex items-center gap-2 print:hidden">
-                                <span className="text-[10px] text-gray-500 uppercase mr-2">Campo Editável</span>
-                                <button
-                                    onClick={handleSaveConsiderations}
-                                    disabled={saving || !selectedStudentId}
-                                    className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold px-3 py-1 rounded transition-colors flex items-center gap-1"
-                                >
-                                    {saving ? 'SALVANDO...' : 'SALVAR NOTA'}
-                                </button>
-                            </div>
+                            {currentUserRole === UserRole.COORDINATOR && (
+                                <div className="flex items-center gap-2 print:hidden">
+                                    <span className="text-[10px] text-gray-500 uppercase mr-2">Acesso Livre (Coord.)</span>
+                                    <button
+                                        onClick={handleSaveConsiderations}
+                                        disabled={saving || !selectedStudentId}
+                                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold px-3 py-1 rounded transition-colors flex items-center gap-1"
+                                    >
+                                        {saving ? 'SALVANDO...' : 'SALVAR NOTA'}
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                        <textarea
-                            className="w-full h-32 p-4 text-sm text-gray-800 outline-none resize-none bg-white placeholder-gray-300"
-                            placeholder="Digite aqui as considerações finais, orientações pedagógicas ou observações da coordenação para impressão..."
-                            value={soeConsiderations}
-                            onChange={(e) => setSoeConsiderations(e.target.value)}
-                        />
+
+                        {currentUserRole !== UserRole.COORDINATOR ? (
+                            <div className="p-4 bg-white flex flex-col">
+                                {/* ReadOnly View of Past History */}
+                                <div className="w-full text-sm text-gray-800 whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200 min-h-[80px] mb-3">
+                                    {soeConsiderations || <span className="text-gray-400 italic">Nenhuma consideração registrada ainda.</span>}
+                                </div>
+
+                                {/* New Entry Add Form */}
+                                <div className="print:hidden border border-emerald-200 rounded-lg overflow-hidden bg-emerald-50">
+                                    <div className="p-2 border-b border-emerald-200 bg-emerald-100/50 flex justify-between items-center">
+                                        <span className="text-xs font-bold text-emerald-800 flex items-center gap-1">Adicionar Nova Observação</span>
+                                        <button
+                                            onClick={handleSaveConsiderations}
+                                            disabled={saving || !selectedStudentId || !newObservation.trim()}
+                                            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold px-3 py-1 rounded transition-colors flex items-center gap-1"
+                                        >
+                                            {saving ? 'SALVANDO...' : 'ADICIONAR OBS.'}
+                                        </button>
+                                    </div>
+                                    <textarea
+                                        className="w-full h-20 p-3 text-sm text-gray-800 outline-none resize-none bg-transparent placeholder-emerald-800/40"
+                                        placeholder="Digite sua observação descritiva sobre o aluno..."
+                                        value={newObservation}
+                                        onChange={(e) => setNewObservation(e.target.value)}
+                                    />
+                                </div>
+
+                                {/* PDF Render Block */}
+                                <div className="hidden print:block whitespace-pre-wrap text-sm text-gray-800 mt-2">
+                                    {newObservation && `\n[Nova Observação não salva: ${newObservation}]`}
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                <textarea
+                                    className="w-full h-32 p-4 text-sm text-gray-800 outline-none resize-none bg-white placeholder-gray-300 print:hidden"
+                                    placeholder="Área de edição livre para coordenação (visão global)..."
+                                    value={soeConsiderations}
+                                    onChange={(e) => setSoeConsiderations(e.target.value)}
+                                />
+                                <div className="hidden print:block whitespace-pre-wrap text-[11px] leading-tight text-gray-800 p-4 min-h-[120px]">
+                                    {soeConsiderations || "Nenhuma consideração."}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Signature Lines */}

@@ -58,22 +58,46 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
         fetchData();
     }, []);
 
+    const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        const logo = localStorage.getItem('educontrol_school_logo');
+        if (logo) setSchoolLogoUrl(logo);
+    }, []);
+
     // -- GLOBAL FILTER STATE (DATE) --
-    // Default to last 30 days
+    // Default to last 30 days or ANUAL
+    const [selectedBimestre, setSelectedBimestre] = useState<string>('ANUAL');
     const [startDate, setStartDate] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
     const [endDate, setEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
 
-    // Update dates when academicYear changes to covering the whole year
+    // Update dates when academicYear or Bimestre changes
     useEffect(() => {
-        if (academicYear !== new Date().getFullYear()) {
-            setStartDate(`${academicYear}-01-01`);
-            setEndDate(`${academicYear}-12-31`);
+        if (selectedBimestre === 'ANUAL') {
+            if (academicYear !== new Date().getFullYear()) {
+                setStartDate(`${academicYear}-01-01`);
+                setEndDate(`${academicYear}-12-31`);
+            } else {
+                setStartDate(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
+                setEndDate(format(new Date(), 'yyyy-MM-dd'));
+            }
         } else {
-            // Default to last 30 days for current year
-            setStartDate(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
-            setEndDate(format(new Date(), 'yyyy-MM-dd'));
+            const year = academicYear;
+            if (selectedBimestre === '1') {
+                setStartDate(`${year}-01-01`);
+                setEndDate(`${year}-04-30`);
+            } else if (selectedBimestre === '2') {
+                setStartDate(`${year}-05-01`);
+                setEndDate(`${year}-06-30`);
+            } else if (selectedBimestre === '3') {
+                setStartDate(`${year}-07-01`);
+                setEndDate(`${year}-09-30`);
+            } else if (selectedBimestre === '4') {
+                setStartDate(`${year}-10-01`);
+                setEndDate(`${year}-12-31`);
+            }
         }
-    }, [academicYear]);
+    }, [academicYear, selectedBimestre]);
 
     // -- STUDENT REPORT STATE --
     // Filter State for Student Report
@@ -332,14 +356,14 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 scale: 2, // Higher scale for better quality
                 useCORS: true, // For images
                 logging: false,
-                backgroundColor: '#0f172a', // Match background color
+                backgroundColor: '#ffffff', // Match background color
                 allowTaint: true,
                 foreignObjectRendering: false,
                 onclone: (clonedDoc) => {
                     const clonedElement = clonedDoc.querySelector('.animate-in') as HTMLElement;
                     if (clonedElement) {
                         clonedElement.style.padding = '20px';
-                        clonedElement.style.background = '#0f172a';
+                        clonedElement.style.background = '#ffffff';
                     }
                 }
             });
@@ -375,22 +399,22 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
         <div className="flex flex-col gap-4 mb-6">
             {/* Top Row: Report Types */}
             <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-                <div className="flex bg-[#0f172a] rounded-lg p-1 border border-gray-700">
+                <div className="flex bg-white rounded-lg p-1 border border-gray-200">
                     <button
                         onClick={() => setReportType('STUDENT')}
-                        className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2 ${reportType === 'STUDENT' ? 'bg-emerald-500 text-[#0f172a]' : 'text-gray-400 hover:text-white'}`}
+                        className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2 ${reportType === 'STUDENT' ? 'bg-emerald-500 text-white' : 'text-gray-600 hover:text-gray-800'}`}
                     >
                         <GraduationCap size={14} /> Aluno
                     </button>
                     <button
                         onClick={() => setReportType('CLASS')}
-                        className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2 ${reportType === 'CLASS' ? 'bg-emerald-500 text-[#0f172a]' : 'text-gray-400 hover:text-white'}`}
+                        className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2 ${reportType === 'CLASS' ? 'bg-emerald-500 text-white' : 'text-gray-600 hover:text-gray-800'}`}
                     >
                         <Users size={14} /> Turma
                     </button>
                     <button
                         onClick={() => setReportType('COMPARE')}
-                        className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2 ${reportType === 'COMPARE' ? 'bg-emerald-500 text-[#0f172a]' : 'text-gray-400 hover:text-white'}`}
+                        className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2 ${reportType === 'COMPARE' ? 'bg-emerald-500 text-white' : 'text-gray-600 hover:text-gray-800'}`}
                     >
                         <BarChart2 size={14} /> Comparativo
                     </button>
@@ -399,7 +423,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 <div className="flex flex-wrap items-center gap-2">
                     <button
                         onClick={handleDownloadPDF}
-                        className="flex items-center gap-2 px-3 py-2 bg-[#1e293b] hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-bold border border-gray-600 transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-bold border border-gray-200 transition-colors"
                     >
                         <Download size={14} />
                         PDF
@@ -408,7 +432,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                     {reportType === 'STUDENT' && currentUserRole === UserRole.COORDINATOR && (
                         <button
                             onClick={handleSendEmail}
-                            className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg text-xs font-bold border border-emerald-500/30 transition-colors"
+                            className="flex items-center gap-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded-lg text-xs font-bold border border-emerald-200 transition-colors"
                         >
                             <Send size={14} />
                             Enviar P/ Pais
@@ -418,47 +442,65 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             </div>
 
             {/* Bottom Row: Filters (Date + Specifics) */}
-            <div className="bg-[#0f172a] p-3 rounded-lg border border-gray-800 flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2 border-r border-gray-700 pr-4 mr-2">
+            <div className="bg-white p-3 rounded-lg border border-gray-200 flex flex-wrap items-center gap-4 shadow-sm">
+                <div className="flex items-center gap-2 border-r border-gray-200 pr-4 mr-2">
                     <Filter size={16} className="text-emerald-500" />
-                    <span className="text-sm font-bold text-white uppercase">Filtros</span>
+                    <span className="text-sm font-bold text-gray-800 uppercase">Filtros</span>
                 </div>
 
                 {/* Academic Year Selector */}
-                <div className="flex flex-col border-r border-gray-700 pr-4 mr-2">
+                <div className="flex flex-col border-r border-gray-200 pr-4 mr-2">
                     <label className="text-[9px] font-bold text-gray-500 uppercase">Ano Letivo</label>
                     <select
                         value={academicYear}
                         onChange={(e) => setAcademicYear(parseInt(e.target.value))}
-                        className="bg-[#1e293b] text-white border border-gray-700 rounded p-1.5 text-xs outline-none focus:border-emerald-500 font-bold"
+                        className="bg-gray-50 text-gray-800 border border-gray-200 rounded p-1.5 text-xs outline-none focus:border-emerald-500 font-bold"
                     >
                         <option value={2026}>2026</option>
                     </select>
                 </div>
 
-                {/* Date Range Picker */}
-                <div className="flex items-center gap-2">
-                    <div className="flex flex-col">
-                        <label className="text-[9px] font-bold text-gray-500 uppercase">De</label>
-                        <input
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            className="bg-[#1e293b] text-white text-xs border border-gray-700 rounded p-1.5 outline-none focus:border-emerald-500"
-                        />
-                    </div>
-                    <div className="flex flex-col">
-                        <label className="text-[9px] font-bold text-gray-500 uppercase">Até</label>
-                        <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="bg-[#1e293b] text-white text-xs border border-gray-700 rounded p-1.5 outline-none focus:border-emerald-500"
-                        />
-                    </div>
+                {/* Quarter/Bimestre Selector */}
+                <div className="flex flex-col">
+                    <label className="text-[9px] font-bold text-gray-500 uppercase">Filtro de Período</label>
+                    <select
+                        value={selectedBimestre}
+                        onChange={(e) => setSelectedBimestre(e.target.value)}
+                        className="bg-gray-50 text-gray-800 text-xs border border-gray-200 rounded p-1.5 outline-none focus:border-emerald-500"
+                    >
+                        <option value="ANUAL">Personalizado / Anual</option>
+                        <option value="1">1º Bimestre</option>
+                        <option value="2">2º Bimestre</option>
+                        <option value="3">3º Bimestre</option>
+                        <option value="4">4º Bimestre</option>
+                    </select>
                 </div>
 
-                <div className="h-8 w-px bg-gray-700 mx-2 hidden md:block"></div>
+                {/* Fallback Date Range Picker for "ANUAL" custom filtering */}
+                {selectedBimestre === 'ANUAL' && (
+                    <div className="flex items-center gap-2">
+                        <div className="flex flex-col">
+                            <label className="text-[9px] font-bold text-gray-500 uppercase">De</label>
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="bg-gray-50 text-gray-800 text-xs border border-gray-200 rounded p-1.5 outline-none focus:border-emerald-500"
+                            />
+                        </div>
+                        <div className="flex flex-col">
+                            <label className="text-[9px] font-bold text-gray-500 uppercase">Até</label>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="bg-gray-50 text-gray-800 text-xs border border-gray-200 rounded p-1.5 outline-none focus:border-emerald-500"
+                            />
+                        </div>
+                    </div>
+                )}
+
+                <div className="h-8 w-px bg-gray-200 mx-2 hidden md:block"></div>
 
                 {/* Context Specific Filters */}
                 {reportType === 'STUDENT' && (
@@ -468,7 +510,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                             <select
                                 value={studentFilterClass}
                                 onChange={(e) => setStudentFilterClass(e.target.value)}
-                                className="bg-[#1e293b] text-white border border-gray-700 rounded p-1.5 text-xs outline-none focus:border-emerald-500 min-w-[120px]"
+                                className="bg-white text-gray-800 border border-gray-300 rounded p-1.5 text-xs outline-none focus:border-emerald-500 min-w-[120px]"
                             >
                                 <option value="">Todas as Turmas</option>
                                 {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
@@ -479,7 +521,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                             <select
                                 value={selectedStudentId}
                                 onChange={(e) => setSelectedStudentId(e.target.value)}
-                                className="bg-[#1e293b] text-white border border-gray-700 rounded p-1.5 text-xs outline-none focus:border-emerald-500 min-w-[200px]"
+                                className="bg-white text-gray-800 border border-gray-300 rounded p-1.5 text-xs outline-none focus:border-emerald-500 min-w-[200px]"
                             >
                                 <option value="" disabled>Selecione um aluno</option>
                                 {(studentFilterClass ? students.filter(s => s.className === studentFilterClass) : students).map(s => (
@@ -496,7 +538,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                         <select
                             value={selectedClassName}
                             onChange={(e) => setSelectedClassName(e.target.value)}
-                            className="bg-[#1e293b] text-white border border-gray-700 rounded p-1.5 text-xs outline-none focus:border-emerald-500 min-w-[150px]"
+                            className="bg-white text-gray-800 border border-gray-300 rounded p-1.5 text-xs outline-none focus:border-emerald-500 min-w-[150px]"
                         >
                             {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                         </select>
@@ -514,29 +556,29 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column: Profile & Summary */}
                 <div className="space-y-6">
-                    <div className="bg-[#0f172a] rounded-xl border border-gray-800 p-6 flex flex-col items-center text-center shadow-lg relative">
+                    <div className="bg-white rounded-xl border border-gray-200 p-6 flex flex-col items-center text-center shadow-lg relative break-inside-avoid">
                         <div className="w-24 h-24 rounded-full p-1 border-2 border-emerald-500 mb-3">
                             <img src={student.photoUrl} className="w-full h-full rounded-full object-cover" />
                         </div>
-                        <h2 className="text-xl font-bold text-white">{student.name}</h2>
-                        <p className="text-gray-400 text-sm mb-4">{student.className}</p>
+                        <h2 className="text-xl font-bold text-gray-800">{student.name}</h2>
+                        <p className="text-gray-500 text-sm mb-4">{student.className}</p>
 
                         <div className="grid grid-cols-2 gap-3 w-full mb-4">
-                            <div className="bg-[#1e293b] p-3 rounded-lg border border-gray-700">
+                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                                 <p className="text-[10px] text-gray-500 font-bold uppercase">Média Geral</p>
-                                <p className={`text-2xl font-bold ${Number(avgGrade) >= 7 ? 'text-emerald-400' : 'text-orange-400'}`}>{avgGrade}</p>
+                                <p className={`text-2xl font-bold ${Number(avgGrade) >= 7 ? 'text-emerald-500' : 'text-orange-500'}`}>{avgGrade}</p>
                             </div>
-                            <div className="bg-[#1e293b] p-3 rounded-lg border border-gray-700">
+                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                                 <p className="text-[10px] text-gray-500 font-bold uppercase">Total Aulas</p>
-                                <p className="text-2xl font-bold text-white">{totalClasses}</p>
+                                <p className="text-2xl font-bold text-gray-800">{totalClasses}</p>
                             </div>
                         </div>
                         <div className="text-[10px] text-gray-500">Período: {format(new Date(startDate), 'dd/MM')} a {format(new Date(endDate), 'dd/MM')}</div>
                     </div>
 
                     {/* Criteria Table Legend */}
-                    <div className="bg-[#0f172a] rounded-xl border border-gray-800 p-5 shadow-lg">
-                        <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-lg break-inside-avoid">
+                        <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
                             <AlertCircle size={16} className="text-emerald-500" /> Critérios de Avaliação
                         </h3>
                         <div className="space-y-3">
@@ -553,10 +595,10 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 {/* Right Column: Chart & History */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* Evolution Chart */}
-                    <div className="bg-[#0f172a] rounded-xl border border-gray-800 p-6 shadow-lg">
+                    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg break-inside-avoid">
                         <div className="flex justify-between items-center mb-6">
                             <div>
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                                     <TrendingUp className="text-emerald-500" size={20} />
                                     Evolução de Desempenho
                                 </h3>
@@ -567,14 +609,14 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                         <div className="h-72 w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                                    <XAxis dataKey="date" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} dy={10} />
-                                    <YAxis domain={[0, 10]} stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} dx={-10} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                    <XAxis dataKey="date" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} dy={10} />
+                                    <YAxis domain={[0, 10]} stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} dx={-10} />
                                     <Tooltip
-                                        contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#fff' }}
-                                        itemStyle={{ color: '#fff' }}
+                                        contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e5e7eb', color: '#1f2937' }}
+                                        itemStyle={{ color: '#1f2937' }}
                                         formatter={(value: number) => [value.toFixed(1), 'Nota']}
-                                        labelStyle={{ color: '#94a3b8', marginBottom: '0.5rem' }}
+                                        labelStyle={{ color: '#6b7280', marginBottom: '0.5rem' }}
                                     />
                                     <Legend wrapperStyle={{ paddingTop: '20px' }} />
                                     <Line
@@ -590,7 +632,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                         name="Média da Turma"
                                         type="monotone"
                                         dataKey="mediaTurma"
-                                        stroke="#475569"
+                                        stroke="#94a3b8"
                                         strokeWidth={2}
                                         strokeDasharray="5 5"
                                         dot={false}
@@ -601,22 +643,22 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                     </div>
 
                     {/* Detailed History Table */}
-                    <div className="bg-[#0f172a] rounded-xl border border-gray-800 p-6 shadow-lg">
-                        <h3 className="text-lg font-bold text-white mb-4">Histórico Detalhado</h3>
+                    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg break-inside-avoid">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4">Histórico Detalhado</h3>
                         <div className="overflow-x-auto -mx-6 px-6">
                             <div className="inline-block min-w-full align-middle">
-                                <div className="overflow-hidden">
+                                <div className="overflow-hidden border border-gray-200 rounded-lg">
                                     <table className="min-w-full text-left">
-                                        <thead className="bg-[#1e293b] text-xs font-bold text-gray-400 uppercase">
+                                        <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase border-b border-gray-200">
                                             <tr>
-                                                <th className="px-4 py-3 rounded-tl-lg sticky left-0 bg-[#1e293b] z-10">Data</th>
+                                                <th className="px-4 py-3 sticky left-0 bg-gray-50 z-10 border-r border-gray-200">Data</th>
                                                 <th className="px-4 py-3">Professor</th>
                                                 <th className="px-4 py-3">Presença</th>
                                                 <th className="px-4 py-3">Ocorrências (Deduções)</th>
                                                 <th className="px-4 py-3 text-right rounded-tr-lg">Nota Final</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-800 text-sm">
+                                        <tbody className="divide-y divide-gray-200 text-sm">
                                             {chartData.length === 0 && (
                                                 <tr><td colSpan={4} className="p-4 text-center text-gray-500">Nenhum registro encontrado neste período.</td></tr>
                                             )}
@@ -638,19 +680,19 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                                 }
 
                                                 return (
-                                                    <tr key={idx} className="hover:bg-[#1e293b]/50">
-                                                        <td className="px-4 py-3 text-gray-300">
+                                                    <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                                        <td className="px-4 py-3 text-gray-800 border-r border-gray-200">
                                                             <div>
                                                                 {format(new Date(d.fullDate), "dd 'de' MMMM", { locale: ptBR })}
-                                                                {d.blocksCount > 1 && <span className="ml-2 text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">{d.blocksCount} aulas</span>}
+                                                                {d.blocksCount > 1 && <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded font-bold border border-emerald-200">{d.blocksCount} aulas</span>}
                                                             </div>
                                                         </td>
-                                                        <td className="px-4 py-3 text-gray-400 text-xs">
+                                                        <td className="px-4 py-3 text-gray-600 text-xs">
                                                             {d.teacherName || '---'}
                                                         </td>
                                                         <td className="px-4 py-3">
                                                             {r.present
-                                                                ? <span className="text-emerald-500 font-bold flex items-center gap-1"><CheckCircle2 size={14} /> SIM</span>
+                                                                ? <span className="text-emerald-600 font-bold flex items-center gap-1"><CheckCircle2 size={14} /> SIM</span>
                                                                 : <span className="text-red-500 font-bold flex items-center gap-1"><AlertCircle size={14} /> NÃO</span>
                                                             }
                                                         </td>
@@ -658,17 +700,17 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                                             {deductions.length > 0 ? (
                                                                 <div className="flex flex-wrap gap-1">
                                                                     {deductions.map((ded, i) => (
-                                                                        <span key={i} className={`text-[10px] px-2 py-0.5 rounded border ${ded.includes('+') ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                                                                        <span key={i} className={`text-[10px] px-2 py-0.5 rounded border ${ded.includes('+') ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-red-50 text-red-500 border-red-200'}`}>
                                                                             {ded}
                                                                         </span>
                                                                     ))}
                                                                 </div>
                                                             ) : (
-                                                                <span className="text-gray-500 text-xs italic">Sem deduções</span>
+                                                                <span className="text-gray-400 text-xs italic">Sem deduções</span>
                                                             )}
                                                         </td>
                                                         <td className="px-4 py-3 text-right">
-                                                            <span className={`font-bold text-lg ${Number(d.aluno) >= 10 ? 'text-emerald-400' : Number(d.aluno) >= 6 ? 'text-white' : 'text-red-400'}`}>
+                                                            <span className={`font-bold text-lg ${Number(d.aluno) >= 10 ? 'text-emerald-500' : Number(d.aluno) >= 6 ? 'text-gray-800' : 'text-red-500'}`}>
                                                                 {d.aluno?.toFixed(1)}
                                                             </span>
                                                         </td>
@@ -693,29 +735,29 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Left Column: Summary */}
                 <div className="space-y-6">
-                    <div className="bg-[#0f172a] rounded-xl border border-gray-800 p-6 flex flex-col items-center text-center shadow-lg">
-                        <div className="w-20 h-20 bg-emerald-500/10 rounded-full flex items-center justify-center mb-3">
+                    <div className="bg-white rounded-xl border border-gray-200 p-6 flex flex-col items-center text-center shadow-lg break-inside-avoid">
+                        <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mb-3">
                             <Users size={32} className="text-emerald-500" />
                         </div>
-                        <h2 className="text-xl font-bold text-white">{selectedClassName}</h2>
-                        <p className="text-gray-400 text-sm mb-4">{totalSessions} aulas registradas</p>
+                        <h2 className="text-xl font-bold text-gray-800">{selectedClassName}</h2>
+                        <p className="text-gray-500 text-sm mb-4">{totalSessions} aulas registradas</p>
 
-                        <div className="w-full bg-[#1e293b] p-4 rounded-lg border border-gray-700">
+                        <div className="w-full bg-gray-50 p-4 rounded-lg border border-gray-200">
                             <p className="text-xs text-gray-500 font-bold uppercase mb-1">Média Geral da Turma</p>
-                            <p className={`text-3xl font-bold ${Number(globalAvg) >= 7 ? 'text-emerald-400' : 'text-orange-400'}`}>{globalAvg}</p>
+                            <p className={`text-3xl font-bold ${Number(globalAvg) >= 7 ? 'text-emerald-500' : 'text-orange-500'}`}>{globalAvg}</p>
                         </div>
                         <div className="mt-2 text-[10px] text-gray-500">Período: {format(new Date(startDate), 'dd/MM')} a {format(new Date(endDate), 'dd/MM')}</div>
                     </div>
 
                     {/* Performance Chart */}
-                    <div className="bg-[#0f172a] rounded-xl border border-gray-800 p-6 shadow-lg">
-                        <h3 className="text-sm font-bold text-white mb-4">Desempenho Diário</h3>
+                    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg break-inside-avoid">
+                        <h3 className="text-sm font-bold text-gray-800 mb-4">Desempenho Diário</h3>
                         <div className="h-48 w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={dailyAvgData}>
-                                    <XAxis dataKey="date" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                                    <YAxis domain={[0, 10]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} width={20} />
-                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', fontSize: '12px' }} />
+                                    <XAxis dataKey="date" stroke="#6b7280" fontSize={10} tickLine={false} axisLine={false} />
+                                    <YAxis domain={[0, 10]} stroke="#6b7280" fontSize={10} tickLine={false} axisLine={false} width={20} />
+                                    <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', fontSize: '12px', color: '#1f2937' }} itemStyle={{ color: '#1f2937' }} />
                                     <Line type="monotone" dataKey="avg" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
                                 </LineChart>
                             </ResponsiveContainer>
@@ -724,14 +766,14 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 </div>
 
                 {/* Right Column: Student List */}
-                <div className="lg:col-span-2 bg-[#0f172a] rounded-xl border border-gray-800 p-6 shadow-lg">
+                <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6 shadow-lg break-inside-avoid">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-white">Desempenho Individual</h3>
+                        <h3 className="text-lg font-bold text-gray-800">Desempenho Individual</h3>
                         <div className="text-[10px] text-gray-500 italic">Clique nos cabeçalhos para ordenar</div>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead className="bg-[#1e293b] text-[10px] font-bold text-gray-400 uppercase">
+                            <thead className="bg-gray-50 text-[10px] font-bold text-gray-500 uppercase border-b border-gray-200">
                                 <tr>
                                     <th className="px-2 py-3 rounded-tl-lg">Aluno</th>
                                     <SortableHeader label="Nota" sortKey="avg" currentSort={sortConfig} onSort={setSortConfig} />
@@ -745,32 +787,32 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                     <SortableHeader label="Part." sortKey="participation" currentSort={sortConfig} onSort={setSortConfig} rounded />
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-800 text-xs">
+                            <tbody className="divide-y divide-gray-200 text-xs">
                                 {studentPerformances.length === 0 ? (
                                     <tr><td colSpan={10} className="p-4 text-center text-gray-500">Sem dados neste período.</td></tr>
                                 ) : (
                                     studentPerformances.map((s, idx) => (
-                                        <tr key={s.id} className="hover:bg-[#1e293b]/50 transition-colors">
+                                        <tr key={s.id} className="hover:bg-gray-50 transition-colors">
                                             <td className="px-2 py-3 flex items-center gap-2 min-w-[150px]">
-                                                <span className="text-gray-600 text-[10px] w-4">{idx + 1}.</span>
+                                                <span className="text-gray-500 text-[10px] w-4">{idx + 1}.</span>
                                                 <img src={s.photoUrl} className="w-6 h-6 rounded-full" />
-                                                <span className="text-gray-200 font-medium truncate">{s.name}</span>
+                                                <span className="text-gray-800 font-medium truncate">{s.name}</span>
                                             </td>
                                             <td className="px-2 py-3">
-                                                <span className={`font-bold ${s.avg >= 7 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                <span className={`font-bold ${s.avg >= 7 ? 'text-emerald-500' : 'text-red-500'}`}>
                                                     {s.avg.toFixed(1)}
                                                 </span>
                                             </td>
                                             <td className="px-2 py-3">
-                                                <span className="text-gray-300">{s.attendance.toFixed(0)}%</span>
+                                                <span className="text-gray-800">{s.attendance.toFixed(0)}%</span>
                                             </td>
-                                            <td className={`px-2 py-3 ${s.talk < 0 ? 'text-red-400' : 'text-gray-500'}`}>{s.talk === 0 ? '0.0' : s.talk.toFixed(1)}</td>
-                                            <td className={`px-2 py-3 ${s.sleep < 0 ? 'text-red-400' : 'text-gray-500'}`}>{s.sleep === 0 ? '0.0' : s.sleep.toFixed(1)}</td>
-                                            <td className={`px-2 py-3 ${s.bathroom < 0 ? 'text-red-400' : 'text-gray-500'}`}>{s.bathroom === 0 ? '0.0' : s.bathroom.toFixed(1)}</td>
-                                            <td className={`px-2 py-3 ${s.material < 0 ? 'text-red-400' : 'text-gray-500'}`}>{s.material === 0 ? '0.0' : s.material.toFixed(1)}</td>
-                                            <td className={`px-2 py-3 ${s.activity < 0 ? 'text-red-400' : 'text-gray-500'}`}>{s.activity === 0 ? '0.0' : s.activity.toFixed(1)}</td>
-                                            <td className={`px-2 py-3 ${s.phone < 0 ? 'text-red-400' : 'text-gray-500'}`}>{s.phone === 0 ? '0.0' : s.phone.toFixed(1)}</td>
-                                            <td className={`px-2 py-3 ${s.participation > 0 ? 'text-emerald-400' : 'text-gray-500'}`}>{s.participation === 0 ? '0.0' : `+${s.participation.toFixed(1)}`}</td>
+                                            <td className={`px-2 py-3 ${s.talk < 0 ? 'text-red-500' : 'text-gray-500'}`}>{s.talk === 0 ? '0.0' : s.talk.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.sleep < 0 ? 'text-red-500' : 'text-gray-500'}`}>{s.sleep === 0 ? '0.0' : s.sleep.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.bathroom < 0 ? 'text-red-500' : 'text-gray-500'}`}>{s.bathroom === 0 ? '0.0' : s.bathroom.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.material < 0 ? 'text-red-500' : 'text-gray-500'}`}>{s.material === 0 ? '0.0' : s.material.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.activity < 0 ? 'text-red-500' : 'text-gray-500'}`}>{s.activity === 0 ? '0.0' : s.activity.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.phone < 0 ? 'text-red-500' : 'text-gray-500'}`}>{s.phone === 0 ? '0.0' : s.phone.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.participation > 0 ? 'text-emerald-500' : 'text-gray-500'}`}>{s.participation === 0 ? '0.0' : `+${s.participation.toFixed(1)}`}</td>
                                         </tr>
                                     ))
                                 )}
@@ -786,14 +828,14 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
         const data = getDetailedComparativeData();
 
         const renderMiniChart = (dataKey: string, title: string, color: string, unit: string = '') => (
-            <div className="bg-[#1e293b] rounded-lg border border-gray-700 p-4">
-                <h4 className="text-xs font-bold text-gray-400 uppercase mb-3">{title}</h4>
+            <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                <h4 className="text-xs font-bold text-gray-600 uppercase mb-3">{title}</h4>
                 <div className="h-40 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={data}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
-                            <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
-                            <Tooltip cursor={{ fill: '#0f172a' }} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', fontSize: '10px' }} formatter={(val: number) => val + unit} />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                            <XAxis dataKey="name" stroke="#6b7280" fontSize={10} tickLine={false} axisLine={false} />
+                            <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', fontSize: '10px', color: '#1f2937' }} itemStyle={{ color: '#1f2937' }} formatter={(val: number) => val + unit} />
                             <Bar dataKey={dataKey} fill={color} radius={[2, 2, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
@@ -805,35 +847,35 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             <div className="space-y-6">
                 {/* Main Overview */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-[#0f172a] rounded-xl border border-gray-800 p-6 shadow-lg">
+                    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg break-inside-avoid">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-bold text-white">Média Geral por Turma</h3>
-                            <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">Período Selecionado</span>
+                            <h3 className="text-lg font-bold text-gray-800">Média Geral por Turma</h3>
+                            <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">Período Selecionado</span>
                         </div>
                         <div className="h-64 w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={data}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                                    <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                                    <YAxis domain={[0, 10]} stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                                    <Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155' }} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                    <XAxis dataKey="name" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis domain={[0, 10]} stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
+                                    <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', color: '#1f2937' }} itemStyle={{ color: '#1f2937' }} />
                                     <Bar dataKey="avgGrade" name="Nota Média" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
-                    <div className="bg-[#0f172a] rounded-xl border border-gray-800 p-6 shadow-lg">
+                    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg break-inside-avoid">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-lg font-bold text-white">Taxa de Presença por Turma</h3>
-                            <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">Período Selecionado</span>
+                            <h3 className="text-lg font-bold text-gray-800">Taxa de Presença por Turma</h3>
+                            <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">Período Selecionado</span>
                         </div>
                         <div className="h-64 w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={data}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                                    <XAxis dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                                    <YAxis domain={[0, 100]} stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} />
-                                    <Tooltip cursor={{ fill: '#1e293b' }} contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155' }} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                    <XAxis dataKey="name" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
+                                    <YAxis domain={[0, 100]} stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
+                                    <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', color: '#1f2937' }} itemStyle={{ color: '#1f2937' }} />
                                     <Bar dataKey="attendance" name="Presença (%)" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
                                 </BarChart>
                             </ResponsiveContainer>
@@ -842,8 +884,8 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 </div>
 
                 {/* Criteria Breakdown */}
-                <div className="bg-[#0f172a] rounded-xl border border-gray-800 p-6 shadow-lg">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg break-inside-avoid">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                         <BarChart2 className="text-emerald-500" />
                         Comparativo por Critério (Média de Ocorrências/Aluno)
                     </h3>
@@ -881,7 +923,29 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                     </div>
                 </div>
             ) : (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-[210mm] mx-auto overflow-visible bg-white p-6 shadow-2xl print:shadow-none print:p-0">
+                    {/* Header Info for Report */}
+                    <div className="flex justify-between items-end border-b-2 border-emerald-800 pb-2 mb-6 gap-4">
+                        <div className="flex items-center gap-4">
+                            {schoolLogoUrl ? (
+                                <img src={schoolLogoUrl} alt="Logo" className="max-h-16 object-contain" />
+                            ) : (
+                                <div className="p-2 border border-emerald-200 bg-emerald-50 rounded-lg">
+                                    <GraduationCap className="text-emerald-500" size={32} />
+                                </div>
+                            )}
+                            <div>
+                                <h1 className="text-3xl font-bold uppercase text-emerald-900 tracking-tight">RELATÓRIO ACADÊMICO</h1>
+                                <p className="text-sm text-gray-800 font-bold mt-1">
+                                    {reportType === 'STUDENT' ? 'Desempenho Individual' : reportType === 'CLASS' ? 'Desempenho de Turma' : 'Comparativo'} / {academicYear}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="text-right hidden sm:block">
+                            <p className="font-bold text-gray-800 text-xs mt-2">EduControl PRO</p>
+                        </div>
+                    </div>
+
                     {reportType === 'STUDENT' && renderStudentReport()}
                     {reportType === 'CLASS' && renderClassReport()}
                     {reportType === 'COMPARE' && renderComparativeReport()}

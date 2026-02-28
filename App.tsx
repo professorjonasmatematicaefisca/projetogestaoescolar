@@ -6,7 +6,7 @@ import { Dashboard } from './Dashboard';
 import { StudentReport } from './StudentReport';
 import { Occurrences } from './Occurrences';
 import { AdminPanel } from './AdminPanel';
-import { ChangePassword } from './ChangePassword';
+import { Settings as SettingsView } from './Settings';
 import { FOA } from './FOA';
 import { Planning } from './Planning';
 import { StudyGuide } from './StudyGuide';
@@ -146,7 +146,7 @@ function App() {
       case 'ADMIN': return <AdminPanel onShowToast={showToast} />;
       case 'REQUESTS': return <RequestsPanel onShowToast={showToast} userEmail={userEmail} userRole={userRole!} />;
       case 'MESSAGES': return <Comunicados onShowToast={showToast} userEmail={userEmail} userName={userName} userRole={userRole!} />;
-      case 'SETTINGS': return <ChangePassword userEmail={userEmail} onShowToast={showToast} />;
+      case 'SETTINGS': return <SettingsView userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
       default: return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole!} />;
     }
   };
