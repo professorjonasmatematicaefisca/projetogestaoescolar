@@ -540,7 +540,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                             <AlertCircle size={16} className="text-emerald-500" /> Critérios de Avaliação
                         </h3>
                         <div className="space-y-3">
-                            <CriteriaRow label="Banheiro" desc="-1,0 por saída" val="Sem teto" />
+                            <CriteriaRow label="Banheiro" desc="-2,0 por saída" val="Sem teto" />
                             <CriteriaRow label="Dormir" desc="-2,0 por ocorrência" val="Sem teto" />
                             <CriteriaRow label="Material" desc="Sem material (Sim/Não)" val="-0,5" />
                             <CriteriaRow label="Tarefas" desc="Não fez (Sim/Não)" val="-0,5" />
@@ -628,7 +628,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                                     deductions.push(r.justifiedAbsence ? "Falta Justificada (Nota 5.0)" : "Falta (Nota 0.0)");
                                                 } else {
                                                     if (r.counters.talk > 0) deductions.push(`${r.counters.talk}x Conversa (-${r.counters.talk * 2})`);
-                                                    if (r.counters.bathroom > 0) deductions.push(`${r.counters.bathroom}x Banheiro (-${(r.counters.bathroom * 1.0).toFixed(1)})`);
+                                                    if (r.counters.bathroom > 0) deductions.push(`${r.counters.bathroom}x Banheiro (-${(r.counters.bathroom * 2.0).toFixed(1)})`);
                                                     if (r.counters.sleep > 0) deductions.push(`${r.counters.sleep}x Sono (-${r.counters.sleep * 2})`);
                                                     if (r.counters.material === 0) deductions.push(`Sem Material (-0.5)`);
                                                     if (r.counters.homework === 0) deductions.push(`Sem Tarefa (-0.5)`);

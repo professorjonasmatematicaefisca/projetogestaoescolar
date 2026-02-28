@@ -18,6 +18,8 @@ interface ClassroomMonitorProps {
     userRole?: UserRole;
 }
 
+const normalize = (s: string) => s.replace(/[º°]/g, 'o').trim().toLowerCase();
+
 const MORNING_BLOCKS = [
     '07h00 - 07h45',
     '07h45 - 08h30',
@@ -504,7 +506,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             if (result.success) {
                 // Mark modules as used in the database for the SPECIFIC CLASS
                 if (selectedContentIds.length > 0) {
-                    const classObj = allClasses.find(c => c.name === selectedClassId);
+                    const classObj = allClasses.find(c => normalize(c.name) === normalize(selectedClassId));
                     if (classObj) {
                         await SupabaseService.markModulesAsUsed(selectedContentIds, classObj.id);
                         // Reload modules so they disappear from the list immediately
@@ -605,7 +607,6 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         const confirmed = window.confirm(`Tem certeza que deseja EXCLUIR o registro de ${format(new Date(sess.date), "dd/MM/yyyy")} — ${sess.className} (${sess.subject})?\n\nEsta ação não pode ser desfeita.`);
         if (!confirmed) return;
 
-        const normalize = (s: string) => s.replace(/[º°]/g, 'o').trim().toLowerCase();
         const classObj = allClasses.find(c => normalize(c.name) === normalize(sess.className));
         const success = await SupabaseService.deleteSession(sess.id, classObj?.id);
         if (success) {
@@ -810,8 +811,6 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         return false;
     };
 
-    if (!session) return <div className="text-white p-6">Carregando dados... Certifique-se de que há turmas e alunos cadastrados.</div>;
-
     return (
         <>
             <div className="max-w-[1600px] mx-auto space-y-6 pb-48 lg:pb-24">
@@ -910,7 +909,14 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 </div>
 
                 {/* Grid of Students (unchanged logic, just rendering) */}
-                {filteredStudents.length === 0 ? (
+                {!session ? (
+                    <div className="flex items-center justify-center p-12 bg-[#0f172a] rounded-xl border border-gray-800 border-dashed">
+                        <div className="text-center">
+                            <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                            <p className="text-gray-400">Carregando dados da aula...</p>
+                        </div>
+                    </div>
+                ) : filteredStudents.length === 0 ? (
                     <div className="text-center p-12 bg-[#0f172a] rounded-xl border border-gray-800 border-dashed">
                         <p className="text-gray-400">
                             {selectedClassId ? 'Nenhum aluno encontrado nesta turma.' : 'Selecione uma turma para carregar os alunos.'}
@@ -1125,8 +1131,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                             );
                         })}
                     </div >
-                )
-                }
+                )}
 
                 <div className="flex flex-wrap gap-2 w-full md:w-auto justify-center sm:justify-end">
                     {/* New Class Register Button */}
