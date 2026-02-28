@@ -489,11 +489,12 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 }
             }
 
-            const updatedSession = {
+            const updatedSession: ClassSession = {
                 ...session,
                 generalNotes: contentStr,
                 homework: classHomework,
-                photos: classPhotos
+                photos: classPhotos,
+                moduleIds: selectedContentIds
             };
             setSession(updatedSession);
             const success = await SupabaseService.saveSession(updatedSession, userEmail);
@@ -741,10 +742,11 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             const compositeBlock = selectedBlocks.length > 1
                 ? `${selectedBlocks[0].split(' - ')[0]} - ${selectedBlocks[selectedBlocks.length - 1].split(' - ')[1]}`
                 : selectedBlocks[0];
-            const updatedSession = {
+            const updatedSession: ClassSession = {
                 ...session,
                 block: compositeBlock,
-                blocksCount: selectedBlocks.length
+                blocksCount: selectedBlocks.length,
+                moduleIds: session.moduleIds // Keep existing if any, or we could try to sync with selectedContentIds if it was active
             };
 
             const success = await SupabaseService.saveSession(updatedSession, userEmail);

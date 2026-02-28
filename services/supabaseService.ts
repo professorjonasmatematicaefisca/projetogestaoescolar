@@ -630,7 +630,8 @@ export const SupabaseService = {
             blocks_count: blocksCount || 1,
             general_notes: generalNotes,
             homework,
-            photos
+            photos,
+            module_ids: session.moduleIds || []
         };
 
         let sessionId: string;
@@ -700,7 +701,40 @@ export const SupabaseService = {
     },
 
     async deleteSession(sessionId: string): Promise<boolean> {
-        // Delete session records first (FK constraint)
+        // 1. Fetch session to get moduleIds and class_name
+        const { data: sessionData, error: fetchError } = await supabase
+            .from('sessions')
+            .select('module_ids, class_name')
+            .eq('id', sessionId)
+            .single();
+
+        if (fetchError) {
+            console.error("Error fetching session for deletion:", fetchError);
+            // We proceed anyway to try and delete the session itself
+        }
+
+        // 2. Restore modules if they exist
+        if (sessionData?.module_ids && sessionData.module_ids.length > 0) {
+            const { data: classData } = await supabase
+                .from('classes')
+                .select('id')
+                .eq('name', sessionData.class_name)
+                .single();
+
+            if (classData) {
+                const { error: usageError } = await supabase
+                    .from('planning_usage')
+                    .delete()
+                    .eq('class_id', classData.id)
+                    .in('module_id', sessionData.module_ids);
+
+                if (usageError) {
+                    console.error("Error restoring planning modules:", usageError);
+                }
+            }
+        }
+
+        // 3. Delete session records (FK constraint)
         const { error: recError } = await supabase
             .from('session_records')
             .delete()
@@ -709,6 +743,8 @@ export const SupabaseService = {
             console.error("Error deleting session records:", recError);
             return false;
         }
+
+        // 4. Delete session
         const { error } = await supabase
             .from('sessions')
             .delete()
@@ -747,6 +783,7 @@ export const SupabaseService = {
             generalNotes: s.general_notes,
             homework: s.homework,
             photos: s.photos,
+            moduleIds: s.module_ids,
             records: s.session_records.map((r: any) => ({
                 studentId: r.student_id,
                 present: r.present,

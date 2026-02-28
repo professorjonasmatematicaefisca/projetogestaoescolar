@@ -92,6 +92,7 @@ export interface ClassSession {
   generalNotes?: string;
   homework?: string;
   photos?: string[]; // URLs (Class generic photos)
+  moduleIds?: string[]; // IDs of planning modules used in this session
 }
 
 export enum OccurrenceStatus {
