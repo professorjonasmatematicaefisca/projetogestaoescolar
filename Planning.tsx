@@ -116,6 +116,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
             if (userRole === UserRole.TEACHER) {
                 filteredMods = sortedMods.filter(m => {
                     const isMyModule = m.teacherId === currentTeacher?.id;
+                    const isInstitutional = !m.teacherId;
                     const matchesAssignment = actualAssignments.some(assign => {
                         const matchClass = allClasses.find(c => c.id === assign.classId || c.name === assign.classId);
                         const classMatch = matchClass ? m.classId === matchClass.id : m.classId === assign.classId;
@@ -123,9 +124,8 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                         const discMatch = matchDisc ? m.disciplineId === matchDisc.id : m.disciplineId === assign.subject;
                         return classMatch && discMatch;
                     });
-                    // Only see modules you own OR if you have assignments for them
-                    // Since privacy is highly demanded: only modules I own AND in my assignments.
-                    return isMyModule && matchesAssignment;
+                    // Show modules the teacher created OR institutional modules (no teacher), as long as they match the teacher's assignments
+                    return (isMyModule || isInstitutional) && matchesAssignment;
                 });
             }
             setModules(filteredMods);
