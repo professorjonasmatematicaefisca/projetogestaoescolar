@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { StorageService } from './services/storageService';
+import { SupabaseService } from './services/supabaseService';
 import { Lock, Save, ImageIcon, Upload, Trash2 } from 'lucide-react';
 import { UserRole } from './types';
 
@@ -18,10 +19,19 @@ export const Settings: React.FC<SettingsProps> = ({ userEmail, userRole, onShowT
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        const savedLogo = localStorage.getItem('educontrol_school_logo');
-        if (savedLogo) {
-            setLogoUrl(savedLogo);
-        }
+        const loadLogo = async () => {
+            // Check local first for speed
+            const cachedLogo = localStorage.getItem('educontrol_school_logo');
+            if (cachedLogo) setLogoUrl(cachedLogo);
+
+            // Sync with Supabase
+            const dbLogo = await SupabaseService.getSetting('school_logo');
+            if (dbLogo && dbLogo !== cachedLogo) {
+                setLogoUrl(dbLogo);
+                localStorage.setItem('educontrol_school_logo', dbLogo);
+            }
+        };
+        loadLogo();
     }, []);
 
     const handleChangePassword = (e: React.FormEvent) => {
@@ -66,15 +76,21 @@ export const Settings: React.FC<SettingsProps> = ({ userEmail, userRole, onShowT
         }
     };
 
-    const handleSaveLogo = () => {
+    const handleSaveLogo = async () => {
         localStorage.setItem('educontrol_school_logo', logoUrl);
-        onShowToast("Logomarca escolar salva com sucesso!");
+        const success = await SupabaseService.updateSetting('school_logo', logoUrl);
+        if (success) {
+            onShowToast("Logomarca escolar salva globalmente!");
+        } else {
+            onShowToast("Logomarca salva localmente (erro ao sincronizar).");
+        }
     };
 
-    const handleRemoveLogo = () => {
+    const handleRemoveLogo = async () => {
         localStorage.removeItem('educontrol_school_logo');
+        await SupabaseService.updateSetting('school_logo', '');
         setLogoUrl('');
-        onShowToast("Logomarca removida.");
+        onShowToast("Logomarca removida globalmente.");
     };
 
     return (

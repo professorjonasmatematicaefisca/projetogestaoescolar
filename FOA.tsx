@@ -69,8 +69,15 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
         const fetchData = async () => {
             setLoading(true);
             try {
-                const logo = localStorage.getItem('educontrol_school_logo');
-                if (logo) setSchoolLogoUrl(logo);
+                // Sync Logo
+                const cachedLogo = localStorage.getItem('educontrol_school_logo');
+                if (cachedLogo) setSchoolLogoUrl(cachedLogo);
+
+                const dbLogo = await SupabaseService.getSetting('school_logo');
+                if (dbLogo && dbLogo !== cachedLogo) {
+                    setSchoolLogoUrl(dbLogo);
+                    localStorage.setItem('educontrol_school_logo', dbLogo);
+                }
 
                 const [sc, ss, sl, st, so] = await Promise.all([
                     SupabaseService.getClasses(),

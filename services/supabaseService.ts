@@ -1500,5 +1500,32 @@ export const SupabaseService = {
             return false;
         }
         return true;
+    },
+
+    // --- SETTINGS ---
+    async getSetting(key: string): Promise<string | null> {
+        const { data, error } = await supabase
+            .from('settings')
+            .select('value')
+            .eq('key', key)
+            .maybeSingle();
+
+        if (error) {
+            console.error(`Error fetching setting ${key}:`, error);
+            return null;
+        }
+        return data?.value || null;
+    },
+
+    async updateSetting(key: string, value: string): Promise<boolean> {
+        const { error } = await supabase
+            .from('settings')
+            .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+
+        if (error) {
+            console.error(`Error updating setting ${key}:`, error);
+            return false;
+        }
+        return true;
     }
 };

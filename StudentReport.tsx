@@ -61,8 +61,17 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
     const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
 
     useEffect(() => {
-        const logo = localStorage.getItem('educontrol_school_logo');
-        if (logo) setSchoolLogoUrl(logo);
+        const loadLogo = async () => {
+            const cachedLogo = localStorage.getItem('educontrol_school_logo');
+            if (cachedLogo) setSchoolLogoUrl(cachedLogo);
+
+            const dbLogo = await SupabaseService.getSetting('school_logo');
+            if (dbLogo && dbLogo !== cachedLogo) {
+                setSchoolLogoUrl(dbLogo);
+                localStorage.setItem('educontrol_school_logo', dbLogo);
+            }
+        };
+        loadLogo();
     }, []);
 
     // -- GLOBAL FILTER STATE (DATE) --
@@ -232,6 +241,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             let sumActivity = 0;
             let sumPhone = 0;
             let sumParticipation = 0;
+            let sumHomework = 0;
 
             classSessions.forEach(cs => {
                 const rec = cs.records.find(r => r.studentId === s.id);
@@ -247,6 +257,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                         sumBathroom += rec.counters.bathroom;
                         sumMaterial += rec.counters.material;
                         sumActivity += rec.counters.activity;
+                        sumHomework += (rec.counters.homework || 0);
                         sumPhone += (rec.phoneConfiscated ? 1 : 0);
                         sumParticipation += (rec.counters.participation || 0);
                     }
@@ -261,11 +272,12 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 avg: parseFloat(avg),
                 attendance: attendance,
                 // Show as deductions/bonuses
-                talk: count ? -((sumTalk / count) * 2.0) : 0,
-                sleep: count ? -((sumSleep / count) * 2.0) : 0,
-                bathroom: count ? -((sumBathroom / count) * 2.0) : 0,
-                material: count ? -(((count - sumMaterial) / count) * 0.5) : 0,
-                activity: count ? -(((count * 3 - sumActivity) / count) * 0.5) : 0,
+                talk: count ? -((sumTalk / count) * 2.5) : 0,
+                sleep: count ? -((sumSleep / count) * 2.5) : 0,
+                bathroom: count ? -((sumBathroom / count) * 2.5) : 0,
+                material: count ? -(((count - sumMaterial) / count) * 1.5) : 0,
+                homework: count ? -(((count - sumHomework) / count) * 2.5) : 0,
+                activity: count ? -(((count * 3 - sumActivity) / count) * 2.0) : 0,
                 phone: count ? -((sumPhone / count) * 5.0) : 0,
                 participation: count ? ((sumParticipation / count) * 0.5) : 0
             };
@@ -396,7 +408,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
     // --- RENDERERS ---
 
     const renderHeader = () => (
-        <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-col gap-4 mb-6 print:hidden">
             {/* Top Row: Report Types */}
             <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                 <div className="flex bg-white rounded-lg p-1 border border-gray-200">
@@ -554,19 +566,6 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
 
         return (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Header with Logo for Print/Report view */}
-                <div className="col-span-1 lg:col-span-3 mb-4 border-b-2 border-emerald-500 pb-2 flex justify-between items-end">
-                    <div className="flex items-center gap-4">
-                        {schoolLogoUrl && <img src={schoolLogoUrl} alt="School Logo" className="max-h-16 object-contain" />}
-                        <div>
-                            <h2 className="text-2xl font-bold text-emerald-900 uppercase">Relatório de Desempenho do Aluno</h2>
-                            <p className="text-sm text-gray-600 font-bold uppercase">{student.name} - {student.className}</p>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-xl font-bold text-gray-400">{academicYear}</p>
-                    </div>
-                </div>
                 {/* Left Column: Profile & Summary */}
                 <div className="space-y-6">
                     <div className="bg-white rounded-xl border border-gray-200 p-6 flex flex-col items-center text-center shadow-lg relative break-inside-avoid">
@@ -595,11 +594,11 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                             <AlertCircle size={16} className="text-emerald-500" /> Critérios de Avaliação
                         </h3>
                         <div className="space-y-3">
-                            <CriteriaRow label="Banheiro" desc="-2,0 por saída" val="Sem teto" />
-                            <CriteriaRow label="Dormir" desc="-2,0 por ocorrência" val="Sem teto" />
-                            <CriteriaRow label="Material" desc="Sem material (Sim/Não)" val="-0,5" />
-                            <CriteriaRow label="Tarefas" desc="Não fez (Sim/Não)" val="-0,5" />
-                            <CriteriaRow label="Atividade" desc="-0,5 por nível perdido (0-3)" val="até -1,5" />
+                            <CriteriaRow label="Banheiro" desc="-2,5 por saída" val="Sem teto" />
+                            <CriteriaRow label="Dormir" desc="-2,5 por ocorrência" val="Sem teto" />
+                            <CriteriaRow label="Material" desc="Sem material (Sim/Não)" val="-1,5" />
+                            <CriteriaRow label="Tarefas" desc="Não fez (Sim/Não)" val="-2,5" />
+                            <CriteriaRow label="Atividade" desc="-2,0 por nível perdido (0-3)" val="até -6,0" />
                             <CriteriaRow label="Celular" desc="Uso não autorizado" val="-5,0" />
                         </div>
                     </div>
@@ -682,12 +681,12 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                                 if (!r.present) {
                                                     deductions.push(r.justifiedAbsence ? "Falta Justificada (Nota 5.0)" : "Falta (Nota 0.0)");
                                                 } else {
-                                                    if (r.counters.talk > 0) deductions.push(`${r.counters.talk}x Conversa (-${r.counters.talk * 2})`);
-                                                    if (r.counters.bathroom > 0) deductions.push(`${r.counters.bathroom}x Banheiro (-${(r.counters.bathroom * 2.0).toFixed(1)})`);
-                                                    if (r.counters.sleep > 0) deductions.push(`${r.counters.sleep}x Sono (-${r.counters.sleep * 2})`);
-                                                    if (r.counters.material === 0) deductions.push(`Sem Material (-0.5)`);
-                                                    if (r.counters.homework === 0) deductions.push(`Sem Tarefa (-0.5)`);
-                                                    if (r.counters.activity < 3) deductions.push(`Ativ. Incompleta (-${((3 - r.counters.activity) * 0.5).toFixed(1)})`);
+                                                    if (r.counters.talk > 0) deductions.push(`${r.counters.talk}x Conversa (-${(r.counters.talk * 2.5).toFixed(1)})`);
+                                                    if (r.counters.bathroom > 0) deductions.push(`${r.counters.bathroom}x Banheiro (-${(r.counters.bathroom * 2.5).toFixed(1)})`);
+                                                    if (r.counters.sleep > 0) deductions.push(`${r.counters.sleep}x Sono (-${(r.counters.sleep * 2.5).toFixed(1)})`);
+                                                    if (r.counters.material === 0) deductions.push(`Sem Material (-1.5)`);
+                                                    if (r.counters.homework === 0) deductions.push(`Sem Tarefa (-2.5)`);
+                                                    if (r.counters.activity < 3) deductions.push(`Ativ. Incompleta (-${((3 - r.counters.activity) * 2.0).toFixed(1)})`);
                                                     if (r.phoneConfiscated) deductions.push(`Celular (-5.0)`);
                                                     if (r.counters.participation > 0) deductions.push(`Participação (+${(r.counters.participation * 0.5).toFixed(1)})`);
                                                 }
@@ -746,19 +745,6 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
 
         return (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Header with Logo for Print/Report view */}
-                <div className="col-span-1 lg:col-span-3 mb-4 border-b-2 border-emerald-500 pb-2 flex justify-between items-end">
-                    <div className="flex items-center gap-4">
-                        {schoolLogoUrl && <img src={schoolLogoUrl} alt="School Logo" className="max-h-16 object-contain" />}
-                        <div>
-                            <h2 className="text-2xl font-bold text-emerald-900 uppercase">Relatório Analítico de Turma</h2>
-                            <p className="text-sm text-gray-600 font-bold uppercase">Turma: {selectedClassName}</p>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-xl font-bold text-gray-400">{academicYear}</p>
-                    </div>
-                </div>
                 {/* Left Column: Summary */}
                 <div className="space-y-6">
                     <div className="bg-white rounded-xl border border-gray-200 p-6 flex flex-col items-center text-center shadow-lg break-inside-avoid">
@@ -808,6 +794,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                     <SortableHeader label="Sono" sortKey="sleep" currentSort={sortConfig} onSort={setSortConfig} />
                                     <SortableHeader label="Banh." sortKey="bathroom" currentSort={sortConfig} onSort={setSortConfig} />
                                     <SortableHeader label="Mat." sortKey="material" currentSort={sortConfig} onSort={setSortConfig} />
+                                    <SortableHeader label="Tare." sortKey="homework" currentSort={sortConfig} onSort={setSortConfig} />
                                     <SortableHeader label="Ativ." sortKey="activity" currentSort={sortConfig} onSort={setSortConfig} />
                                     <SortableHeader label="Cel." sortKey="phone" currentSort={sortConfig} onSort={setSortConfig} />
                                     <SortableHeader label="Part." sortKey="participation" currentSort={sortConfig} onSort={setSortConfig} rounded />
@@ -836,6 +823,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                             <td className={`px-2 py-3 ${s.sleep < 0 ? 'text-red-500' : 'text-gray-500'}`}>{s.sleep === 0 ? '0.0' : s.sleep.toFixed(1)}</td>
                                             <td className={`px-2 py-3 ${s.bathroom < 0 ? 'text-red-500' : 'text-gray-500'}`}>{s.bathroom === 0 ? '0.0' : s.bathroom.toFixed(1)}</td>
                                             <td className={`px-2 py-3 ${s.material < 0 ? 'text-red-500' : 'text-gray-500'}`}>{s.material === 0 ? '0.0' : s.material.toFixed(1)}</td>
+                                            <td className={`px-2 py-3 ${s.homework < 0 ? 'text-red-500' : 'text-gray-500'}`}>{s.homework === 0 ? '0.0' : s.homework.toFixed(1)}</td>
                                             <td className={`px-2 py-3 ${s.activity < 0 ? 'text-red-500' : 'text-gray-500'}`}>{s.activity === 0 ? '0.0' : s.activity.toFixed(1)}</td>
                                             <td className={`px-2 py-3 ${s.phone < 0 ? 'text-red-500' : 'text-gray-500'}`}>{s.phone === 0 ? '0.0' : s.phone.toFixed(1)}</td>
                                             <td className={`px-2 py-3 ${s.participation > 0 ? 'text-emerald-500' : 'text-gray-500'}`}>{s.participation === 0 ? '0.0' : `+${s.participation.toFixed(1)}`}</td>
@@ -961,9 +949,17 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                 </div>
                             )}
                             <div>
-                                <h1 className="text-3xl font-bold uppercase text-emerald-900 tracking-tight">RELATÓRIO ACADÊMICO</h1>
-                                <p className="text-sm text-gray-800 font-bold mt-1">
-                                    {reportType === 'STUDENT' ? 'Desempenho Individual' : reportType === 'CLASS' ? 'Desempenho de Turma' : 'Comparativo'} / {academicYear}
+                                <h1 className="text-2xl font-bold uppercase text-emerald-900 tracking-tight">RELATÓRIO DE DESEMPENHO</h1>
+                                <p className="text-xs text-gray-800 font-bold mt-1">
+                                    {reportType === 'STUDENT' ? (
+                                        <>
+                                            Aluno: <span className="text-emerald-700">{students.find(s => s.id === selectedStudentId)?.name || '---'}</span>
+                                        </>
+                                    ) : reportType === 'CLASS' ? (
+                                        <>
+                                            Turma: <span className="text-emerald-700">{selectedClassName}</span>
+                                        </>
+                                    ) : 'Comparativo Geral'} / {academicYear}
                                 </p>
                             </div>
                         </div>

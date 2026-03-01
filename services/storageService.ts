@@ -144,30 +144,30 @@ export const StorageService = {
     let grade = 10.0;
 
     // 2. Deductions
-    // Conversa (Talk): -2.0 per occurrence
-    grade -= (record.counters.talk * 2.0);
+    // Conversa (Talk): -2.5 per occurrence
+    grade -= (record.counters.talk * 2.5);
 
-    // Dormir (Sleep): -2.0 per occurrence
-    grade -= (record.counters.sleep * 2.0);
+    // Dormir (Sleep): -2.5 per occurrence
+    grade -= (record.counters.sleep * 2.5);
 
-    // Material: If 0 (missing), deduct 0.5
+    // Material: If 0 (missing), deduct 1.5
     if (record.counters.material === 0) {
-      grade -= 0.5;
+      grade -= 1.5;
     }
 
-    // Atividade (Activity): Starts at 3. Deduct 0.5 per tick lost.
+    // Atividade (Activity): Starts at 3. Deduct 2.0 per tick lost.
     const lostActivityLevels = 3 - record.counters.activity;
     if (lostActivityLevels > 0) {
-      grade -= (lostActivityLevels * 0.5);
+      grade -= (lostActivityLevels * 2.0);
     }
 
-    // Tarefas (Homework): If 0 (missing), deduct 0.5
+    // Tarefas (Homework): If 0 (missing), deduct 2.5
     if (record.counters.homework === 0) {
-      grade -= 0.5;
+      grade -= 2.5;
     }
 
-    // Banheiro (Bathroom): -2.0 per occurrence
-    grade -= (record.counters.bathroom * 2.0);
+    // Banheiro (Bathroom): -2.5 per occurrence
+    grade -= (record.counters.bathroom * 2.5);
 
     // Celular (Phone): If SIM (true), deduct 5.0
     if (record.phoneConfiscated) {
