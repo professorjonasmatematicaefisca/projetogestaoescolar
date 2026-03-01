@@ -10,20 +10,39 @@ export class PDFService {
     static async generateFOAPDF(data: any) {
         const doc = new jsPDF();
         const { studentName, className, bimestre, year, rows, observations } = data;
+        let { schoolLogoUrl } = data;
+
+        if (!schoolLogoUrl) {
+            schoolLogoUrl = localStorage.getItem('educontrol_school_logo');
+        }
 
         // Header - Green Palette
         doc.setFillColor(34, 197, 94); // emerald-500
         doc.rect(0, 0, 210, 40, 'F');
 
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(22);
-        doc.setFont("helvetica", "bold");
-        doc.text("EduControl PRO", 20, 18);
+        if (schoolLogoUrl) {
+            try {
+                // We add the image to the PDF.
+                doc.addImage(schoolLogoUrl, 'PNG', 15, 5, 30, 30, undefined, 'FAST');
+            } catch (e) {
+                console.error("Error adding logo to PDF", e);
+                doc.setFontSize(22);
+                doc.setFont("helvetica", "bold");
+                doc.text("EduControl PRO", 20, 18);
+            }
+        } else {
+            doc.setFontSize(22);
+            doc.setFont("helvetica", "bold");
+            doc.text("EduControl PRO", 20, 18);
+        }
+
+        const titleX = schoolLogoUrl ? 50 : 20;
 
         doc.setFontSize(14);
-        doc.text("FICHA DE OBSERVAÇÃO DO ALUNO (FOA)", 20, 28);
+        doc.text("FICHA DE OBSERVAÇÃO DO ALUNO (FOA)", titleX, 28);
         doc.setFontSize(10);
-        doc.text(`${bimestre}º Bimestre - Ano Letivo ${year || new Date().getFullYear()}`, 20, 35);
+        doc.text(`${bimestre}º Bimestre - Ano Letivo ${year || new Date().getFullYear()}`, titleX, 35);
 
         // Content
         doc.setTextColor(31, 41, 55);
@@ -202,15 +221,31 @@ export class PDFService {
     static async generateStudentReportPDF(data: any) {
         const doc = new jsPDF();
         const { studentName, className, avgGrade, totalClasses, chartData } = data;
+        let { schoolLogoUrl } = data;
+
+        if (!schoolLogoUrl) {
+            schoolLogoUrl = localStorage.getItem('educontrol_school_logo');
+        }
 
         // Header - Blue Palette
         doc.setFillColor(59, 130, 246); // blue-500
         doc.rect(0, 0, 210, 40, 'F');
 
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(22);
-        doc.setFont("helvetica", "bold");
-        doc.text("EduControl PRO", 105, 15, { align: "center" });
+        if (schoolLogoUrl) {
+            try {
+                doc.addImage(schoolLogoUrl, 'PNG', 15, 5, 30, 30, undefined, 'FAST');
+            } catch (e) {
+                console.error("Error adding logo to PDF", e);
+                doc.setFontSize(22);
+                doc.setFont("helvetica", "bold");
+                doc.text("EduControl PRO", 105, 15, { align: "center" });
+            }
+        } else {
+            doc.setFontSize(22);
+            doc.setFont("helvetica", "bold");
+            doc.text("EduControl PRO", 105, 15, { align: "center" });
+        }
 
         doc.setFontSize(14);
         doc.text("RELATÓRIO INDIVIDUAL DO ALUNO", 105, 25, { align: "center" });

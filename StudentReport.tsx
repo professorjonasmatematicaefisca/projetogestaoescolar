@@ -949,17 +949,13 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                 </div>
                             )}
                             <div>
-                                <h1 className="text-2xl font-bold uppercase text-emerald-900 tracking-tight">RELATÓRIO DE DESEMPENHO</h1>
+                                <h1 className="text-2xl font-bold uppercase text-emerald-900 tracking-tight">
+                                    {reportType === 'STUDENT' ? 'Relatório Individual do Aluno' :
+                                        reportType === 'CLASS' ? 'Relatório de Desempenho da Turma' :
+                                            'Comparativo Geral'}
+                                </h1>
                                 <p className="text-xs text-gray-800 font-bold mt-1">
-                                    {reportType === 'STUDENT' ? (
-                                        <>
-                                            Aluno: <span className="text-emerald-700">{students.find(s => s.id === selectedStudentId)?.name || '---'}</span>
-                                        </>
-                                    ) : reportType === 'CLASS' ? (
-                                        <>
-                                            Turma: <span className="text-emerald-700">{selectedClassName}</span>
-                                        </>
-                                    ) : 'Comparativo Geral'} / {academicYear}
+                                    Ano Letivo {academicYear}
                                 </p>
                             </div>
                         </div>

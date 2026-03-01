@@ -18,6 +18,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 
 import { supabase } from './supabaseClient';
 import { SupabaseService } from './services/supabaseService';
+import { offlineService } from './services/offlineService';
 
 function App() {
 
@@ -77,6 +78,55 @@ function App() {
       SupabaseService.getUnreadMessagesCount(userEmail, userRole).then(setUnreadCount);
     }
   }, [isAuthenticated, userEmail, userRole, currentView]);
+
+  // Handle Background Sync for Offline actions
+  useEffect(() => {
+    const processSyncQueue = async () => {
+      if (!isAuthenticated || !offlineService.isOnline()) return;
+
+      const queue = await offlineService.getSyncQueue();
+      if (queue.length === 0) return;
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const item of queue) {
+        try {
+          if (item.feature === 'occurrence' && item.operation === 'POST') {
+            await SupabaseService.saveOccurrence(item.data);
+          } else if (item.feature === 'comunicado' && item.operation === 'POST') {
+            await SupabaseService.createMessage(item.data);
+          } else if (item.feature === 'frequence' && item.operation === 'POST') {
+            await SupabaseService.saveSession(item.data.session, item.data.userEmail);
+          }
+          await offlineService.removeFromSyncQueue(item.id);
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to sync item ${item.id}`, error);
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        showToast(`Sincronização concluída: ${successCount} item(ns) enviado(s)`);
+      }
+      if (errorCount > 0) {
+        showToast(`Falha ao sincronizar ${errorCount} item(ns). Verifique sua rede.`);
+      }
+    };
+
+    const handleOnline = () => {
+      showToast('Conexão restabelecida. Verificando dados pendentes...');
+      processSyncQueue();
+    };
+
+    window.addEventListener('online', handleOnline);
+    processSyncQueue(); // Attempt on load
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [isAuthenticated]);
 
   const handleLogin = (role: UserRole, email: string, name?: string, photoUrl?: string) => {
     setUserRole(role);

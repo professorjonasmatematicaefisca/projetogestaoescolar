@@ -15,9 +15,12 @@ import {
   FileText,
   BookOpen,
   ClipboardCheck,
-  MessageSquare
+  MessageSquare,
+  Cloud,
+  CloudOff
 } from 'lucide-react';
 import { UserAvatar } from './components/UserAvatar';
+import { offlineService } from './services/offlineService';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -44,6 +47,32 @@ export const Layout: React.FC<LayoutProps> = ({
   unreadMessagesCount = 0
 }) => {
   const [isSidebarOpen, setSidebarOpen] = React.useState(false);
+  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+  const [pendingSyncs, setPendingSyncs] = React.useState(0);
+
+  // Pool local sync queue to display counter
+  React.useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    const checkQueue = async () => {
+      const queue = await offlineService.getSyncQueue();
+      setPendingSyncs(queue.length);
+    };
+
+    checkQueue();
+    // Poll loosely
+    const interval = setInterval(checkQueue, 5000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Define allowed views per role
   const rolePermissions: Record<UserRole, ViewState[]> = {
@@ -101,6 +130,24 @@ export const Layout: React.FC<LayoutProps> = ({
             <X size={24} />
           </button>
         </div>
+
+        {/* Offline Indicator Alert Block */}
+        {!isOnline && (
+          <div className="m-4 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-amber-500">
+              <CloudOff size={18} />
+              <span className="font-bold text-sm tracking-wide">Modo Offline</span>
+            </div>
+            <p className="text-xs text-amber-400/80 leading-tight">
+              Ações serão refletidas no banco quando a internet retornar.
+            </p>
+            {pendingSyncs > 0 && (
+              <div className="mt-1 bg-amber-500/20 text-amber-500 text-xs font-bold px-2 py-1 rounded-md w-fit">
+                {pendingSyncs} pendente(s)
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="p-4 flex-1 overflow-y-auto">
           <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 px-2">
@@ -206,6 +253,16 @@ export const Layout: React.FC<LayoutProps> = ({
             <GraduationCap className="text-emerald-500" size={24} />
             <h1 className="text-lg font-bold text-white">EduControl PRO</h1>
           </div>
+
+          <div className="flex flex-1 justify-end items-center mr-4">
+            {!isOnline && (
+              <div className="flex items-center gap-1 text-amber-500 bg-amber-500/10 px-2 py-1 rounded-lg">
+                <CloudOff size={16} />
+                <span className="text-xs font-bold">{pendingSyncs > 0 ? pendingSyncs : ''}</span>
+              </div>
+            )}
+          </div>
+
           <button onClick={() => setSidebarOpen(true)} className="text-gray-400">
             <Menu size={24} />
           </button>

@@ -1,6 +1,7 @@
 import { supabase } from '../supabaseClient';
 import { Student, ClassRoom, Discipline, Teacher, Occurrence, ClassSession, SessionRecord, UserRole, StudentExit, PlanningModule, PlanningSchedule, StudyGuideItem, RequestItem } from '../types';
 import { SEED_STUDENTS, SEED_CLASSES, SEED_TEACHERS, SEED_OCCURRENCES } from './mockData';
+import { offlineService } from './offlineService';
 
 export const SupabaseService = {
     async getPlanningModules(filters?: { teacherId?: string, classId?: string, disciplineId?: string, unusedOnly?: boolean }): Promise<PlanningModule[]> {
@@ -343,10 +344,17 @@ export const SupabaseService = {
 
     // --- DATA FETCHING ---
     async getClasses(): Promise<ClassRoom[]> {
+        if (!offlineService.isOnline()) {
+            const cached = await offlineService.getCache<ClassRoom[]>('classes');
+            if (cached) return cached;
+            return [];
+        }
+
         const { data, error } = await supabase.from('classes').select('*');
         if (error) {
             console.error("Error fetching classes:", error);
-            return [];
+            const cached = await offlineService.getCache<ClassRoom[]>('classes');
+            return cached || [];
         }
 
         const { data: assignments } = await supabase.from('class_disciplines').select('class_id, discipline_id');
@@ -371,15 +379,26 @@ export const SupabaseService = {
             '3º AEM': 5,
         };
 
-        return classes.sort((a, b) => {
+        const sorted = classes.sort((a, b) => {
             const orderA = classOrder[a.name] || 99;
             const orderB = classOrder[b.name] || 99;
             if (orderA === orderB) return a.name.localeCompare(b.name);
             return orderA - orderB;
         });
+
+        await offlineService.setCache('classes', sorted);
+        return sorted;
     },
 
     async getStudents(includeInactive = false): Promise<Student[]> {
+        const cacheKey = `students_${includeInactive}`;
+
+        if (!offlineService.isOnline()) {
+            const cached = await offlineService.getCache<Student[]>(cacheKey);
+            if (cached) return cached;
+            return [];
+        }
+
         let query = supabase.from('students').select('*');
         if (!includeInactive) {
             query = query.eq('status', 'ACTIVE');
@@ -388,9 +407,11 @@ export const SupabaseService = {
 
         if (error) {
             console.error("Error fetching students:", error);
-            return [];
+            const cached = await offlineService.getCache<Student[]>(cacheKey);
+            return cached || [];
         }
-        return data.map((s: any) => ({
+
+        const students = data.map((s: any) => ({
             id: s.id,
             name: s.name,
             photoUrl: s.photo_url,
@@ -400,6 +421,9 @@ export const SupabaseService = {
             inactiveReason: s.inactive_reason,
             inactiveDate: s.inactive_date
         }));
+
+        await offlineService.setCache(cacheKey, students);
+        return students;
     },
 
     async createStudent(student: Omit<Student, 'id'>): Promise<boolean> {
@@ -625,6 +649,15 @@ export const SupabaseService = {
 
     // --- SESSION MANAGEMENT ---
     async saveSession(session: ClassSession, userEmail?: string): Promise<{ success: boolean, error?: string }> {
+        if (!offlineService.isOnline()) {
+            await offlineService.addToSyncQueue({
+                feature: 'frequence',
+                operation: 'POST',
+                data: { session, userEmail }
+            });
+            return { success: true };
+        }
+
         let teacherId = session.teacherId;
 
         // Try to resolve teacher ID from email if it's a mock ID or missing
@@ -920,16 +953,27 @@ export const SupabaseService = {
     },
 
     async getDisciplines(): Promise<Discipline[]> {
+        if (!offlineService.isOnline()) {
+            const cached = await offlineService.getCache<Discipline[]>('disciplines');
+            if (cached) return cached;
+            return [];
+        }
+
         const { data, error } = await supabase.from('disciplines').select('*').order('name', { ascending: true });
         if (error) {
             console.error("Error fetching disciplines:", error);
-            return [];
+            const cached = await offlineService.getCache<Discipline[]>('disciplines');
+            return cached || [];
         }
-        return data.map((d: any) => ({
+
+        const disciplines = data.map((d: any) => ({
             id: d.id,
             name: d.name,
             displayName: d.display_name
         }));
+
+        await offlineService.setCache('disciplines', disciplines);
+        return disciplines;
     },
 
     async getOccurrences(): Promise<Occurrence[]> {
@@ -946,6 +990,15 @@ export const SupabaseService = {
     },
 
     async saveOccurrence(occurrence: Occurrence): Promise<boolean> {
+        if (!offlineService.isOnline()) {
+            await offlineService.addToSyncQueue({
+                feature: 'occurrence',
+                operation: 'POST',
+                data: occurrence
+            });
+            return true;
+        }
+
         const { error } = await supabase
             .from('occurrences')
             .upsert(occurrence);
@@ -1425,6 +1478,15 @@ export const SupabaseService = {
     // --- MESSAGES (Comunicados) ---
 
     async createMessage(msg: Omit<import('../types').MessageItem, 'id' | 'createdAt'>): Promise<boolean> {
+        if (!offlineService.isOnline()) {
+            await offlineService.addToSyncQueue({
+                feature: 'comunicado',
+                operation: 'POST',
+                data: msg
+            });
+            return true;
+        }
+
         const { error } = await supabase.from('messages').insert({
             sender_name: msg.senderName,
             sender_email: msg.senderEmail,
