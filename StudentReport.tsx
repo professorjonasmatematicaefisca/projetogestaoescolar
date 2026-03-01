@@ -554,6 +554,19 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
 
         return (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Header with Logo for Print/Report view */}
+                <div className="col-span-1 lg:col-span-3 mb-4 border-b-2 border-emerald-500 pb-2 flex justify-between items-end">
+                    <div className="flex items-center gap-4">
+                        {schoolLogoUrl && <img src={schoolLogoUrl} alt="School Logo" className="max-h-16 object-contain" />}
+                        <div>
+                            <h2 className="text-2xl font-bold text-emerald-900 uppercase">Relatório de Desempenho do Aluno</h2>
+                            <p className="text-sm text-gray-600 font-bold uppercase">{student.name} - {student.className}</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xl font-bold text-gray-400">{academicYear}</p>
+                    </div>
+                </div>
                 {/* Left Column: Profile & Summary */}
                 <div className="space-y-6">
                     <div className="bg-white rounded-xl border border-gray-200 p-6 flex flex-col items-center text-center shadow-lg relative break-inside-avoid">
@@ -733,6 +746,19 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
 
         return (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Header with Logo for Print/Report view */}
+                <div className="col-span-1 lg:col-span-3 mb-4 border-b-2 border-emerald-500 pb-2 flex justify-between items-end">
+                    <div className="flex items-center gap-4">
+                        {schoolLogoUrl && <img src={schoolLogoUrl} alt="School Logo" className="max-h-16 object-contain" />}
+                        <div>
+                            <h2 className="text-2xl font-bold text-emerald-900 uppercase">Relatório Analítico de Turma</h2>
+                            <p className="text-sm text-gray-600 font-bold uppercase">Turma: {selectedClassName}</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-xl font-bold text-gray-400">{academicYear}</p>
+                    </div>
+                </div>
                 {/* Left Column: Summary */}
                 <div className="space-y-6">
                     <div className="bg-white rounded-xl border border-gray-200 p-6 flex flex-col items-center text-center shadow-lg break-inside-avoid">

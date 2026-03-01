@@ -56,7 +56,7 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
     const [newObservation, setNewObservation] = useState<string>('');
     const [lastSignedBy, setLastSignedBy] = useState<string>('');
     const [saving, setSaving] = useState(false);
-    const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(null);
+    const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(localStorage.getItem('educontrol_school_logo'));
 
     // Generate available years based on session history + current year
     const availableYears = Array.from(new Set([
@@ -527,7 +527,7 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                                     foaRows.map((row, index) => (
                                         <tr key={index}>
                                             <td className="border border-gray-900 p-2 pl-3 bg-white font-bold text-gray-800 text-[11px] truncate uppercase">
-                                                {row.subject}
+                                                {row.subject.replace(/\s+\d+º.*$/, '').trim()}
                                             </td>
                                             <td className="border border-gray-900 p-2 pl-3 bg-white text-gray-700 text-[11px] truncate">
                                                 {row.teacherName}
