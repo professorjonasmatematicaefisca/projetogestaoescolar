@@ -75,14 +75,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             {/* Logo and Header */}
                             <div className="mb-8 animate-in fade-in slide-in-from-left-4 duration-500">
                                 <div className="flex items-center gap-4 mb-6">
-                                    <div className="w-14 h-14 bg-white/5 p-2 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden">
-                                        <img src="/coc-logo.png" alt="COC Logo" className="w-full h-full object-contain" />
+                                    <div className="w-20 h-20 bg-white/5 p-2 rounded-2xl border border-white/10 flex items-center justify-center overflow-hidden shadow-xl">
+                                        <img src="/coc-logo.png" alt="COC Logo" className="w-full h-full object-contain scale-110" />
                                     </div>
                                     <div>
-                                        <h1 className="text-xl font-bold text-white tracking-tight">
-                                            CONEXÃO <span className="text-emerald-500">COC</span>
+                                        <h1 className="text-24 font-bold text-white tracking-tight uppercase">
+                                            JF <span className="text-emerald-500">EduControl</span>
                                         </h1>
-                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Paulínia • EduControl</p>
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Conexão COC Paulínia</p>
                                     </div>
                                 </div>
 
@@ -264,18 +264,18 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     {/* Main Content */}
                     <div className="relative z-10 text-center">
                         {/* COC Logo - Substituindo o círculo com "C" */}
-                        <div className="w-48 h-48 bg-white/5 backdrop-blur-md rounded-3xl flex items-center justify-center mb-8 mx-auto shadow-2xl border border-white/10 p-6 group transition-all duration-500 hover:scale-105">
+                        <div className="w-64 h-64 bg-white/5 backdrop-blur-md rounded-[2.5rem] flex items-center justify-center mb-8 mx-auto shadow-2xl border border-white/10 p-8 group transition-all duration-500 hover:scale-105">
                             <div className="w-full h-full relative">
-                                <img src="/coc-logo.png" alt="Branding" className="w-full h-full object-contain filter drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] group-hover:drop-shadow-[0_0_20px_rgba(16,185,129,0.5)] transition-all" />
+                                <img src="/coc-logo.png" alt="Branding" className="w-full h-full object-contain filter drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] group-hover:drop-shadow-[0_0_30px_rgba(16,185,129,0.6)] transition-all scale-110" />
                             </div>
                         </div>
 
                         {/* Title */}
-                        <h1 className="text-5xl font-black text-white mb-2 tracking-tight">
-                            CONEXÃO
+                        <h1 className="text-6xl font-black text-white mb-2 tracking-tight">
+                            JF
                         </h1>
-                        <h2 className="text-5xl font-black text-emerald-500 mb-6 drop-shadow-lg">
-                            COC
+                        <h2 className="text-6xl font-black text-emerald-500 mb-6 drop-shadow-lg">
+                            EduControl
                         </h2>
 
                         {/* Decorative Line */}
