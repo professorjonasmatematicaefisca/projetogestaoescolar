@@ -13,6 +13,7 @@ import { StudyGuide } from './StudyGuide';
 import { RequestsPanel } from './RequestsPanel';
 import { Comunicados } from './Comunicados';
 import { PortalDashboard } from './PortalDashboard';
+import { UpdatePassword } from './UpdatePassword';
 import { UserRole, ViewState } from './types';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -32,6 +33,7 @@ function App() {
   const [targetStudentId, setTargetStudentId] = useState<string | undefined>(undefined);
   const [isDark, setIsDark] = useState(false);
   const [toast, setToast] = useState<{ msg: string, visible: boolean }>({ msg: '', visible: false });
+  const [isRecovering, setIsRecovering] = useState(false);
 
   // Theme Init
   useEffect(() => {
@@ -64,6 +66,17 @@ function App() {
         else setCurrentView('OCCURRENCES');
       }
     }
+
+    // 3. Listen for Auth Events (Password Recovery)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecovering(true);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const toggleTheme = () => setIsDark(!isDark);
@@ -200,6 +213,17 @@ function App() {
       default: return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole!} />;
     }
   };
+
+  if (isRecovering) {
+    return (
+      <ErrorBoundary>
+        <UpdatePassword onComplete={() => {
+          setIsRecovering(false);
+          handleLogout();
+        }} />
+      </ErrorBoundary>
+    );
+  }
 
   if (!isAuthenticated) {
     return (

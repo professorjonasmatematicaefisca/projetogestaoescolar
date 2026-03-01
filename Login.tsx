@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { UserRole } from './types';
 import { SupabaseService } from './services/supabaseService';
-import { GraduationCap, User, Lock, ArrowRight, Eye, EyeOff, Zap, TrendingUp, Rocket } from 'lucide-react';
+import { User, Lock, ArrowRight, Eye, EyeOff, Zap, TrendingUp, Rocket, Mail, ChevronLeft, CheckCircle } from 'lucide-react';
 import { LoadingSpinner } from './components/LoadingSpinner';
 
 interface LoginProps {
     onLogin: (role: UserRole, email: string, name?: string, photoUrl?: string) => void;
 }
 
+type LoginView = 'LOGIN' | 'FORGOT_PASSWORD' | 'SUCCESS_SENT';
+
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
+    const [view, setView] = useState<LoginView>('LOGIN');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -43,113 +46,207 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         }
     };
 
+    const handleResetPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        try {
+            const success = await SupabaseService.resetPasswordForEmail(email);
+            if (success) {
+                setView('SUCCESS_SENT');
+            } else {
+                setError('Falha ao enviar e-mail de recuperação.');
+            }
+        } catch (err) {
+            setError('Digite um e-mail válido cadastrado no sistema.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[#0a0f1e] flex items-center justify-center p-4 md:p-8">
             <div className="w-full max-w-6xl bg-[#1a2332] rounded-3xl shadow-2xl overflow-hidden border border-gray-800/50 grid md:grid-cols-2">
-                {/* Left Side - Login Form */}
-                <div className="p-8 md:p-12 flex flex-col justify-center">
-                    {/* Logo and Header */}
-                    <div className="mb-8">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-12 h-12 bg-emerald-500 rounded-xl flex items-center justify-center">
-                                <GraduationCap className="text-white" size={24} />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold text-white">
-                                    COC <span className="text-emerald-500">PAULÍNA</span>
-                                </h1>
-                                <p className="text-xs text-gray-400 italic">Inteligência e valores em cada atitude</p>
-                            </div>
-                        </div>
+                {/* Left Side - Form Area */}
+                <div className="p-8 md:p-12 flex flex-col justify-center min-h-[600px]">
 
-                        <h2 className="text-2xl font-bold text-white mb-2">Bem-vindo</h2>
-                        <p className="text-sm text-gray-400">Acesse o sistema com suas credenciais para continuar.</p>
-                    </div>
+                    {view === 'LOGIN' && (
+                        <>
+                            {/* Logo and Header */}
+                            <div className="mb-8 animate-in fade-in slide-in-from-left-4 duration-500">
+                                <div className="flex items-center gap-4 mb-6">
+                                    <div className="w-14 h-14 bg-white/5 p-2 rounded-xl border border-white/10 flex items-center justify-center overflow-hidden">
+                                        <img src="/coc-logo.png" alt="COC Logo" className="w-full h-full object-contain" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-xl font-bold text-white tracking-tight">
+                                            CONEXÃO <span className="text-emerald-500">COC</span>
+                                        </h1>
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Paulínia • EduControl</p>
+                                    </div>
+                                </div>
 
-                    {/* Login Form */}
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2 tracking-wide">
-                                Usuário
-                            </label>
-                            <div className="relative">
-                                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full bg-[#0f1621] border border-gray-700/50 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
-                                    placeholder="Insira seu e-mail ou usuário"
-                                    required
-                                />
+                                <h2 className="text-2xl font-bold text-white mb-2">Bem-vindo</h2>
+                                <p className="text-sm text-gray-400">Acesse o sistema com suas credenciais para continuar.</p>
                             </div>
-                        </div>
 
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 uppercase mb-2 tracking-wide">
-                                Senha
-                            </label>
-                            <div className="relative">
-                                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-[#0f1621] border border-gray-700/50 rounded-xl py-3.5 pl-12 pr-12 text-white placeholder-gray-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
-                                    placeholder="••••••••••••"
-                                    required
-                                />
+                            {/* Login Form */}
+                            <form onSubmit={handleSubmit} className="space-y-5 animate-in fade-in duration-700 delay-200">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2 tracking-wide">
+                                        Usuário / E-mail
+                                    </label>
+                                    <div className="relative">
+                                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                                        <input
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            className="w-full bg-[#0f1621] border border-gray-700/50 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                            placeholder="seu@email.com"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2 tracking-wide">
+                                        Senha
+                                    </label>
+                                    <div className="relative">
+                                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="w-full bg-[#0f1621] border border-gray-700/50 rounded-xl py-3.5 pl-12 pr-12 text-white placeholder-gray-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                            placeholder="••••••••••••"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                                        >
+                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {error && (
+                                    <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs font-medium text-center">
+                                        {error}
+                                    </div>
+                                )}
+
+                                <div className="flex items-center justify-between text-sm">
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <input
+                                            type="checkbox"
+                                            checked={rememberMe}
+                                            onChange={(e) => setRememberMe(e.target.checked)}
+                                            className="w-4 h-4 rounded border-gray-600 bg-[#0f1621] text-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                                        />
+                                        <span className="text-gray-400 text-xs group-hover:text-gray-300 transition-colors">Lembrar acesso</span>
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setView('FORGOT_PASSWORD')}
+                                        className="text-xs text-emerald-500 hover:text-emerald-400 font-bold transition-colors"
+                                    >
+                                        Esqueci a senha
+                                    </button>
+                                </div>
+
                                 <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 group"
                                 >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    {loading ? (
+                                        <LoadingSpinner size="sm" text="Autenticando..." />
+                                    ) : (
+                                        <>
+                                            ENTRAR NO SISTEMA
+                                            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                                        </>
+                                    )}
                                 </button>
+                            </form>
+                        </>
+                    )}
+
+                    {view === 'FORGOT_PASSWORD' && (
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                            <button
+                                onClick={() => setView('LOGIN')}
+                                className="flex items-center gap-2 text-gray-400 hover:text-white text-xs font-bold mb-8 transition-colors"
+                            >
+                                <ChevronLeft size={16} />
+                                VOLTAR PARA O LOGIN
+                            </button>
+
+                            <div className="mb-8">
+                                <h2 className="text-2xl font-bold text-white mb-2">Recuperar Senha</h2>
+                                <p className="text-sm text-gray-400">Insira seu e-mail cadastrado para receber instruções de redefinição.</p>
                             </div>
-                        </div>
 
-                        {error && (
-                            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs font-medium text-center">
-                                {error}
+                            <form onSubmit={handleResetPassword} className="space-y-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Seu E-mail</label>
+                                    <div className="relative">
+                                        <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                                        <input
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            className="w-full bg-[#0f1621] border border-gray-700/50 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:border-emerald-500 outline-none"
+                                            placeholder="exemplo@email.com"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                {error && (
+                                    <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-xs text-center font-medium">
+                                        {error}
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+                                >
+                                    {loading ? 'ENVIANDO...' : 'ENVIAR LINK DE RECUPERAÇÃO'}
+                                </button>
+                            </form>
+                        </div>
+                    )}
+
+                    {view === 'SUCCESS_SENT' && (
+                        <div className="text-center animate-in zoom-in duration-500">
+                            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+                                <CheckCircle className="text-emerald-500" size={40} />
                             </div>
-                        )}
-
-                        <div className="flex items-center justify-between text-sm">
-                            <label className="flex items-center gap-2 cursor-pointer group">
-                                <input
-                                    type="checkbox"
-                                    checked={rememberMe}
-                                    onChange={(e) => setRememberMe(e.target.checked)}
-                                    className="w-4 h-4 rounded border-gray-600 bg-[#0f1621] text-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                                />
-                                <span className="text-gray-400 text-xs group-hover:text-gray-300 transition-colors">Lembrar acesso</span>
-                            </label>
-                            <a href="#" className="text-xs text-emerald-500 hover:text-emerald-400 transition-colors">
-                                Esqueci a senha
-                            </a>
+                            <h2 className="text-2xl font-bold text-white mb-4">Email Enviado!</h2>
+                            <p className="text-gray-400 text-sm mb-8 leading-relaxed px-4">
+                                Enviamos um link de redefinição para <span className="text-white font-medium">{email}</span>.
+                                Verifique sua caixa de entrada e spam.
+                            </p>
+                            <button
+                                onClick={() => setView('LOGIN')}
+                                className="w-full max-w-[200px] border border-gray-700 hover:bg-gray-800 text-white font-bold py-3 rounded-xl transition-colors"
+                            >
+                                VOLTAR AO LOGIN
+                            </button>
                         </div>
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 group"
-                        >
-                            {loading ? (
-                                <LoadingSpinner size="sm" text="Autenticando..." />
-                            ) : (
-                                <>
-                                    ENTRAR NO SISTEMA
-                                    <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-                                </>
-                            )}
-                        </button>
-                    </form>
+                    )}
 
                     {/* Support Link */}
-                    <div className="mt-8 text-center">
+                    <div className="mt-8 text-center pt-8 border-t border-gray-800/30">
                         <p className="text-xs text-gray-500">
-                            Suporte técnico: <a href="#" className="text-emerald-500 hover:underline">Clique aqui</a>
+                            Suporte técnico: <a href="#" className="text-emerald-500 hover:underline">cocpaulinia.com.br</a>
                         </p>
                     </div>
                 </div>
@@ -161,67 +258,57 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
 
                     {/* Geometric Shapes */}
-                    <div className="absolute top-20 right-20 w-20 h-20 border-2 border-emerald-500/20 rounded-2xl rotate-12"></div>
+                    <div className="absolute top-20 right-20 w-20 h-20 border-2 border-emerald-500/20 rounded-2xl rotate-12 animate-pulse"></div>
                     <div className="absolute bottom-32 right-32 w-16 h-16 border-2 border-blue-500/20 rounded-full"></div>
-
-                    {/* Star Icon */}
-                    <div className="absolute top-8 right-8 w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center border border-blue-500/20">
-                        <svg className="w-5 h-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                    </div>
-
-                    {/* Lightning Icon */}
-                    <div className="absolute bottom-20 left-8 w-10 h-10 bg-emerald-500/10 rounded-lg flex items-center justify-center border border-emerald-500/20">
-                        <Zap className="w-5 h-5 text-emerald-400" />
-                    </div>
 
                     {/* Main Content */}
                     <div className="relative z-10 text-center">
-                        {/* Logo Circle */}
-                        <div className="w-32 h-32 bg-emerald-500 rounded-3xl flex items-center justify-center mb-8 mx-auto shadow-2xl shadow-emerald-500/30">
-                            <span className="text-6xl font-black text-white">C</span>
+                        {/* COC Logo - Substituindo o círculo com "C" */}
+                        <div className="w-48 h-48 bg-white/5 backdrop-blur-md rounded-3xl flex items-center justify-center mb-8 mx-auto shadow-2xl border border-white/10 p-6 group transition-all duration-500 hover:scale-105">
+                            <div className="w-full h-full relative">
+                                <img src="/coc-logo.png" alt="Branding" className="w-full h-full object-contain filter drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] group-hover:drop-shadow-[0_0_20px_rgba(16,185,129,0.5)] transition-all" />
+                            </div>
                         </div>
 
                         {/* Title */}
                         <h1 className="text-5xl font-black text-white mb-2 tracking-tight">
                             CONEXÃO
                         </h1>
-                        <h2 className="text-5xl font-black text-emerald-500 mb-6">
+                        <h2 className="text-5xl font-black text-emerald-500 mb-6 drop-shadow-lg">
                             COC
                         </h2>
 
                         {/* Decorative Line */}
                         <div className="flex items-center justify-center gap-2 mb-8">
                             <div className="h-1 w-16 bg-emerald-500 rounded-full"></div>
-                            <div className="h-1 w-2 bg-blue-500 rounded-full"></div>
+                            <div className="h-0.5 w-6 bg-blue-500/50 rounded-full"></div>
                             <div className="h-1 w-16 bg-emerald-500 rounded-full"></div>
                         </div>
 
                         {/* Subtitle */}
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-12">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-12">
                             EDUCONTROL ECOSYSTEM
                         </p>
 
                         {/* Feature Icons */}
                         <div className="flex items-center justify-center gap-6">
-                            <div className="w-14 h-14 bg-[#1a2332] rounded-xl flex items-center justify-center border border-gray-700/50 hover:border-emerald-500/50 transition-all group">
+                            <div className="w-14 h-14 bg-[#1a2332] rounded-xl flex items-center justify-center border border-gray-700/50 hover:border-emerald-500/50 transition-all group shadow-lg">
                                 <Zap className="w-6 h-6 text-gray-400 group-hover:text-emerald-500 transition-colors" />
                             </div>
-                            <div className="w-14 h-14 bg-[#1a2332] rounded-xl flex items-center justify-center border border-gray-700/50 hover:border-emerald-500/50 transition-all group">
+                            <div className="w-14 h-14 bg-[#1a2332] rounded-xl flex items-center justify-center border border-gray-700/50 hover:border-emerald-500/50 transition-all group shadow-lg">
                                 <TrendingUp className="w-6 h-6 text-gray-400 group-hover:text-emerald-500 transition-colors" />
                             </div>
-                            <div className="w-14 h-14 bg-[#1a2332] rounded-xl flex items-center justify-center border border-gray-700/50 hover:border-emerald-500/50 transition-all group">
+                            <div className="w-14 h-14 bg-[#1a2332] rounded-xl flex items-center justify-center border border-gray-700/50 hover:border-emerald-500/50 transition-all group shadow-lg">
                                 <Rocket className="w-6 h-6 text-gray-400 group-hover:text-emerald-500 transition-colors" />
                             </div>
                         </div>
                     </div>
 
-                    {/* Bottom Dots Indicator */}
-                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
-                        <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                        <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
-                        <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
+                    {/* Bottom Indicator */}
+                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-1.5">
+                        <div className="w-8 h-1 bg-emerald-500 rounded-full"></div>
+                        <div className="w-2 h-1 bg-gray-700 rounded-full"></div>
+                        <div className="w-2 h-1 bg-gray-700 rounded-full"></div>
                     </div>
                 </div>
             </div>

@@ -1589,5 +1589,35 @@ export const SupabaseService = {
             return false;
         }
         return true;
+    },
+
+    // --- PASSWORD RECOVERY METHODS ---
+
+    /**
+     * Envia um e-mail de redefinição de senha para o usuário.
+     */
+    async resetPasswordForEmail(email: string): Promise<boolean> {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin,
+        });
+        if (error) {
+            console.error('resetPasswordForEmail error:', error);
+            return false;
+        }
+        return true;
+    },
+
+    /**
+     * Atualiza a senha do usuário logado (usado após clicar no link do e-mail).
+     */
+    async updateUserPassword(newPassword: string): Promise<boolean> {
+        const { error } = await supabase.auth.updateUser({
+            password: newPassword
+        });
+        if (error) {
+            console.error('updateUserPassword error:', error);
+            return false;
+        }
+        return true;
     }
 };

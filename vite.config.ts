@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
           name: 'EduControl PRO',
           short_name: 'EduControl',
           description: 'Gestão Escolar Inteligente e Controle de Sala de Aula',
-          theme_color: '#10b981', // emerald-500
+          theme_color: '#00843D', // COC Dark Green
           background_color: '#f8fafc', // slate-50
           icons: [
             {

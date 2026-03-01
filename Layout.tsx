@@ -116,8 +116,8 @@ export const Layout: React.FC<LayoutProps> = ({
       `}>
         <div className="p-6 flex items-center justify-between border-b border-gray-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <GraduationCap className="text-white" size={24} />
+            <div className="w-10 h-10 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center p-1 overflow-hidden shadow-lg selection:bg-transparent">
+              <img src="/coc-logo.png" alt="COC Logo" className="w-full h-full object-contain" />
             </div>
             <div>
               <h1 className="text-lg font-bold text-white tracking-tight leading-none">
@@ -250,8 +250,10 @@ export const Layout: React.FC<LayoutProps> = ({
       <main className="flex-1 flex flex-col overflow-hidden h-screen bg-gray-900 relative print:h-auto print:overflow-visible print:bg-white">
         <header className="lg:hidden h-16 bg-[#0f172a] border-b border-gray-800 flex items-center px-4 justify-between z-30 shrink-0 print:hidden">
           <div className="flex items-center gap-2">
-            <GraduationCap className="text-emerald-500" size={24} />
-            <h1 className="text-lg font-bold text-white">EduControl PRO</h1>
+            <div className="w-8 h-8 bg-white/5 rounded-lg border border-white/10 flex items-center justify-center p-1 overflow-hidden">
+              <img src="/coc-logo.png" alt="COC Logo" className="w-full h-full object-contain" />
+            </div>
+            <h1 className="text-lg font-bold text-white tracking-tight">EduControl <span className="text-emerald-500">PRO</span></h1>
           </div>
 
           <div className="flex flex-1 justify-end items-center mr-4">
