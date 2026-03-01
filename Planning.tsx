@@ -1370,7 +1370,7 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
 
                                 <div className="space-y-4">
                                     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 max-h-64 overflow-y-auto space-y-2 relative">
-                                        {(userRole === UserRole.TEACHER ? myCreatedModules : modules)
+                                        {modules
                                             .filter(m => scheduleFilterClass === 'all' || m.classId === scheduleFilterClass)
                                             // Filter out modules already scheduled ANYWHERE for this class (not just this day)?
                                             // The user asked: "Caso ele já tenha registrado em aula esse módulo, não deve mais aparecer" -> We can filter by `planning_usage` or `allSchedules`?
@@ -1420,11 +1420,11 @@ export const Planning: React.FC<PlanningProps> = ({ userEmail, userRole, onShowT
                                                 );
                                             })}
 
-                                        {userRole === UserRole.TEACHER && myCreatedModules.length === 0 && (
+                                        {userRole === UserRole.TEACHER && modules.length === 0 && (
                                             <p className="text-xs text-amber-400 mt-2 italic text-center py-4">Você ainda não criou nenhum módulo. Crie primeiro na aba "Conteúdo".</p>
                                         )}
-                                        {userRole === UserRole.TEACHER && myCreatedModules.length > 0 &&
-                                            myCreatedModules.filter(m => scheduleFilterClass === 'all' || m.classId === scheduleFilterClass).filter(m => !allSchedules.some(s => s.moduleId === m.id && s.module?.classId === m.classId)).length === 0 && (
+                                        {userRole === UserRole.TEACHER && modules.length > 0 &&
+                                            modules.filter(m => scheduleFilterClass === 'all' || m.classId === scheduleFilterClass).filter(m => !allSchedules.some(s => s.moduleId === m.id && s.module?.classId === m.classId)).length === 0 && (
                                                 <p className="text-xs text-gray-500 mt-2 italic text-center py-4">Nenhum módulo novo disponível para esta turma.</p>
                                             )}
                                     </div>
