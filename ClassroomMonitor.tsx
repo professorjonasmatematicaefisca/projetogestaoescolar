@@ -61,7 +61,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
 
     // Multi-Select Time Blocks State
-    const [selectedBlocks, setSelectedBlocks] = useState<string[]>([MORNING_BLOCKS[0]]);
+    const [selectedBlocks, setSelectedBlocks] = useState<string[]>([]);
     const [isTimeDropdownOpen, setIsTimeDropdownOpen] = useState(false);
     const timeDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -146,9 +146,9 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                     }
                     setAvailableClasses(availCls);
 
-                    if (availCls.length > 0) {
-                        setSelectedClassId(availCls[0].name);
-                    }
+                    // Do NOT auto-select — start clean
+                    setSelectedClassId('');
+                    setSelectedSubject('');
                 }
             } catch (error) {
                 onShowToast("Erro ao carregar dados do Supabase.");
@@ -171,10 +171,10 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
         setAvailableClasses(availCls);
 
-        // Auto-select first class if current selection is invalid
+        // Only reset if current selection is not in available classes
         if (availCls.length > 0) {
-            if (!availCls.find(c => c.name === selectedClassId)) {
-                setSelectedClassId(availCls[0].name);
+            if (selectedClassId && !availCls.find(c => c.name === selectedClassId)) {
+                setSelectedClassId('');
             }
         } else {
             setSelectedClassId('');
@@ -198,28 +198,36 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             if (validSelected.length > 0) setSelectedBlocks(validSelected);
             else setSelectedBlocks([newBlocks[0]]);
 
-            // 2. Update Subjects based on Class-Discipline assignments
+            // 2. Update Subjects based on role
             let subjs: string[] = [];
 
-            if (selectedClass && selectedClass.disciplineIds && selectedClass.disciplineIds.length > 0) {
-                // Link based on explicitly assigned disciplines to this class
-                subjs = allDisciplines
-                    .filter(d => selectedClass.disciplineIds?.includes(d.id))
-                    .map(d => d.name);
-            } else if (teacher.assignments && teacher.assignments.length > 0) {
-                // Fallback to teacher assignments
-                subjs = teacher.assignments
-                    .filter(a => a.classId === selectedClassId)
-                    .map(a => a.subject);
+            if (userRole === UserRole.TEACHER) {
+                // Teachers: ONLY show disciplines assigned to them for this class
+                if (teacher.assignments && teacher.assignments.length > 0) {
+                    subjs = teacher.assignments
+                        .filter(a => a.classId === selectedClassId)
+                        .map(a => a.subject);
+                }
+            } else {
+                // Coordinators: show all disciplines assigned to this class
+                if (selectedClass && selectedClass.disciplineIds && selectedClass.disciplineIds.length > 0) {
+                    subjs = allDisciplines
+                        .filter(d => selectedClass.disciplineIds?.includes(d.id))
+                        .map(d => d.name);
+                } else if (teacher.assignments && teacher.assignments.length > 0) {
+                    subjs = teacher.assignments
+                        .filter(a => a.classId === selectedClassId)
+                        .map(a => a.subject);
+                }
             }
 
             subjs = [...new Set(subjs)];
             setAvailableSubjects(subjs);
 
-            if (subjs.length > 0 && !subjs.includes(selectedSubject)) {
-                setSelectedSubject(subjs[0]);
+            if (subjs.length > 0 && selectedSubject && !subjs.includes(selectedSubject)) {
+                setSelectedSubject('');
             } else if (subjs.length === 0) {
-                setSelectedSubject('Geral');
+                setSelectedSubject('');
             }
         }
     }, [selectedClassId, selectedTeacherId, allClasses, teachers]);
@@ -308,7 +316,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
     };
 
     const getCompositeBlockLabel = () => {
-        if (selectedBlocks.length === 0) return 'Selecione...';
+        if (selectedBlocks.length === 0) return 'Selecione o horário...';
         if (selectedBlocks.length === 1) return selectedBlocks[0];
 
         // Logic to merge "07h00 - 07h45" and "07h45 - 08h30" into "07h00 - 08h30"
@@ -903,7 +911,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                 onChange={(e) => checkUnsavedAndProceed(() => setSelectedClassId(e.target.value))}
                                 className="bg-[#1e293b] text-white text-sm border border-gray-700 rounded-lg p-2 outline-none focus:border-emerald-500 w-[120px]"
                             >
-                                {availableClasses.length === 0 && <option value="">Sem turmas</option>}
+                                {!selectedClassId && <option value="">Selecione a turma...</option>}
+                                {availableClasses.length === 0 && selectedClassId === '' && <option value="" disabled>Sem turmas</option>}
                                 {availableClasses.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                             </select>
                         </div>
@@ -914,6 +923,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                 onChange={(e) => checkUnsavedAndProceed(() => setSelectedSubject(e.target.value))}
                                 className="bg-[#1e293b] text-white text-sm border border-gray-700 rounded-lg p-2 outline-none focus:border-emerald-500 w-[130px]"
                             >
+                                {!selectedSubject && <option value="">Selecione a disciplina...</option>}
                                 {availableSubjects.map(s => {
                                     const disc = allDisciplines.find(d => d.name === s);
                                     return <option key={s} value={s}>{disc?.displayName || s}</option>;
@@ -1538,60 +1548,80 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                     <div className="text-center p-12">
                                         <p className="text-gray-500">Nenhuma aula registrada por este professor.</p>
                                     </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {historySessions.map(sess => (
-                                            <div
-                                                key={sess.id}
-                                                className="bg-[#0f172a] border border-gray-800 p-4 rounded-lg hover:border-emerald-500/50 transition-colors group flex items-center justify-between"
-                                            >
-                                                <div
-                                                    className="flex flex-col gap-1 flex-1 cursor-pointer"
-                                                    onClick={() => handleLoadSession(sess)}
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <Calendar size={14} className="text-emerald-500" />
-                                                        <span className="font-bold text-white text-sm">
-                                                            {format(new Date(sess.date), "dd 'de' MMMM, yyyy", { locale: ptBR })}
-                                                        </span>
+                                ) : (() => {
+                                    // Group sessions by className (series)
+                                    const grouped: Record<string, ClassSession[]> = {};
+                                    historySessions.forEach(sess => {
+                                        const key = sess.className || 'Sem turma';
+                                        if (!grouped[key]) grouped[key] = [];
+                                        grouped[key].push(sess);
+                                    });
+                                    const classNames = Object.keys(grouped).sort();
+
+                                    return (
+                                        <div className="space-y-4">
+                                            {classNames.map(className => (
+                                                <div key={className}>
+                                                    <div className="flex items-center gap-2 px-3 py-2 bg-[#0f172a] rounded-lg border border-gray-700 mb-2">
+                                                        <Users size={14} className="text-emerald-500" />
+                                                        <span className="font-bold text-emerald-400 text-sm uppercase tracking-wide">{className}</span>
+                                                        <span className="text-gray-500 text-xs ml-auto">{grouped[className].length} aula(s)</span>
                                                     </div>
-                                                    <div className="flex gap-4 text-xs text-gray-400 ml-6">
-                                                        <span>Turma: <strong className="text-gray-300">{sess.className}</strong></span>
-                                                        <span>•</span>
-                                                        <span>{sess.subject}</span>
-                                                        <span>•</span>
-                                                        <span>{sess.block}</span>
+                                                    <div className="space-y-2 pl-2">
+                                                        {grouped[className].map(sess => (
+                                                            <div
+                                                                key={sess.id}
+                                                                className="bg-[#0f172a] border border-gray-800 p-4 rounded-lg hover:border-emerald-500/50 transition-colors group flex items-center justify-between"
+                                                            >
+                                                                <div
+                                                                    className="flex flex-col gap-1 flex-1 cursor-pointer"
+                                                                    onClick={() => handleLoadSession(sess)}
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <Calendar size={14} className="text-emerald-500" />
+                                                                        <span className="font-bold text-white text-sm">
+                                                                            {format(new Date(sess.date), "dd 'de' MMMM, yyyy", { locale: ptBR })}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex gap-4 text-xs text-gray-400 ml-6">
+                                                                        <span>{sess.subject}</span>
+                                                                        <span>•</span>
+                                                                        <span>{sess.block}</span>
+                                                                    </div>
+                                                                    {sess.generalNotes && (
+                                                                        <p className="text-[10px] text-gray-500 ml-6 mt-1 truncate max-w-md">
+                                                                            "{sess.generalNotes}"
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    {userRole === UserRole.COORDINATOR ? (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleDeleteSession(sess); }}
+                                                                            className="p-2 rounded-lg text-gray-600 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                                                            title="Excluir registro"
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </button>
+                                                                    ) : (
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); handleRequestDeleteSession(sess); }}
+                                                                            className="p-2 rounded-lg text-gray-600 hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                                                                            title="Solicitar exclusão ao coordenador"
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </button>
+                                                                    )}
+                                                                    <ArrowRight size={18} className="text-gray-600 group-hover:text-emerald-500 transition-colors" />
+                                                                </div>
+                                                            </div>
+                                                        ))}
                                                     </div>
-                                                    {sess.generalNotes && (
-                                                        <p className="text-[10px] text-gray-500 ml-6 mt-1 truncate max-w-md">
-                                                            "{sess.generalNotes}"
-                                                        </p>
-                                                    )}
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    {userRole === UserRole.COORDINATOR ? (
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleDeleteSession(sess); }}
-                                                            className="p-2 rounded-lg text-gray-600 hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                                                            title="Excluir registro"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); handleRequestDeleteSession(sess); }}
-                                                            className="p-2 rounded-lg text-gray-600 hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
-                                                            title="Solicitar exclusão ao coordenador"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
-                                                    )}
-                                                    <ArrowRight size={18} className="text-gray-600 group-hover:text-emerald-500 transition-colors" />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>

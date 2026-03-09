@@ -32,7 +32,10 @@ export const SupabaseService = {
 
             if (usageData) {
                 const usedIds = new Set(usageData.map((u: any) => u.module_id));
-                dataToReturn = data.filter((m: any) => !usedIds.has(m.id));
+                // Keep Cap 0 / Mod 0 modules (special always-available modules) even if used
+                dataToReturn = data.filter((m: any) =>
+                    !usedIds.has(m.id) || (String(m.chapter) === '0' && String(m.module) === '0')
+                );
             }
         }
 
