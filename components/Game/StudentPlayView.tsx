@@ -381,9 +381,26 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                 )}
 
                 {showHint && (
-                    <div className="bg-amber-500/10 border border-amber-500/20 px-5 py-4 rounded-xl text-amber-300 text-center font-medium">
-                        <b className="block text-amber-400 mb-1">Fórmula Recomendada:</b>
-                        {q.hint}
+                    <div className="bg-amber-500/10 border border-amber-500/20 px-5 py-4 rounded-xl flex flex-col gap-3">
+                        <div className="flex items-center gap-2 text-amber-400 font-black">
+                            <span>💡</span>
+                            <span>Dica</span>
+                            <span className="ml-auto text-xs font-normal text-amber-500/70 italic">-30% nos pontos</span>
+                        </div>
+                        {/* Fórmula recomendada renderizada com KaTeX */}
+                        <div className="bg-black/40 border border-amber-500/20 rounded-xl px-4 py-3 text-center">
+                            <p className="text-amber-500 text-xs font-bold uppercase tracking-wider mb-2">Fórmula</p>
+                            <p className="text-amber-200 text-xl font-bold">
+                                <MathText text={q.hint} />
+                            </p>
+                        </div>
+                        {/* Orientação sem dar a resposta */}
+                        <div className="text-amber-300/80 text-sm leading-relaxed">
+                            <b className="text-amber-400">Como usar:</b> Identifique os valores do enunciado e substitua cada variável da fórmula. Calcule com atenção os expoentes e as operações. Lembre das unidades.
+                        </div>
+                        <p className="text-amber-500/60 text-xs italic text-center">
+                            Os dados de que você precisa estão no enunciado acima.
+                        </p>
                     </div>
                 )}
 
