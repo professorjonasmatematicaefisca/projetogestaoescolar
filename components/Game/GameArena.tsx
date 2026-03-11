@@ -109,7 +109,18 @@ const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) 
             .in('status', ['waiting', 'active'])
             .order('created_at', { ascending: false });
 
-        setAvailableSessions(data || []);
+        // Filtra para manter apenas a sessão mais recente de cada professor
+        const latestSessions: SessionInfo[] = [];
+        const seenTeachers = new Set<string>();
+        
+        for (const sess of (data || [])) {
+            if (!seenTeachers.has(sess.teacher_name)) {
+                latestSessions.push(sess);
+                seenTeachers.add(sess.teacher_name);
+            }
+        }
+
+        setAvailableSessions(latestSessions);
 
         // Se temos um ID salvo, mas que não está mais aberto ou disponível
         if (selectedSessionId && data) {

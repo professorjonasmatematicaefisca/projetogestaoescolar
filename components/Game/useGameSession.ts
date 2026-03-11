@@ -65,7 +65,11 @@ export function useGameSession(
             return;
         }
         const tick = () => {
-            const elapsed = Math.floor((Date.now() - new Date(questionStartTime).getTime()) / 1000);
+            // Garantir que a string de data seja interpretada como UTC adicionando 'Z' se não houver fuso horário explícito
+            const dateStr = questionStartTime.endsWith('Z') || questionStartTime.includes('+') || questionStartTime.includes('-') && questionStartTime.lastIndexOf('-') > 10 
+                ? questionStartTime 
+                : `${questionStartTime}Z`;
+            const elapsed = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
             setTimeLeft(Math.max(0, QUESTION_DURATION - elapsed));
         };
         tick();

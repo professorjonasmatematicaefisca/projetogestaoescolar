@@ -99,8 +99,9 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
             setCurrentAnswer('');
             setHintUsed(false);
             setShowHint(false);
-            setAnswered(false);
-            setWasCorrect(null);
+            const alreadyAnswered = myParticipant?.answered_current ?? false;
+            setAnswered(alreadyAnswered);
+            setWasCorrect(null); // O professor ainda não liberou a correção se atualizou, mas se já acabou, mostramos info genérica.
             setPointsEarned(0);
             setMaxPoints(1000);
         }
@@ -396,14 +397,17 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                         />
                     </div>
                 ) : (
-                    <div className={`rounded-2xl p-6 border text-center ${wasCorrect ? 'bg-emerald-900/30 border-emerald-500/40' : 'bg-red-900/20 border-red-500/30'}`}>
-                        <div className="text-5xl mb-3">{wasCorrect ? '🎉' : '😞'}</div>
-                        <p className={`text-2xl font-black mb-1 ${wasCorrect ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {wasCorrect ? `+${pointsEarned} pontos!` : 'Resposta incorreta'}
+                    <div className={`rounded-2xl p-6 border text-center ${wasCorrect === true ? 'bg-emerald-900/30 border-emerald-500/40' : wasCorrect === false ? 'bg-red-900/20 border-red-500/30' : 'bg-[#8bc34a]/10 border-[#8bc34a]/30'}`}>
+                        <div className="text-5xl mb-3">{wasCorrect === true ? '🎉' : wasCorrect === false ? '😞' : '✅'}</div>
+                        <p className={`text-2xl font-black mb-1 ${wasCorrect === true ? 'text-emerald-400' : wasCorrect === false ? 'text-red-400' : 'text-[#8bc34a]'}`}>
+                            {wasCorrect === true ? `+${pointsEarned} pontos!` : wasCorrect === false ? 'Resposta incorreta' : 'Resposta registrada!'}
                         </p>
-                        {wasCorrect
+                        {wasCorrect === true
                             ? <CheckCircle size={20} className="text-emerald-400 mx-auto" />
-                            : <XCircle size={20} className="text-red-400 mx-auto" />}
+                            : wasCorrect === false 
+                                ? <XCircle size={20} className="text-red-400 mx-auto" />
+                                : <CheckCircle size={20} className="text-[#8bc34a] mx-auto" />
+                        }
                         <p className="text-gray-400 text-sm mt-3">Aguardando o professor liberar a próxima questão...</p>
                     </div>
                 )}
@@ -450,12 +454,14 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                     <b className="text-gray-300">Painel do Parque:</b> Gravidade (g) = 10 m/s² | Densidade = 1000 kg/m³ | 1 m/s = 3,6 km/h
                 </div>
 
-                <div className="bg-black/30 border border-[#8bc34a]/10 rounded-2xl p-4">
-                    <h3 className="text-[#8bc34a] font-bold text-sm mb-3 flex items-center gap-2">
-                        <Trophy size={14} /> Sua Posição
-                    </h3>
-                    <LiveLeaderboard participants={participants} myName={studentName} onlyMe compact />
-                </div>
+                {timeLeft === 0 && (
+                    <div className="bg-black/30 border border-[#8bc34a]/10 rounded-2xl p-4">
+                        <h3 className="text-[#8bc34a] font-bold text-sm mb-3 flex items-center gap-2">
+                            <Trophy size={14} /> Sua Posição (Tempo Esgotado)
+                        </h3>
+                        <LiveLeaderboard participants={participants} myName={studentName} onlyMe compact />
+                    </div>
+                )}
             </div>
         </div>
     );
