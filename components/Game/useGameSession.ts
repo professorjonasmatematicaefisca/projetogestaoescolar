@@ -19,6 +19,7 @@ export interface GameParticipant {
     score: number;
     answered_current: boolean;
     last_seen: string;
+    status: 'pending' | 'approved' | 'rejected';
     created_at: string;
     updated_at: string;
 }
@@ -34,6 +35,8 @@ interface UseGameSessionReturn {
     createSession: (teacherName: string) => Promise<GameSession | null>;
     startNextQuestion: () => Promise<void>;
     finishGame: () => Promise<void>;
+    approveParticipant: (id: string) => Promise<void>;
+    rejectParticipant: (id: string) => Promise<void>;
     // Student actions
     joinSession: (sessionId: string, studentName: string) => Promise<GameParticipant | null>;
     submitAnswer: (isCorrect: boolean, pointsEarned: number) => Promise<void>;
@@ -229,21 +232,20 @@ export function useGameSession(
             .update({ status: 'finished' })
             .eq('id', session.id);
 
-        // 2. Aguarda 3 s para os alunos verem o ranking final
-        await new Promise(r => setTimeout(r, 3000));
-
-        // 3. Deleta participantes da sessão
-        await supabase
-            .from('game_participants')
-            .delete()
-            .eq('session_id', session.id);
-
-        // 4. Remove o ID da sessão do localStorage (professor volta ao início)
+        // 2. Remove o ID da sessão do localStorage (professor volta ao início)
         localStorage.removeItem('wetwiquest_session_id');
 
-        // 5. Recarrega a página para resetar o estado local do professor
+        // 3. Recarrega a página para resetar o estado local do professor
         //    (estado React vai ser resetado automaticamente junto com sessionId)
         window.location.reload();
+    };
+
+    const approveParticipant = async (id: string) => {
+        await supabase.from('game_participants').update({ status: 'approved' }).eq('id', id);
+    };
+
+    const rejectParticipant = async (id: string) => {
+        await supabase.from('game_participants').update({ status: 'rejected' }).eq('id', id);
     };
 
     // ─── Ações do Aluno ───
@@ -251,7 +253,7 @@ export function useGameSession(
     const joinSession = async (sid: string, studentName: string): Promise<GameParticipant | null> => {
         const { data, error } = await supabase
             .from('game_participants')
-            .insert({ session_id: sid, student_name: studentName, score: 0 })
+            .insert({ session_id: sid, student_name: studentName, score: 0, status: 'pending' })
             .select()
             .single();
         if (error) { setError(error.message); return null; }
@@ -269,6 +271,6 @@ export function useGameSession(
 
     return {
         session, participants, myParticipant, timeLeft, loading, error,
-        createSession, startNextQuestion, finishGame, joinSession, submitAnswer,
+        createSession, startNextQuestion, finishGame, approveParticipant, rejectParticipant, joinSession, submitAnswer,
     };
 }

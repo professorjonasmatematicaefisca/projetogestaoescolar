@@ -3,7 +3,7 @@ import { questions } from './gameData';
 import { useGameSession } from './useGameSession';
 import { LiveLeaderboard } from './LiveLeaderboard';
 import { MathText } from './MathText';
-import { Play, SkipForward, Square, Users, Trophy, Clock, AlertTriangle, Loader, BookOpen, BarChart3 } from 'lucide-react';
+import { Play, SkipForward, Square, Users, Trophy, Clock, AlertTriangle, Loader, BookOpen, BarChart3, CheckSquare, XSquare } from 'lucide-react';
 
 interface TeacherControlPanelProps {
     teacherName: string;
@@ -16,7 +16,7 @@ type TabId = 'controle' | 'questao' | 'ranking';
 export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
     teacherName, sessionId, onCreateSession,
 }) => {
-    const { session, participants, timeLeft, loading, startNextQuestion, finishGame } =
+    const { session, participants, timeLeft, loading, startNextQuestion, finishGame, approveParticipant, rejectParticipant } =
         useGameSession(sessionId, null);
     const [confirming, setConfirming] = useState(false);
     const [tab, setTab] = useState<TabId>('controle');
@@ -24,7 +24,10 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
     const qi = session?.current_question_index ?? -1;
     const isLast = qi >= questions.length - 1;
     const currentQ = qi >= 0 ? questions[qi] : null;
-    const answeredCount = participants.filter(p => p.answered_current).length;
+    const approvedParticipants = participants.filter(p => p.status === 'approved');
+    const pendingParticipants = participants.filter(p => p.status === 'pending');
+
+    const answeredCount = approvedParticipants.filter(p => p.answered_current).length;
     const timerPct = (timeLeft / 180) * 100;
     const timerColor = timeLeft > 60 ? '#8bc34a' : timeLeft > 30 ? '#ffb300' : '#ff4b4b';
     const timerExpired = timeLeft === 0 && session?.status === 'active';
@@ -56,7 +59,7 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
     const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
         { id: 'controle', label: 'Controle', icon: <Play size={15} /> },
         { id: 'questao', label: `Questão ${qi >= 0 ? qi + 1 : '—'}`, icon: <BookOpen size={15} /> },
-        { id: 'ranking', label: `Ranking (${participants.length})`, icon: <BarChart3 size={15} /> },
+        { id: 'ranking', label: `Ranking (${approvedParticipants.length})`, icon: <BarChart3 size={15} /> },
     ];
 
     return (
@@ -70,7 +73,12 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                 <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2 bg-[#8bc34a]/10 border border-[#8bc34a]/20 px-4 py-2 rounded-xl">
                         <Users size={16} className="text-[#8bc34a]" />
-                        <span className="text-[#8bc34a] font-black text-lg">{participants.length}</span>
+                        <span className="text-[#8bc34a] font-black text-lg">{approvedParticipants.length}</span>
+                        {pendingParticipants.length > 0 && (
+                            <span className="ml-1 text-amber-500 font-bold text-sm bg-amber-500/20 px-2 py-0.5 rounded-md">
+                                +{pendingParticipants.length} pendentes
+                            </span>
+                        )}
                     </div>
                     {qi >= 0 && (
                         <div className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-gray-300 font-bold text-sm">
@@ -78,8 +86,8 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                         </div>
                     )}
                     <div className={`px-4 py-2 rounded-xl font-bold text-sm border ${session?.status === 'waiting' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
-                            session?.status === 'active' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
-                                'bg-gray-500/10 border-gray-500/20 text-gray-400'
+                        session?.status === 'active' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                            'bg-gray-500/10 border-gray-500/20 text-gray-400'
                         }`}>
                         {session?.status === 'waiting' ? '⏳ Aguardando' :
                             session?.status === 'active' ? '🔴 Ao Vivo' : '✅ Encerrado'}
@@ -119,7 +127,7 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                             <div className="flex items-center gap-2 text-sm">
                                 <div className={`w-2 h-2 rounded-full ${answeredCount === participants.length ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
                                 <span className="text-gray-400">
-                                    <span className="text-white font-bold">{answeredCount}/{participants.length}</span> já responderam
+                                    <span className="text-white font-bold">{answeredCount}/{approvedParticipants.length}</span> já responderam
                                 </span>
                             </div>
                             {timerExpired && (
@@ -127,6 +135,30 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                                     <AlertTriangle size={16} /> Tempo esgotado! Libere a próxima questão abaixo.
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* Lista de Espera */}
+                    {session?.status === 'waiting' && pendingParticipants.length > 0 && (
+                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 mb-2">
+                            <div className="text-amber-400 font-black mb-3 flex items-center gap-2">
+                                <AlertTriangle size={18} /> {pendingParticipants.length} aluno(s) aguardando liberação para entrar
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                {pendingParticipants.map(p => (
+                                    <div key={p.id} className="flex items-center justify-between bg-black/40 border border-white/5 rounded-xl px-4 py-3">
+                                        <span className="text-white font-bold">{p.student_name}</span>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => approveParticipant(p.id)} className="flex items-center gap-1 bg-[#8bc34a]/20 text-[#8bc34a] hover:bg-[#8bc34a]/40 px-3 py-1.5 rounded-lg border border-[#8bc34a]/30 transition font-bold text-sm">
+                                                <CheckSquare size={16} /> Liberar
+                                            </button>
+                                            <button onClick={() => rejectParticipant(p.id)} className="flex items-center gap-1 bg-red-500/20 text-red-400 hover:bg-red-500/40 px-3 py-1.5 rounded-lg border border-red-500/30 transition font-bold text-sm">
+                                                <XSquare size={16} /> Recusar
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
 
@@ -220,9 +252,9 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                     <div className="flex items-center gap-2 mb-4">
                         <Trophy size={18} className="text-yellow-400" />
                         <h3 className="text-white font-black">Ranking Ao Vivo</h3>
-                        <span className="ml-auto text-xs text-gray-500">{participants.length} participante(s)</span>
+                        <span className="ml-auto text-xs text-gray-500">{approvedParticipants.length} participante(s)</span>
                     </div>
-                    <LiveLeaderboard participants={participants} />
+                    <LiveLeaderboard participants={approvedParticipants} />
                 </div>
             )}
         </div>

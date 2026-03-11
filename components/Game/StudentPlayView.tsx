@@ -76,21 +76,14 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
     const [maxPoints, setMaxPoints] = useState(1000);
     const prevQuestionIndexRef = useRef(-1);
 
-    // Limpa sessionStorage do aluno quando a sessão é encerrada
-    // Isso garante que na próxima sessão o aluno entre como novo participante
-    useEffect(() => {
-        if (session?.status === 'finished' || session?.status === 'waiting') {
-            // Só limpa se a questão já foi exibida (status 'finished') ou nova sessão  
-            if (session.status === 'finished') {
-                // Dá 5 s para o aluno ver o ranking antes de limpar
-                const t = setTimeout(() => {
-                    sessionStorage.removeItem(`game_student_name_${sessionId}`);
-                    sessionStorage.removeItem(`game_participant_id_${sessionId}`);
-                }, 5000);
-                return () => clearTimeout(t);
-            }
-        }
-    }, [session?.status, sessionId]);
+    // Não limpa sessionStorage automaticamente quando session === 'finished', 
+    // mas sim somente no clique explícito do aluno ao sair.
+    // Assim garantimos que o aluno sempre veja o ranking final.
+    const handleLeaveSession = () => {
+        sessionStorage.removeItem(`game_student_name_${sessionId}`);
+        sessionStorage.removeItem(`game_participant_id_${sessionId}`);
+        window.location.reload();
+    };
 
     // Reset ao mudar de questão
     useEffect(() => {
@@ -238,51 +231,95 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
         );
     }
 
+    if (!myParticipant) {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <Loader size={40} className="text-[#8bc34a] animate-spin" />
+                <p className="text-gray-400 font-bold">Conectando à sessão...</p>
+            </div>
+        );
+    }
+
+    if (myParticipant.status === 'rejected') {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 gap-6">
+                <div className="text-6xl">⛔</div>
+                <h2 className="text-2xl font-black text-red-500">Entrada Não Autorizada</h2>
+                <p className="text-gray-400 text-center max-w-sm mb-4">
+                    O professor não autorizou sua entrada nesta sessão.
+                </p>
+                <button onClick={handleLeaveSession}
+                    className="bg-gray-700 text-white font-bold px-6 py-3 rounded-xl hover:bg-gray-600 transition">
+                    Voltar ao Início
+                </button>
+            </div>
+        );
+    }
+
+    if (myParticipant.status === 'pending') {
+        return (
+            <div className="flex flex-col items-center justify-center py-20 gap-6">
+                <Loader size={50} className="text-amber-500 animate-spin mb-4" />
+                <h2 className="text-xl font-black text-amber-500">Aguardando Autorização</h2>
+                <p className="text-amber-400/80 text-center max-w-sm">
+                    Sua solicitação está pendente. O professor precisa autorizar sua entrada no painel de controle.
+                </p>
+                <button onClick={handleLeaveSession}
+                    className="bg-gray-800 text-white font-bold px-4 py-2 mt-4 rounded-lg hover:bg-gray-700 transition text-sm">
+                    Cancelar Solicitação
+                </button>
+            </div>
+        );
+    }
+
     if (!session) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: '#0a1a0d' }}>
-                <Wifi size={40} className="text-red-400" />
+                <Loader size={40} className="text-red-400" />
                 <p className="text-red-400 font-bold">Sessão não encontrada.</p>
             </div>
         );
     }
 
-    // ---- Aguardando início ----
     if (session.status === 'waiting') {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-4"
-                style={{ background: 'radial-gradient(ellipse at top, #0d2e14 0%, #050d06 100%)' }}>
-                <div className="text-6xl animate-bounce">🎮</div>
-                <h2 className="text-3xl font-black text-white text-center">Aguardando o Professor...</h2>
-                <p className="text-[#8bc34a] font-bold">
-                    Preparado para competir, <span className="text-white">{studentName.split(' ')[0]}</span>?
-                </p>
-                <div className="bg-black/40 border border-[#8bc34a]/20 rounded-2xl p-6 w-full max-w-md">
-                    <h3 className="text-[#8bc34a] font-bold mb-3 flex items-center gap-2">
-                        <Trophy size={16} /> Participantes ({participants.length})
-                    </h3>
-                    <LiveLeaderboard participants={participants} myName={studentName} compact />
+            <div className="flex flex-col items-center justify-center py-24 gap-6 relative overflow-hidden min-h-screen">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,195,74,0.1)_0%,transparent_60%)] animate-pulse" />
+                <div className="w-24 h-24 bg-gradient-to-br from-[#2e7d32] to-[#8bc34a] rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(139,195,74,0.4)] z-10">
+                    <span className="text-4xl text-white font-black">{myParticipant?.student_name.charAt(0).toUpperCase()}</span>
                 </div>
+                <div className="text-center z-10">
+                    <h2 className="text-2xl font-black text-white mb-2">Entrada Autorizada!</h2>
+                    <p className="text-[#8bc34a] font-bold text-lg mb-2">Você já está na sala.</p>
+                    <p className="text-gray-400">Aguardando o professor iniciar a competição...</p>
+                </div>
+                <Loader size={30} className="text-[#8bc34a] animate-spin mt-4 z-10" />
             </div>
         );
     }
 
-    // ---- Jogo finalizado ----
     if (session.status === 'finished') {
-        const myRank =
-            [...participants].sort((a, b) => b.score - a.score).findIndex(p => p.id === participantId) + 1;
+        const myRank = [...participants].filter(p => p.status === 'approved').sort((a, b) => b.score - a.score).findIndex(p => p.id === participantId) + 1;
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-4"
-                style={{ background: 'radial-gradient(ellipse at top, #0d2e14 0%, #050d06 100%)' }}>
-                <div className="text-6xl">🏆</div>
-                <h1 className="text-4xl font-black text-white">Competição Encerrada!</h1>
+            <div className="flex flex-col items-center py-10 gap-6 animate-fade-in w-full max-w-2xl mx-auto min-h-screen">
+                <div className="text-6xl animate-bounce">🏆</div>
+                <h2 className="text-3xl font-black text-white text-center">Fim de Jogo!</h2>
+
                 <p className="text-[#8bc34a] text-xl font-bold">
                     {myParticipant?.score?.toLocaleString() ?? 0} pontos — #{myRank}º lugar
                 </p>
-                <div className="bg-black/40 border border-yellow-500/20 rounded-2xl p-6 w-full max-w-lg">
-                    <h3 className="text-yellow-400 font-black text-lg mb-4 flex items-center gap-2">🏆 Ranking Final</h3>
-                    <LiveLeaderboard participants={participants} myName={studentName} />
+
+                <div className="w-full bg-black/40 border border-[#8bc34a]/30 rounded-2xl p-6 mb-6">
+                    <h3 className="text-[#8bc34a] font-bold text-lg mb-4 flex items-center gap-2 justify-center">
+                        <Trophy size={18} /> Ranking Final
+                    </h3>
+                    <LiveLeaderboard participants={participants.filter(p => p.status === 'approved')} myName={studentName} />
                 </div>
+
+                <button onClick={handleLeaveSession}
+                    className="bg-gradient-to-r from-red-600 to-red-500 text-white font-black px-8 py-4 rounded-xl shadow-[0_4px_20px_rgba(239,68,68,0.4)] hover:brightness-110 transition w-full sm:w-auto text-lg">
+                    Sair e Voltar ao Início
+                </button>
             </div>
         );
     }
