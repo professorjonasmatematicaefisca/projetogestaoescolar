@@ -124,13 +124,8 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
         setMaxPoints(Math.max(150, 1000 - (QUESTION_DURATION - timeLeft) * 5));
     }, [timeLeft]);
 
-    // Auto-submit quando tempo acaba
-    useEffect(() => {
-        // Se ainda estiver na sala de espera (indice < 0), o tempo pode chegar a 0 antes de começar a valer, então não enviar!
-        if (timeLeft === 0 && !answered && session?.status === 'active' && session.current_question_index >= 0) {
-            handleSubmit(true);
-        }
-    }, [timeLeft, session?.status, session?.current_question_index, answered]);
+    // Removido auto-submit devido a problemas de fuso horário/sincronia de relógio nos dispositivos dos alunos.
+    // O aluno agora simplesmente fará o envio manual ou sua resposta não será enviada quando o professor avançar.
 
     // Se chegou com preAuthName mas ainda não tem participantId, entra automaticamente na sessão
     useEffect(() => {
@@ -425,18 +420,15 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                         />
                     </div>
                 ) : (
-                    <div className={`rounded-2xl p-6 border text-center ${timeLeft === 0 && wasCorrect === true ? 'bg-emerald-900/30 border-emerald-500/40' : timeLeft === 0 && wasCorrect === false ? 'bg-red-900/20 border-red-500/30' : 'bg-[#8bc34a]/10 border-[#8bc34a]/30'}`}>
-                        <div className="text-5xl mb-3">{timeLeft === 0 ? (wasCorrect === true ? '🎉' : wasCorrect === false ? '😞' : '✅') : '✅'}</div>
-                        <p className={`text-2xl font-black mb-1 ${timeLeft === 0 && wasCorrect === true ? 'text-emerald-400' : timeLeft === 0 && wasCorrect === false ? 'text-red-400' : 'text-[#8bc34a]'}`}>
-                            {timeLeft === 0 ? (wasCorrect === true ? `+${pointsEarned} pontos!` : wasCorrect === false ? 'Resposta incorreta' : 'Resposta registrada!') : 'Resposta registrada!'}
+                    <div className="rounded-2xl p-6 border text-center bg-[#8bc34a]/10 border-[#8bc34a]/30">
+                        <div className="text-5xl mb-3">✅</div>
+                        <p className="text-2xl font-black mb-1 text-[#8bc34a]">
+                            Resposta registrada!
                         </p>
-                        {timeLeft === 0 && wasCorrect === true
-                            ? <CheckCircle size={20} className="text-emerald-400 mx-auto" />
-                            : timeLeft === 0 && wasCorrect === false 
-                                ? <XCircle size={20} className="text-red-400 mx-auto" />
-                                : <CheckCircle size={20} className="text-[#8bc34a] mx-auto" />
-                        }
-                        <p className="text-gray-400 text-sm mt-3">{timeLeft === 0 ? 'Aguardando o professor liberar a próxima questão...' : 'Aguarde o tempo da questão acabar...'}</p>
+                        <CheckCircle size={20} className="text-[#8bc34a] mx-auto" />
+                        <p className="text-gray-400 text-sm mt-3">
+                            Aguardando o professor liberar a próxima etapa...
+                        </p>
                     </div>
                 )}
 
