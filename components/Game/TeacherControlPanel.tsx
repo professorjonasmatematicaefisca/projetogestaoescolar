@@ -110,7 +110,7 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
             {tab === 'controle' && (
                 <div className="flex flex-col gap-4">
                     {/* Timer (apenas quando ativo) */}
-                    {session?.status === 'active' && (
+                    {session?.status === 'active' && qi >= 0 && (
                         <div className="bg-black/40 border border-[#8bc34a]/20 rounded-2xl p-5 flex flex-col gap-3">
                             <div className="flex items-center justify-between">
                                 <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Timer da Questão {qi + 1}</span>

@@ -40,7 +40,7 @@ export const GameArena: React.FC<GameArenaProps> = ({ userRole, userName, onShow
     const handleCreateSession = async () => {
         const { data, error } = await supabase
             .from('game_sessions')
-            .insert({ teacher_name: userName, status: 'waiting', current_question_index: -1 })
+            .insert({ teacher_name: userName, status: 'active', current_question_index: -1 })
             .select()
             .single();
         if (error || !data) {
