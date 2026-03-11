@@ -102,8 +102,8 @@ const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) 
     const [availableSessions, setAvailableSessions] = useState<SessionInfo[]>([]);
     const [searching, setSearching] = useState(true);
 
-    const fetchSessions = async () => {
-        setSearching(true);
+    const fetchSessions = async (showLoading = true) => {
+        if (showLoading) setSearching(true);
         // Calcula o timestamp de 12 horas atrás
         const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
 
@@ -129,14 +129,10 @@ const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) 
 
         // Se temos um ID salvo, mas que não está mais aberto ou disponível
         if (selectedSessionId && data) {
-            const stillExists = data.find(s => s.id === selectedSessionId) ||
-                // Pode ser que tenhamos uma salva que já está finished, a conferência
-                // de status "finished" agora é feita por dentro do StudentPlayView.
-                // Então deixamos passar se o ID foi recuperado.
-                true;
+            const stillExists = data.find(s => s.id === selectedSessionId) || true;
         }
 
-        setSearching(false);
+        if (showLoading) setSearching(false);
     };
 
     useEffect(() => {
@@ -145,22 +141,26 @@ const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) 
             return;
         }
 
-        fetchSessions();
+        fetchSessions(true);
 
-        // Inscreve-se para escutar modificações nas sessões (ex: professor acabou de criar uma sala)
+        const interval = setInterval(() => {
+            fetchSessions(false);
+        }, 3000);
+
+        // Mantém a inscrição do realtime como auxiliar primário
         const channel = supabase
             .channel('public:game_sessions_lobby')
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'game_sessions' },
                 () => {
-                    // Toda vez que uma sessão é alterada, removemos ou adicionamos na tela (atualiza a lista)
-                    fetchSessions();
+                    fetchSessions(false);
                 }
             )
             .subscribe();
 
         return () => {
+            clearInterval(interval);
             supabase.removeChannel(channel);
         };
     }, [selectedSessionId]);
@@ -189,7 +189,7 @@ const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) 
             ) : availableSessions.length === 0 ? (
                 <div className="bg-black/40 border border-[#8bc34a]/30 rounded-2xl p-8 w-full text-center">
                     <p className="text-gray-300 font-bold text-lg mb-4">Nenhuma competição aberta no momento.</p>
-                    <button onClick={fetchSessions} className="bg-white/5 hover:bg-white/10 text-[#8bc34a] border border-[#8bc34a]/30 px-6 py-3 rounded-xl transition font-bold">
+                    <button onClick={() => fetchSessions(true)} className="bg-white/5 hover:bg-white/10 text-[#8bc34a] border border-[#8bc34a]/30 px-6 py-3 rounded-xl transition font-bold">
                         Atualizar Lista
                     </button>
                 </div>
@@ -197,7 +197,7 @@ const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) 
                 <div className="w-full flex flex-col gap-3">
                     <div className="flex justify-between items-center mb-2 px-2">
                         <span className="text-gray-500 font-bold uppercase tracking-wider text-xs">Salas Encontradas ({availableSessions.length})</span>
-                        <button onClick={fetchSessions} className="text-[#8bc34a] text-sm hover:underline font-bold">Atualizar</button>
+                        <button onClick={() => fetchSessions(true)} className="text-[#8bc34a] text-sm hover:underline font-bold">Atualizar</button>
                     </div>
                     {availableSessions.map(sess => (
                         <div key={sess.id} className="bg-black/50 border border-[#8bc34a]/20 hover:border-[#8bc34a]/60 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition group">
