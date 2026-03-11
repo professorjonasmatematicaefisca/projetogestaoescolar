@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Question } from './gameData';
+import { MathText } from './MathText';
 
 interface InteractionProps {
     question: Question;
@@ -28,7 +29,7 @@ export const InteractionComboMatch: React.FC<InteractionProps> = ({ question, on
                 {question.optsA?.map(o => (
                     <button key={o.id} onClick={() => select('A', o.id)} disabled={disabled}
                         className={`w-full mb-2 px-2 py-3 rounded-lg text-sm text-center transition-all border cursor-pointer ${stateA === o.id ? 'bg-[#8bc34a] text-black font-bold border-[#8bc34a]' : 'bg-[#8bc34a]/10 text-white border-[#8bc34a]/30 hover:bg-[#8bc34a]/30'}`}>
-                        {o.val}
+                        <MathText text={o.val} />
                     </button>
                 ))}
             </div>
@@ -37,7 +38,7 @@ export const InteractionComboMatch: React.FC<InteractionProps> = ({ question, on
                 {question.optsB?.map(o => (
                     <button key={o.id} onClick={() => select('B', o.id)} disabled={disabled}
                         className={`w-full mb-2 px-2 py-3 rounded-lg text-sm text-center transition-all border cursor-pointer ${stateB === o.id ? 'bg-[#8bc34a] text-black font-bold border-[#8bc34a]' : 'bg-[#8bc34a]/10 text-white border-[#8bc34a]/30 hover:bg-[#8bc34a]/30'}`}>
-                        {o.val}
+                        <MathText text={o.val} />
                     </button>
                 ))}
             </div>
@@ -77,7 +78,7 @@ export const InteractionCombo3: React.FC<InteractionProps> = ({ question, onAnsw
                     {opts?.map(o => (
                         <button key={o.id} onClick={() => select(key, o.id)} disabled={disabled}
                             className={`w-full mb-2 px-1 py-2 rounded-lg text-xs text-center transition-all border ${states[key] === o.id ? 'bg-[#8bc34a] text-black font-bold border-[#8bc34a]' : 'bg-[#8bc34a]/10 text-white border-[#8bc34a]/30 hover:bg-[#8bc34a]/30'}`}>
-                            {o.val}
+                            <MathText text={o.val} />
                         </button>
                     ))}
                 </div>

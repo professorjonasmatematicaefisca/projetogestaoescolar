@@ -4,6 +4,7 @@ import { useGameSession } from './useGameSession';
 import { QuestionInteraction } from './QuestionInteractions';
 import { GameLogin } from './GameLogin';
 import { LiveLeaderboard } from './LiveLeaderboard';
+import { MathText } from './MathText';
 import { supabase } from '../../supabaseClient';
 import { Clock, Trophy, CheckCircle, XCircle, Loader, Wifi } from 'lucide-react';
 
@@ -302,7 +303,11 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                     <div className="h-full rounded-full transition-all duration-1000"
                         style={{ width: `${timerPct}%`, background: timerColor }} />
                 </div>
-                <div className="text-right">
+                {/* Número da questão */}
+                <div className="bg-white/10 border border-white/10 px-3 py-1 rounded-lg text-xs font-bold text-gray-300 shrink-0">
+                    Q {qi + 1}/{questions.length}
+                </div>
+                <div className="shrink-0 text-right">
                     <span className="text-[#8bc34a] font-black">{hintUsed ? Math.floor(maxPoints * 0.7) : maxPoints}</span>
                     <span className="text-gray-500 text-xs ml-1">pts</span>
                 </div>
@@ -319,7 +324,7 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                 <h2 className="text-[#8bc34a] font-black text-xl">{q.title}</h2>
 
                 <div className="bg-black/60 border-l-4 border-[#8bc34a] px-5 py-4 rounded-xl text-gray-200 text-base leading-relaxed font-medium italic">
-                    "{q.text}"
+                    “<MathText text={q.text} />”
                 </div>
 
                 {/* Interação */}
@@ -372,9 +377,9 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
 
                 <div className="bg-black/30 border border-[#8bc34a]/10 rounded-2xl p-4">
                     <h3 className="text-[#8bc34a] font-bold text-sm mb-3 flex items-center gap-2">
-                        <Trophy size={14} /> Ranking Ao Vivo
+                        <Trophy size={14} /> Sua Posição
                     </h3>
-                    <LiveLeaderboard participants={participants} myName={studentName} compact />
+                    <LiveLeaderboard participants={participants} myName={studentName} onlyMe compact />
                 </div>
             </div>
         </div>
