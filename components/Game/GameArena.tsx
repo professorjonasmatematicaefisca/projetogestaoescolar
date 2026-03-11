@@ -12,18 +12,19 @@ interface GameArenaProps {
     onShowToast: (msg: string) => void;
 }
 
-// ID da sessão armazenado para persistência entre recarregamentos
 const SESSION_STORAGE_KEY = 'wetwiquest_session_id';
 
 export const GameArena: React.FC<GameArenaProps> = ({ userRole, userName, onShowToast }) => {
     const isTeacherOrCoordinator =
         userRole === UserRole.TEACHER || userRole === UserRole.COORDINATOR;
 
+    const isGameStudent = userRole === UserRole.GAME_STUDENT;
+
     const [sessionId, setSessionId] = useState<string | null>(() => {
         return localStorage.getItem(SESSION_STORAGE_KEY);
     });
 
-    const { session, createSession } = useGameSession(
+    const { createSession } = useGameSession(
         isTeacherOrCoordinator ? sessionId : null,
         null
     );
@@ -49,7 +50,7 @@ export const GameArena: React.FC<GameArenaProps> = ({ userRole, userName, onShow
         if (newSession) {
             localStorage.setItem(SESSION_STORAGE_KEY, newSession.id);
             setSessionId(newSession.id);
-            onShowToast('Sessão criada! Compartilhe o código com os alunos.');
+            onShowToast('Sessão criada! Alunos devem acessar o menu Game para entrar.');
         } else {
             onShowToast('Erro ao criar sessão. Tente novamente.');
         }
@@ -59,22 +60,14 @@ export const GameArena: React.FC<GameArenaProps> = ({ userRole, userName, onShow
     if (isTeacherOrCoordinator) {
         return (
             <div className="min-h-full">
-                {/* Instruções para alunos */}
                 {sessionId && (
                     <div className="mb-4 bg-[#8bc34a]/10 border border-[#8bc34a]/20 rounded-xl px-5 py-3 flex items-center gap-3 flex-wrap">
                         <ExternalLink size={16} className="text-[#8bc34a] shrink-0" />
                         <p className="text-sm text-gray-300 flex-1">
-                            Os alunos devem acessar a plataforma e navegar até <span className="text-[#8bc34a] font-bold">Game</span> no menu lateral para entrar na competição.
+                            Os alunos acessam com o email escolar (<span className="font-mono text-[#8bc34a]">joaogomes@cocpaulinia.com.br</span>) + senha <b>123</b> e verão apenas a aba <span className="text-[#8bc34a] font-bold">Game</span>.
                         </p>
-                        <button
-                            onClick={() => { navigator.clipboard.writeText(sessionId); onShowToast('ID da sessão copiado!'); }}
-                            className="text-[#8bc34a] border border-[#8bc34a]/30 text-xs font-mono px-3 py-1.5 rounded-lg hover:bg-[#8bc34a]/10 transition shrink-0"
-                        >
-                            {sessionId.slice(0, 12)}… (copiar)
-                        </button>
                     </div>
                 )}
-
                 <TeacherControlPanel
                     teacherName={userName}
                     sessionId={sessionId}
@@ -84,15 +77,14 @@ export const GameArena: React.FC<GameArenaProps> = ({ userRole, userName, onShow
         );
     }
 
-    // ---- Alunos e outros roles ----
-    // Buscar sessão ativa (status waiting ou active)
-    return <ActiveStudentGame userName={userName} />;
+    // ---- Alunos do Game (GAME_STUDENT) e outros roles ----
+    // preAuthName: se já autenticado como GAME_STUDENT, pula o login interno do jogo
+    return <ActiveStudentGame preAuthName={isGameStudent ? userName : undefined} />;
 };
 
-// Componente auxiliar: busca a sessão ativa para alunos
-const ActiveStudentGame: React.FC<{ userName: string }> = ({ userName }) => {
+// Componente auxiliar: busca a sessão ativa e renderiza o jogo
+const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) => {
     const [sessionId, setSessionId] = useState<string | null>(() => {
-        // Verificar sessões salvas no sessionStorage
         for (let i = 0; i < sessionStorage.length; i++) {
             const key = sessionStorage.key(i);
             if (key?.startsWith('game_student_name_')) {
@@ -107,7 +99,6 @@ const ActiveStudentGame: React.FC<{ userName: string }> = ({ userName }) => {
     useEffect(() => {
         const findActiveSession = async () => {
             if (sessionId) {
-                // Verificar se a sessão salva ainda é válida
                 const { data } = await supabase
                     .from('game_sessions')
                     .select('id, status')
@@ -117,7 +108,6 @@ const ActiveStudentGame: React.FC<{ userName: string }> = ({ userName }) => {
                 if (data) { setFound(true); setSearching(false); return; }
                 setSessionId(null);
             }
-            // Buscar qualquer sessão ativa
             const { data } = await supabase
                 .from('game_sessions')
                 .select('id')
@@ -158,5 +148,5 @@ const ActiveStudentGame: React.FC<{ userName: string }> = ({ userName }) => {
         );
     }
 
-    return <StudentPlayView sessionId={sessionId} />;
+    return <StudentPlayView sessionId={sessionId} preAuthName={preAuthName} />;
 };

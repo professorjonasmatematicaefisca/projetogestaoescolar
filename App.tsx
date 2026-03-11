@@ -64,6 +64,7 @@ function App() {
         if (storedRole === UserRole.COORDINATOR) setCurrentView('DASHBOARD');
         else if (storedRole === UserRole.TEACHER) setCurrentView('MONITORING');
         else if (storedRole === UserRole.STUDENT || storedRole === UserRole.PARENT) setCurrentView('MESSAGES');
+        else if (storedRole === UserRole.GAME_STUDENT) setCurrentView('GAME');
         else setCurrentView('OCCURRENCES');
       }
     }
@@ -160,6 +161,7 @@ function App() {
     if (role === UserRole.COORDINATOR) initialView = 'DASHBOARD';
     else if (role === UserRole.TEACHER) initialView = 'MONITORING';
     else if (role === UserRole.STUDENT || role === UserRole.PARENT) initialView = 'MESSAGES';
+    else if (role === UserRole.GAME_STUDENT) initialView = 'GAME';
     else initialView = 'OCCURRENCES';
 
     setCurrentView(initialView);

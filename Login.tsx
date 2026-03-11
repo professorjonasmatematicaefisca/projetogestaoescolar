@@ -25,6 +25,40 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         setLoading(true);
 
         try {
+            const emailLower = email.trim().toLowerCase();
+
+            // ── Fluxo do aluno do Game: @cocpaulinia.com.br + senha 123 ──
+            if (emailLower.endsWith('@cocpaulinia.com.br') && password === '123') {
+                const { supabase } = await import('./supabaseClient');
+                const { data: students } = await supabase
+                    .from('students')
+                    .select('name')
+                    .eq('status', 'ACTIVE');
+
+                if (students && students.length > 0) {
+                    const localPart = emailLower.split('@')[0];
+                    // Normaliza removendo acentos para comparação
+                    const normalize = (s: string) =>
+                        s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '');
+
+                    let found: { name: string } | null = null;
+                    for (const student of students) {
+                        const parts = student.name.trim().split(/\s+/);
+                        if (parts.length < 2) continue;
+                        if (normalize(parts[0]) + normalize(parts[1]) === localPart) { found = student; break; }
+                        if (parts.length >= 3 && normalize(parts[0]) + normalize(parts[2]) === localPart) { found = student; break; }
+                    }
+
+                    if (found) {
+                        onLogin(UserRole.GAME_STUDENT, emailLower, found.name);
+                        return;
+                    }
+                }
+                setError('Email não encontrado. Verifique se digitou corretamente: primeironome+sobrenome@cocpaulinia.com.br');
+                return;
+            }
+
+            // ── Fluxo padrão (professores, coordenadores, etc.) ──
             const result = await SupabaseService.loginUser(email, password);
 
             if (result.success && result.role && result.email) {

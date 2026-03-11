@@ -9,6 +9,7 @@ import { Clock, Trophy, CheckCircle, XCircle, Loader, Wifi } from 'lucide-react'
 
 interface StudentPlayViewProps {
     sessionId: string;
+    preAuthName?: string; // nome do aluno já autenticado via login do EduControl
 }
 
 const QUESTION_DURATION = 180;
@@ -47,16 +48,20 @@ function findStudentByEmail(email: string, students: { name: string }[]): { name
     return null;
 }
 
-export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) => {
-    // Estado de autenticação do game — persiste via sessionStorage
-    const [studentName, setStudentName] = useState<string>(() =>
-        sessionStorage.getItem(`game_student_name_${sessionId}`) || ''
-    );
+export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, preAuthName }) => {
+    // Se preAuthName foi fornecido (aluno logado via EduControl), usá-lo diretamente
+    const [studentName, setStudentName] = useState<string>(() => {
+        if (preAuthName) return preAuthName;
+        return sessionStorage.getItem(`game_student_name_${sessionId}`) || '';
+    });
     const [participantId, setParticipantId] = useState<string | null>(() =>
         sessionStorage.getItem(`game_participant_id_${sessionId}`) || null
     );
     const [loginLoading, setLoginLoading] = useState(false);
     const [loginError, setLoginError] = useState('');
+
+    // Se chegou com preAuthName mas sem participantId, cria o participante automaticamente
+    const [autoJoining, setAutoJoining] = useState(false);
 
     const { session, participants, myParticipant, timeLeft, loading, joinSession, submitAnswer } =
         useGameSession(sessionId, participantId);
@@ -97,6 +102,35 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
             handleSubmit(true);
         }
     }, [timeLeft]);
+
+    // Se chegou com preAuthName mas ainda não tem participantId, entra automaticamente na sessão
+    useEffect(() => {
+        if (!preAuthName || participantId || autoJoining) return;
+        setAutoJoining(true);
+        const autoJoin = async () => {
+            // Verificar se já existe participante com esse nome
+            const { data: existing } = await supabase
+                .from('game_participants')
+                .select('id')
+                .eq('session_id', sessionId)
+                .eq('student_name', preAuthName)
+                .maybeSingle();
+
+            let pid: string;
+            if (existing) {
+                pid = existing.id;
+            } else {
+                const participant = await joinSession(sessionId, preAuthName);
+                if (!participant) return;
+                pid = participant.id;
+            }
+            setParticipantId(pid);
+            sessionStorage.setItem(`game_student_name_${sessionId}`, preAuthName);
+            sessionStorage.setItem(`game_participant_id_${sessionId}`, pid);
+            setAutoJoining(false);
+        };
+        autoJoin();
+    }, [preAuthName, sessionId]);
 
     // ---- Login: valida email e busca nome cadastrado no banco ----
     const handleLogin = async (email: string) => {
@@ -166,8 +200,8 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
         await submitAnswer(isCorrect, pts);
     };
 
-    // ---- Tela de login ----
-    if (!studentName || !participantId) {
+    // ---- Tela de login: apenas se não há nome (nem via EduControl, nem via sessão) ----
+    if (!studentName || (!participantId && !autoJoining && !preAuthName)) {
         return (
             <GameLogin
                 sessionId={sessionId}
@@ -178,7 +212,8 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
         );
     }
 
-    if (loading) {
+    // Loading do auto-join ou da sessão
+    if (loading || autoJoining) {
         return (
             <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a1a0d' }}>
                 <Loader size={40} className="text-[#8bc34a] animate-spin" />

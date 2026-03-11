@@ -81,7 +81,8 @@ export const Layout: React.FC<LayoutProps> = ({
     [UserRole.TEACHER]: ['MONITORING', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'MESSAGES', 'SETTINGS', 'FOA', 'GAME'],
     [UserRole.MONITOR]: ['OCCURRENCES', 'SETTINGS'],
     [UserRole.STUDENT]: ['DASHBOARD', 'REQUESTS', 'MESSAGES', 'SETTINGS', 'GAME'],
-    [UserRole.PARENT]: ['DASHBOARD', 'REQUESTS', 'MESSAGES', 'SETTINGS']
+    [UserRole.PARENT]: ['DASHBOARD', 'REQUESTS', 'MESSAGES', 'SETTINGS'],
+    [UserRole.GAME_STUDENT]: ['GAME'],
   };
 
   const menuItems = [
@@ -153,7 +154,7 @@ export const Layout: React.FC<LayoutProps> = ({
 
         <div className="p-4 flex-1 overflow-y-auto">
           <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 px-2">
-            Menu {role === UserRole.COORDINATOR ? 'Coordenador' : role === UserRole.TEACHER ? 'Professor' : 'Monitor'}
+            Menu {role === UserRole.COORDINATOR ? 'Coordenador' : role === UserRole.TEACHER ? 'Professor' : role === UserRole.GAME_STUDENT ? 'Aluno' : 'Monitor'}
           </div>
           <nav className="space-y-2">
             {menuItems.map((item) => {
