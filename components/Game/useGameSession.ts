@@ -126,63 +126,34 @@ export function useGameSession(
                     recalcTimer(updated.question_start_time, updated.status);
                 }
             )
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    // Canal ativo — nada a fazer
-                }
-                if (status === 'CHANNEL_ERROR') {
-                    // Fallback: polling a cada 3 s se canal falhar
-                    const interval = setInterval(async () => {
-                        const { data } = await supabase.from('game_sessions').select('*').eq('id', sessionId).single();
-                        if (data && isMounted) {
-                            const s = data as GameSession;
-                            setSession(prev => {
-                                if (prev?.current_question_index !== s.current_question_index || prev?.status !== s.status) {
-                                    recalcTimer(s.question_start_time, s.status);
-                                    return s;
-                                }
-                                return prev;
-                            });
-                        }
-                    }, 3000);
-                    return () => clearInterval(interval);
-                }
-            });
-
-        // ─── Realtime: game_participants ───
-        const participantsChannel = supabase
-            .channel(`participants:${sessionId}`)
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'game_participants', filter: `session_id=eq.${sessionId}` },
-                (payload) => {
-                    if (!isMounted) return;
-                    setParticipants((prev) => {
-                        let updated: GameParticipant[];
-                        if (payload.eventType === 'INSERT') {
-                            updated = [...prev, payload.new as GameParticipant];
-                        } else if (payload.eventType === 'UPDATE') {
-                            updated = prev.map((p) =>
-                                p.id === (payload.new as GameParticipant).id ? payload.new as GameParticipant : p
-                            );
-                            if (participantId && (payload.new as GameParticipant).id === participantId) {
-                                // O myParticipant é mantido em sync no hook de dependência
-                            }
-                        } else if (payload.eventType === 'DELETE') {
-                            updated = prev.filter((p) => p.id !== (payload.old as GameParticipant).id);
-                        } else {
-                            updated = prev;
-                        }
-                        return [...updated].sort((a, b) => b.score - a.score);
-                    });
-                }
-            )
             .subscribe();
+
+        // Polling contínuo adicional como garantia contra falhas silenciosas do Realtime (ex: RLS bloqueando eventos)
+        const pollInterval = setInterval(async () => {
+            if (!isMounted) return;
+            // Busca sessão
+            const { data: sData } = await supabase.from('game_sessions').select('*').eq('id', sessionId).single();
+            if (sData) {
+                const s = sData as GameSession;
+                setSession(prev => {
+                    if (prev?.current_question_index !== s.current_question_index || prev?.status !== s.status) {
+                        recalcTimer(s.question_start_time, s.status);
+                        return s;
+                    }
+                    return prev;
+                });
+            }
+            // Busca participantes
+            const { data: pData } = await supabase.from('game_participants').select('*').eq('session_id', sessionId).order('score', { ascending: false });
+            if (pData) {
+                setParticipants(pData as GameParticipant[]);
+            }
+        }, 3000);
 
         return () => {
             isMounted = false;
+            clearInterval(pollInterval);
             supabase.removeChannel(sessionChannel);
-            supabase.removeChannel(participantsChannel);
             if (timerRef.current) clearInterval(timerRef.current);
         };
     }, [sessionId, participantId, recalcTimer]);
@@ -267,7 +238,7 @@ export function useGameSession(
     const joinSession = async (sid: string, studentName: string): Promise<GameParticipant | null> => {
         const { data, error } = await supabase
             .from('game_participants')
-            .insert({ session_id: sid, student_name: studentName, score: 0, status: 'pending' })
+            .insert({ session_id: sid, student_name: studentName, score: 0, status: 'pending', answered_current: false, correct_answers: 0 })
             .select()
             .single();
         if (error) { setError(error.message); return null; }

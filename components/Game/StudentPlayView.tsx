@@ -276,16 +276,22 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
 
     if (myParticipant.status === 'pending') {
         return (
-            <div className="flex flex-col items-center justify-center py-20 gap-6">
-                <Loader size={50} className="text-amber-500 animate-spin mb-4" />
-                <h2 className="text-xl font-black text-amber-500">Aguardando Autorização</h2>
-                <p className="text-amber-400/80 text-center max-w-sm">
-                    Sua solicitação está pendente. O professor precisa autorizar sua entrada no painel de controle.
-                </p>
-                <button onClick={handleLeaveSession}
-                    className="bg-gray-800 text-white font-bold px-4 py-2 mt-4 rounded-lg hover:bg-gray-700 transition text-sm">
-                    Cancelar Solicitação
-                </button>
+            <div className="flex flex-col items-center justify-center min-h-screen py-20 gap-6 relative" >
+                {/* Background da splash screen */}
+                <div className="absolute inset-0 bg-[url('/splash-game.png')] bg-cover bg-center bg-no-repeat opacity-40 mix-blend-overlay"></div>
+                <div className="absolute inset-0 bg-black/60"></div>
+                
+                <div className="relative z-10 flex flex-col items-center">
+                    <Loader size={50} className="text-amber-500 animate-spin mb-4" />
+                    <h2 className="text-2xl font-black text-amber-500 mb-2">Aguardando Autorização</h2>
+                    <p className="text-amber-400/90 text-center max-w-sm mb-6 text-lg">
+                        O professor precisa autorizar sua entrada no painel de controle.
+                    </p>
+                    <button onClick={handleLeaveSession}
+                        className="bg-gray-800 text-white font-bold px-6 py-3 rounded-lg hover:bg-gray-700 transition text-sm">
+                        Cancelar Solicitação
+                    </button>
+                </div>
             </div>
         );
     }
@@ -301,17 +307,23 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
 
     if (session.status === 'active' && session.current_question_index < 0) {
         return (
-            <div className="flex flex-col items-center justify-center py-24 gap-6 relative overflow-hidden min-h-screen">
+            <div className="flex flex-col items-center justify-center min-h-screen py-24 gap-6 relative overflow-hidden">
+                <div className="absolute inset-0 bg-[url('/splash-game.png')] bg-cover bg-center bg-no-repeat opacity-40 mix-blend-overlay"></div>
+                <div className="absolute inset-0 bg-black/60"></div>
+
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,195,74,0.1)_0%,transparent_60%)] animate-pulse" />
-                <div className="w-24 h-24 bg-gradient-to-br from-[#2e7d32] to-[#8bc34a] rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(139,195,74,0.4)] z-10">
-                    <span className="text-4xl text-white font-black">{myParticipant?.student_name.charAt(0).toUpperCase()}</span>
+                
+                <div className="relative z-10 w-28 h-28 bg-gradient-to-br from-[#2e7d32] to-[#8bc34a] rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(139,195,74,0.6)] border-4 border-[#8bc34a]/30">
+                    <span className="text-5xl text-white font-black">{myParticipant?.student_name.charAt(0).toUpperCase()}</span>
                 </div>
-                <div className="text-center z-10">
-                    <h2 className="text-2xl font-black text-white mb-2">Entrada Autorizada!</h2>
-                    <p className="text-[#8bc34a] font-bold text-lg mb-2">Você já está na sala.</p>
-                    <p className="text-gray-400">Aguardando o professor iniciar a competição...</p>
+                <div className="text-center relative z-10 bg-black/40 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
+                    <h2 className="text-3xl font-black text-white mb-2">Entrada Autorizada!</h2>
+                    <p className="text-[#8bc34a] font-bold text-xl mb-4">Você já está na sala.</p>
+                    <p className="text-gray-300 flex items-center gap-3">
+                        <Loader size={20} className="text-[#8bc34a] animate-spin" />
+                        Aguardando o professor iniciar a competição...
+                    </p>
                 </div>
-                <Loader size={30} className="text-[#8bc34a] animate-spin mt-4 z-10" />
             </div>
         );
     }
