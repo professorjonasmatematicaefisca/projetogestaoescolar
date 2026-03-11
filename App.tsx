@@ -14,6 +14,7 @@ import { RequestsPanel } from './RequestsPanel';
 import { Comunicados } from './Comunicados';
 import { PortalDashboard } from './PortalDashboard';
 import { UpdatePassword } from './UpdatePassword';
+import { GameArena } from './components/Game/GameArena';
 import { UserRole, ViewState } from './types';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -210,6 +211,7 @@ function App() {
       case 'REQUESTS': return <RequestsPanel onShowToast={showToast} userEmail={userEmail} userRole={userRole!} />;
       case 'MESSAGES': return <Comunicados onShowToast={showToast} userEmail={userEmail} userName={userName} userRole={userRole!} />;
       case 'SETTINGS': return <SettingsView userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
+      case 'GAME': return <GameArena userRole={userRole!} userName={userName} onShowToast={showToast} />;
       default: return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole!} />;
     }
   };

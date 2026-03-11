@@ -17,7 +17,8 @@ import {
   ClipboardCheck,
   MessageSquare,
   Cloud,
-  CloudOff
+  CloudOff,
+  Gamepad2
 } from 'lucide-react';
 import { UserAvatar } from './components/UserAvatar';
 import { offlineService } from './services/offlineService';
@@ -76,10 +77,10 @@ export const Layout: React.FC<LayoutProps> = ({
 
   // Define allowed views per role
   const rolePermissions: Record<UserRole, ViewState[]> = {
-    [UserRole.COORDINATOR]: ['MONITORING', 'DASHBOARD', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'OCCURRENCES', 'REQUESTS', 'MESSAGES', 'ADMIN', 'SETTINGS', 'FOA'],
-    [UserRole.TEACHER]: ['MONITORING', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'MESSAGES', 'SETTINGS', 'FOA'],
+    [UserRole.COORDINATOR]: ['MONITORING', 'DASHBOARD', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'OCCURRENCES', 'REQUESTS', 'MESSAGES', 'ADMIN', 'SETTINGS', 'FOA', 'GAME'],
+    [UserRole.TEACHER]: ['MONITORING', 'REPORTS', 'PLANNING', 'STUDY_GUIDE', 'MESSAGES', 'SETTINGS', 'FOA', 'GAME'],
     [UserRole.MONITOR]: ['OCCURRENCES', 'SETTINGS'],
-    [UserRole.STUDENT]: ['DASHBOARD', 'REQUESTS', 'MESSAGES', 'SETTINGS'],
+    [UserRole.STUDENT]: ['DASHBOARD', 'REQUESTS', 'MESSAGES', 'SETTINGS', 'GAME'],
     [UserRole.PARENT]: ['DASHBOARD', 'REQUESTS', 'MESSAGES', 'SETTINGS']
   };
 
@@ -93,6 +94,7 @@ export const Layout: React.FC<LayoutProps> = ({
     { view: 'OCCURRENCES', icon: AlertTriangle, label: 'Monitoria' },
     { view: 'REQUESTS', icon: Inbox, label: 'Solicitações' },
     { view: 'MESSAGES', icon: MessageSquare, label: 'Comunicados' },
+    { view: 'GAME', icon: Gamepad2, label: '🎮 Game' },
   ] as const;
 
   const allowedViews = rolePermissions[role] || [];
