@@ -139,11 +139,29 @@ const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) 
     };
 
     useEffect(() => {
-        if (!selectedSessionId) {
-            fetchSessions();
-        } else {
+        if (selectedSessionId) {
             setSearching(false);
+            return;
         }
+
+        fetchSessions();
+
+        // Inscreve-se para escutar modificações nas sessões (ex: professor acabou de criar uma sala)
+        const channel = supabase
+            .channel('public:game_sessions_lobby')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'game_sessions' },
+                () => {
+                    // Toda vez que uma sessão é alterada, removemos ou adicionamos na tela (atualiza a lista)
+                    fetchSessions();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [selectedSessionId]);
 
     // Se tem uma sessão escolhida (seja auto restaurada ou clicada), vai pra view do jogo
