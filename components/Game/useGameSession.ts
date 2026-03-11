@@ -211,22 +211,23 @@ export function useGameSession(
         if (!session) return;
         const nextIndex = session.current_question_index + 1;
 
-        // Atualiza sessão → isso dispara o Realtime para todos
-        const { error: sessionErr } = await supabase
-            .from('game_sessions')
-            .update({
-                current_question_index: nextIndex,
-                question_start_time: new Date().toISOString(),
-                status: 'active',
-            })
-            .eq('id', session.id);
+        // Reseta Flag de resposta de todos os participantes PRIMEIRO
+        // Assim, quando a nova questão for exibida (via realtime de session), o participant já está "limpo" no banco
+        const { error: partErr } = await supabase
+            .from('game_participants')
+            .update({ answered_current: false })
+            .eq('session_id', session.id);
 
-        if (!sessionErr) {
-            // Reseta Flag de resposta de todos os participantes
+        if (!partErr) {
+            // Atualiza sessão → dispara o Realtime para todos recarregarem a questão visível
             await supabase
-                .from('game_participants')
-                .update({ answered_current: false })
-                .eq('session_id', session.id);
+                .from('game_sessions')
+                .update({
+                    current_question_index: nextIndex,
+                    question_start_time: new Date().toISOString(),
+                    status: 'active',
+                })
+                .eq('id', session.id);
         }
     };
 

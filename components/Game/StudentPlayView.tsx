@@ -75,7 +75,7 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
     const [wasCorrect, setWasCorrect] = useState<boolean | null>(null);
     const [pointsEarned, setPointsEarned] = useState(0);
     const [maxPoints, setMaxPoints] = useState(1000);
-    const prevQuestionIndexRef = useRef(-1);
+    const prevQuestionIndexRef = useRef(-100);
 
     // Não limpa sessionStorage automaticamente quando session === 'finished', 
     // mas sim somente no clique explícito do aluno ao sair.
@@ -90,20 +90,32 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
         }
     };
 
+    // Mantém o local state atualizado de acordo com o servidor (útil ao reconectar ou ao transitar questões)
+    useEffect(() => {
+        if (myParticipant?.answered_current !== undefined) {
+            setAnswered(myParticipant.answered_current);
+        }
+    }, [myParticipant?.answered_current]);
+
     // Reset ao mudar de questão
     useEffect(() => {
         if (!session) return;
         const newIdx = session.current_question_index;
         if (newIdx !== prevQuestionIndexRef.current) {
+            const isInitialLoad = prevQuestionIndexRef.current === -100;
             prevQuestionIndexRef.current = newIdx;
             setCurrentAnswer('');
             setHintUsed(false);
             setShowHint(false);
-            const alreadyAnswered = myParticipant?.answered_current ?? false;
-            setAnswered(alreadyAnswered);
             setWasCorrect(null); // O professor ainda não liberou a correção se atualizou, mas se já acabou, mostramos info genérica.
             setPointsEarned(0);
             setMaxPoints(1000);
+
+            // Evita o piscar "RESPOSTA REGISTRADA" ao transitar para uma nova questão:
+            // Força o 'answered' falso caso não seja a primeira carga. Se for a primeira carga da página, o effect de cima resgatará a real flag do banco.
+            if (!isInitialLoad) {
+                setAnswered(false);
+            }
         }
     }, [session?.current_question_index]);
 
