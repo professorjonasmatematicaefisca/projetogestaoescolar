@@ -39,7 +39,7 @@ interface UseGameSessionReturn {
     submitAnswer: (isCorrect: boolean, pointsEarned: number) => Promise<void>;
 }
 
-const QUESTION_DURATION = 180; // seconds
+const QUESTION_DURATION = 180;
 
 export function useGameSession(
     sessionId: string | null,
@@ -54,30 +54,28 @@ export function useGameSession(
 
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    // Calcula o tempo restante baseado no horário do servidor (resiliente a recarregamentos)
+    // Calcula o tempo restante baseado no timestamp do servidor
     const recalcTimer = useCallback((questionStartTime: string | null, status: string) => {
         if (timerRef.current) clearInterval(timerRef.current);
         if (!questionStartTime || status !== 'active') {
             setTimeLeft(QUESTION_DURATION);
             return;
         }
-
         const tick = () => {
             const elapsed = Math.floor((Date.now() - new Date(questionStartTime).getTime()) / 1000);
-            const remaining = Math.max(0, QUESTION_DURATION - elapsed);
-            setTimeLeft(remaining);
+            setTimeLeft(Math.max(0, QUESTION_DURATION - elapsed));
         };
-
         tick();
         timerRef.current = setInterval(tick, 1000);
     }, []);
 
-    // Carrega dados iniciais da sessão
     useEffect(() => {
         if (!sessionId) {
             setLoading(false);
             return;
         }
+
+        let isMounted = true;
 
         const loadInitialData = async () => {
             setLoading(true);
@@ -86,56 +84,79 @@ export function useGameSession(
                     supabase.from('game_sessions').select('*').eq('id', sessionId).single(),
                     supabase.from('game_participants').select('*').eq('session_id', sessionId).order('score', { ascending: false }),
                 ]);
-
+                if (!isMounted) return;
                 if (sessionRes.error) throw sessionRes.error;
-                if (participantsRes.error) throw participantsRes.error;
 
                 const loadedSession = sessionRes.data as GameSession;
                 setSession(loadedSession);
-                setParticipants(participantsRes.data as GameParticipant[]);
+                setParticipants((participantsRes.data as GameParticipant[]) ?? []);
 
                 if (participantId) {
-                    const mine = participantsRes.data.find((p: GameParticipant) => p.id === participantId) || null;
+                    const mine = (participantsRes.data ?? []).find((p: GameParticipant) => p.id === participantId) ?? null;
                     setMyParticipant(mine);
                 }
-
                 recalcTimer(loadedSession.question_start_time, loadedSession.status);
             } catch (err: any) {
-                setError(err.message);
+                if (isMounted) setError(err.message);
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
 
         loadInitialData();
 
-        // Subscrição Realtime: game_sessions
-        const sessionSub = supabase
-            .channel(`game_session_${sessionId}`)
+        // ─── Realtime: game_sessions (postgres_changes) ───
+        const sessionChannel = supabase
+            .channel(`session:${sessionId}`)
             .on(
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'game_sessions', filter: `id=eq.${sessionId}` },
                 (payload) => {
+                    if (!isMounted) return;
                     const updated = payload.new as GameSession;
                     setSession(updated);
                     recalcTimer(updated.question_start_time, updated.status);
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    // Canal ativo — nada a fazer
+                }
+                if (status === 'CHANNEL_ERROR') {
+                    // Fallback: polling a cada 3 s se canal falhar
+                    const interval = setInterval(async () => {
+                        const { data } = await supabase.from('game_sessions').select('*').eq('id', sessionId).single();
+                        if (data && isMounted) {
+                            const s = data as GameSession;
+                            setSession(prev => {
+                                if (prev?.current_question_index !== s.current_question_index || prev?.status !== s.status) {
+                                    recalcTimer(s.question_start_time, s.status);
+                                    return s;
+                                }
+                                return prev;
+                            });
+                        }
+                    }, 3000);
+                    return () => clearInterval(interval);
+                }
+            });
 
-        // Subscrição Realtime: game_participants
-        const participantsSub = supabase
-            .channel(`game_participants_${sessionId}`)
+        // ─── Realtime: game_participants ───
+        const participantsChannel = supabase
+            .channel(`participants:${sessionId}`)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'game_participants', filter: `session_id=eq.${sessionId}` },
                 (payload) => {
+                    if (!isMounted) return;
                     setParticipants((prev) => {
                         let updated: GameParticipant[];
                         if (payload.eventType === 'INSERT') {
                             updated = [...prev, payload.new as GameParticipant];
                         } else if (payload.eventType === 'UPDATE') {
-                            updated = prev.map((p) => (p.id === (payload.new as GameParticipant).id ? payload.new as GameParticipant : p));
+                            updated = prev.map((p) =>
+                                p.id === (payload.new as GameParticipant).id ? payload.new as GameParticipant : p
+                            );
                             if (participantId && (payload.new as GameParticipant).id === participantId) {
                                 setMyParticipant(payload.new as GameParticipant);
                             }
@@ -151,13 +172,15 @@ export function useGameSession(
             .subscribe();
 
         return () => {
-            supabase.removeChannel(sessionSub);
-            supabase.removeChannel(participantsSub);
+            isMounted = false;
+            supabase.removeChannel(sessionChannel);
+            supabase.removeChannel(participantsChannel);
             if (timerRef.current) clearInterval(timerRef.current);
         };
     }, [sessionId, participantId, recalcTimer]);
 
-    // --- Ações do Professor ---
+    // ─── Ações do Professor ───
+
     const createSession = async (teacherName: string): Promise<GameSession | null> => {
         const { data, error } = await supabase
             .from('game_sessions')
@@ -171,7 +194,9 @@ export function useGameSession(
     const startNextQuestion = async () => {
         if (!session) return;
         const nextIndex = session.current_question_index + 1;
-        const { error } = await supabase
+
+        // Atualiza sessão → isso dispara o Realtime para todos
+        const { error: sessionErr } = await supabase
             .from('game_sessions')
             .update({
                 current_question_index: nextIndex,
@@ -180,8 +205,8 @@ export function useGameSession(
             })
             .eq('id', session.id);
 
-        if (!error) {
-            // Resetar answered_current para todos os participantes
+        if (!sessionErr) {
+            // Reseta Flag de resposta de todos os participantes
             await supabase
                 .from('game_participants')
                 .update({ answered_current: false })
@@ -189,15 +214,40 @@ export function useGameSession(
         }
     };
 
+    /**
+     * Encerra o game:
+     * 1. Marca sessão como finished
+     * 2. Deleta TODOS os participantes da sessão
+     * → Professores voltam à tela "Criar Nova Sessão"
+     */
     const finishGame = async () => {
         if (!session) return;
+
+        // 1. Marca finished (Realtime vai notificar alunos)
         await supabase
             .from('game_sessions')
             .update({ status: 'finished' })
             .eq('id', session.id);
+
+        // 2. Aguarda 3 s para os alunos verem o ranking final
+        await new Promise(r => setTimeout(r, 3000));
+
+        // 3. Deleta participantes da sessão
+        await supabase
+            .from('game_participants')
+            .delete()
+            .eq('session_id', session.id);
+
+        // 4. Remove o ID da sessão do localStorage (professor volta ao início)
+        localStorage.removeItem('wetwiquest_session_id');
+
+        // 5. Recarrega a página para resetar o estado local do professor
+        //    (estado React vai ser resetado automaticamente junto com sessionId)
+        window.location.reload();
     };
 
-    // --- Ações do Aluno ---
+    // ─── Ações do Aluno ───
+
     const joinSession = async (sid: string, studentName: string): Promise<GameParticipant | null> => {
         const { data, error } = await supabase
             .from('game_participants')
@@ -218,16 +268,7 @@ export function useGameSession(
     };
 
     return {
-        session,
-        participants,
-        myParticipant,
-        timeLeft,
-        loading,
-        error,
-        createSession,
-        startNextQuestion,
-        finishGame,
-        joinSession,
-        submitAnswer,
+        session, participants, myParticipant, timeLeft, loading, error,
+        createSession, startNextQuestion, finishGame, joinSession, submitAnswer,
     };
 }

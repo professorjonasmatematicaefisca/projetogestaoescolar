@@ -76,6 +76,22 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
     const [maxPoints, setMaxPoints] = useState(1000);
     const prevQuestionIndexRef = useRef(-1);
 
+    // Limpa sessionStorage do aluno quando a sessão é encerrada
+    // Isso garante que na próxima sessão o aluno entre como novo participante
+    useEffect(() => {
+        if (session?.status === 'finished' || session?.status === 'waiting') {
+            // Só limpa se a questão já foi exibida (status 'finished') ou nova sessão  
+            if (session.status === 'finished') {
+                // Dá 5 s para o aluno ver o ranking antes de limpar
+                const t = setTimeout(() => {
+                    sessionStorage.removeItem(`game_student_name_${sessionId}`);
+                    sessionStorage.removeItem(`game_participant_id_${sessionId}`);
+                }, 5000);
+                return () => clearTimeout(t);
+            }
+        }
+    }, [session?.status, sessionId]);
+
     // Reset ao mudar de questão
     useEffect(() => {
         if (!session) return;
