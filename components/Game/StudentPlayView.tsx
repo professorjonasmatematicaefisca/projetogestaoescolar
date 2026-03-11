@@ -126,10 +126,11 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
 
     // Auto-submit quando tempo acaba
     useEffect(() => {
-        if (timeLeft === 0 && !answered && session?.status === 'active') {
+        // Se ainda estiver na sala de espera (indice < 0), o tempo pode chegar a 0 antes de começar a valer, então não enviar!
+        if (timeLeft === 0 && !answered && session?.status === 'active' && session.current_question_index >= 0) {
             handleSubmit(true);
         }
-    }, [timeLeft]);
+    }, [timeLeft, session?.status, session?.current_question_index, answered]);
 
     // Se chegou com preAuthName mas ainda não tem participantId, entra automaticamente na sessão
     useEffect(() => {
