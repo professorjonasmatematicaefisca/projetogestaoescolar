@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UserRole } from './types';
 import { SupabaseService } from './services/supabaseService';
+import { supabase } from './supabaseClient';
 import { User, Lock, ArrowRight, Eye, EyeOff, Zap, TrendingUp, Rocket, Mail, ChevronLeft, CheckCircle } from 'lucide-react';
 import { LoadingSpinner } from './components/LoadingSpinner';
 
@@ -29,32 +30,33 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
             // ── Fluxo do aluno do Game: @cocpaulinia.com.br + senha 123 ──
             if (emailLower.endsWith('@cocpaulinia.com.br') && password === '123') {
-                const { supabase } = await import('./supabaseClient');
                 const { data: students } = await supabase
                     .from('students')
-                    .select('name')
-                    .eq('status', 'ACTIVE');
+                    .select('name');
 
-                if (students && students.length > 0) {
-                    const localPart = emailLower.split('@')[0];
-                    // Normaliza removendo acentos para comparação
-                    const normalize = (s: string) =>
-                        s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '');
+                const normalize = (s: string) =>
+                    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, '');
 
-                    let found: { name: string } | null = null;
-                    for (const student of students) {
-                        const parts = student.name.trim().split(/\s+/);
-                        if (parts.length < 2) continue;
-                        if (normalize(parts[0]) + normalize(parts[1]) === localPart) { found = student; break; }
-                        if (parts.length >= 3 && normalize(parts[0]) + normalize(parts[2]) === localPart) { found = student; break; }
-                    }
+                const localPart = emailLower.split('@')[0];
+                let found: { name: string } | null = null;
 
-                    if (found) {
-                        onLogin(UserRole.GAME_STUDENT, emailLower, found.name);
-                        return;
-                    }
+                for (const student of (students || [])) {
+                    const parts = student.name.trim().split(/\s+/);
+                    if (parts.length < 2) continue;
+                    // tenta primeiro+segundo nome (ex: anaclaradeCAMPOS → anaclara)
+                    if (normalize(parts[0]) + normalize(parts[1]) === localPart) { found = student; break; }
+                    // tenta primeiro+terceiro nome pulando artigos (ex: Ana de Campos → anacampos)
+                    if (parts.length >= 3 && normalize(parts[0]) + normalize(parts[2]) === localPart) { found = student; break; }
+                    // tenta primeiro nome APENAS (se o localPart tiver só um segmento)
+                    if (normalize(parts[0]) === localPart) { found = student; break; }
                 }
-                setError('Email não encontrado. Verifique se digitou corretamente: primeironome+sobrenome@cocpaulinia.com.br');
+
+                if (found) {
+                    onLogin(UserRole.GAME_STUDENT, emailLower, found.name);
+                    return;
+                }
+
+                setError('Email não encontrado. Use: primeironome+sobrenome@cocpaulinia.com.br (sem acentos)');
                 return;
             }
 
