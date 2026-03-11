@@ -103,10 +103,14 @@ const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) 
 
     const fetchSessions = async () => {
         setSearching(true);
+        // Calcula o timestamp de 12 horas atrás
+        const twelveHoursAgo = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+
         const { data } = await supabase
             .from('game_sessions')
             .select('id, teacher_name, status, created_at')
             .in('status', ['waiting', 'active'])
+            .gte('created_at', twelveHoursAgo)
             .order('created_at', { ascending: false });
 
         // Filtra para manter apenas a sessão mais recente de cada professor

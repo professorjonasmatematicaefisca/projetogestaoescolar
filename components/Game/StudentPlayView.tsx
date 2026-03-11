@@ -319,7 +319,7 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                     <h3 className="text-[#8bc34a] font-bold text-lg mb-4 flex items-center gap-2 justify-center">
                         <Trophy size={18} /> Ranking Final
                     </h3>
-                    <LiveLeaderboard participants={participants.filter(p => p.status === 'approved')} myName={studentName} />
+                    <LiveLeaderboard participants={participants.filter(p => p.status === 'approved')} myName={studentName} currentQuestionIndex={session?.current_question_index} />
                 </div>
 
                 <button onClick={handleLeaveSession}
@@ -370,7 +370,10 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                     <span className="text-[#8bc34a] font-black">{hintUsed ? Math.floor(maxPoints * 0.7) : maxPoints}</span>
                     <span className="text-gray-500 text-xs ml-1">pts</span>
                 </div>
-                <div className="text-[#8bc34a] font-black text-sm">{myParticipant?.score?.toLocaleString() ?? 0} pts total</div>
+                <div className="flex flex-col text-right">
+                   <div className="text-[#8bc34a] font-black text-sm">{myParticipant?.score?.toLocaleString() ?? 0} pts total</div>
+                   <div className="text-gray-400 font-bold text-xs">{myParticipant?.correct_answers ?? 0}/{qi > 0 ? (answered ? qi + 1 : qi) : (answered ? 1 : 0)} acertos</div>
+                </div>
             </div>
 
             <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 flex flex-col gap-4">
@@ -397,18 +400,18 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                         />
                     </div>
                 ) : (
-                    <div className={`rounded-2xl p-6 border text-center ${wasCorrect === true ? 'bg-emerald-900/30 border-emerald-500/40' : wasCorrect === false ? 'bg-red-900/20 border-red-500/30' : 'bg-[#8bc34a]/10 border-[#8bc34a]/30'}`}>
-                        <div className="text-5xl mb-3">{wasCorrect === true ? '🎉' : wasCorrect === false ? '😞' : '✅'}</div>
-                        <p className={`text-2xl font-black mb-1 ${wasCorrect === true ? 'text-emerald-400' : wasCorrect === false ? 'text-red-400' : 'text-[#8bc34a]'}`}>
-                            {wasCorrect === true ? `+${pointsEarned} pontos!` : wasCorrect === false ? 'Resposta incorreta' : 'Resposta registrada!'}
+                    <div className={`rounded-2xl p-6 border text-center ${timeLeft === 0 && wasCorrect === true ? 'bg-emerald-900/30 border-emerald-500/40' : timeLeft === 0 && wasCorrect === false ? 'bg-red-900/20 border-red-500/30' : 'bg-[#8bc34a]/10 border-[#8bc34a]/30'}`}>
+                        <div className="text-5xl mb-3">{timeLeft === 0 ? (wasCorrect === true ? '🎉' : wasCorrect === false ? '😞' : '✅') : '✅'}</div>
+                        <p className={`text-2xl font-black mb-1 ${timeLeft === 0 && wasCorrect === true ? 'text-emerald-400' : timeLeft === 0 && wasCorrect === false ? 'text-red-400' : 'text-[#8bc34a]'}`}>
+                            {timeLeft === 0 ? (wasCorrect === true ? `+${pointsEarned} pontos!` : wasCorrect === false ? 'Resposta incorreta' : 'Resposta registrada!') : 'Resposta registrada!'}
                         </p>
-                        {wasCorrect === true
+                        {timeLeft === 0 && wasCorrect === true
                             ? <CheckCircle size={20} className="text-emerald-400 mx-auto" />
-                            : wasCorrect === false 
+                            : timeLeft === 0 && wasCorrect === false 
                                 ? <XCircle size={20} className="text-red-400 mx-auto" />
                                 : <CheckCircle size={20} className="text-[#8bc34a] mx-auto" />
                         }
-                        <p className="text-gray-400 text-sm mt-3">Aguardando o professor liberar a próxima questão...</p>
+                        <p className="text-gray-400 text-sm mt-3">{timeLeft === 0 ? 'Aguardando o professor liberar a próxima questão...' : 'Aguarde o tempo da questão acabar...'}</p>
                     </div>
                 )}
 
@@ -459,7 +462,7 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                         <h3 className="text-[#8bc34a] font-bold text-sm mb-3 flex items-center gap-2">
                             <Trophy size={14} /> Sua Posição (Tempo Esgotado)
                         </h3>
-                        <LiveLeaderboard participants={participants} myName={studentName} onlyMe compact />
+                        <LiveLeaderboard participants={participants} myName={studentName} onlyMe compact currentQuestionIndex={session?.current_question_index} />
                     </div>
                 )}
             </div>

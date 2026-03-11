@@ -254,7 +254,7 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                         <h3 className="text-white font-black">Ranking Ao Vivo</h3>
                         <span className="ml-auto text-xs text-gray-500">{approvedParticipants.length} participante(s)</span>
                     </div>
-                    <LiveLeaderboard participants={approvedParticipants} />
+                    <LiveLeaderboard participants={approvedParticipants} currentQuestionIndex={session?.current_question_index} />
                 </div>
             )}
         </div>

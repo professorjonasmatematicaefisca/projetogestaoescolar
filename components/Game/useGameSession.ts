@@ -17,6 +17,7 @@ export interface GameParticipant {
     session_id: string;
     student_name: string;
     score: number;
+    correct_answers: number;
     answered_current: boolean;
     last_seen: string;
     status: 'pending' | 'approved' | 'rejected';
@@ -165,7 +166,7 @@ export function useGameSession(
                                 p.id === (payload.new as GameParticipant).id ? payload.new as GameParticipant : p
                             );
                             if (participantId && (payload.new as GameParticipant).id === participantId) {
-                                setMyParticipant(payload.new as GameParticipant);
+                                // O myParticipant é mantido em sync no hook de dependência
                             }
                         } else if (payload.eventType === 'DELETE') {
                             updated = prev.filter((p) => p.id !== (payload.old as GameParticipant).id);
@@ -185,6 +186,14 @@ export function useGameSession(
             if (timerRef.current) clearInterval(timerRef.current);
         };
     }, [sessionId, participantId, recalcTimer]);
+
+    // O myParticipant é derivado do estado de participants para nunca dessincronizar com o realtime
+    useEffect(() => {
+        if (participantId && participants.length > 0) {
+            const mine = participants.find(p => p.id === participantId);
+            if (mine) setMyParticipant(mine);
+        }
+    }, [participants, participantId]);
 
     // ─── Ações do Professor ───
 
@@ -267,9 +276,15 @@ export function useGameSession(
     const submitAnswer = async (isCorrect: boolean, pointsEarned: number) => {
         if (!myParticipant || myParticipant.answered_current) return;
         const newScore = myParticipant.score + (isCorrect ? pointsEarned : 0);
+        const newCorrectAnswers = myParticipant.correct_answers + (isCorrect ? 1 : 0);
         await supabase
             .from('game_participants')
-            .update({ score: newScore, answered_current: true, last_seen: new Date().toISOString() })
+            .update({ 
+                 score: newScore, 
+                 correct_answers: newCorrectAnswers,
+                 answered_current: true, 
+                 last_seen: new Date().toISOString() 
+            })
             .eq('id', myParticipant.id);
     };
 

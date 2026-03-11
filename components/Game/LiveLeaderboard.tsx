@@ -8,6 +8,7 @@ interface LiveLeaderboardProps {
     compact?: boolean;
     /** Se true, aluno só vê sua própria posição (modo aluno) */
     onlyMe?: boolean;
+    currentQuestionIndex?: number;
 }
 
 function getInitials(name: string): string {
@@ -34,7 +35,9 @@ const ParticipantRow: React.FC<{
     rank: number;
     isMe: boolean;
     totalCount?: number;
-}> = ({ p, rank, isMe, totalCount }) => {
+    compact?: boolean;
+    currentQuestionIndex?: number;
+}> = ({ p, rank, isMe, totalCount, compact, currentQuestionIndex = 0 }) => {
     const medal = medalColors[rank];
     const avatarColor = getAvatarColor(p.student_name);
 
@@ -55,23 +58,31 @@ const ParticipantRow: React.FC<{
                 {getInitials(p.student_name)}
             </div>
 
-            {/* Nome + badge */}
             <div className="flex-1 min-w-0">
-                <p className={`font-bold truncate text-sm ${isMe ? 'text-[#8bc34a]' : 'text-white'}`}>
-                    {p.student_name}
-                    {isMe && totalCount && totalCount > 1 && (
-                        <span className="ml-2 text-[10px] bg-[#8bc34a]/20 text-[#8bc34a] px-2 py-0.5 rounded-full font-bold">VOCÊ</span>
-                    )}
-                </p>
+                <div className="flex items-center gap-2">
+                    <span className={`font-black truncate ${isMe ? 'text-white' : 'text-gray-300'}`}>
+                        {p.student_name}
+                    </span>
+                    {isMe && <span className="text-[10px] bg-[#8bc34a]/20 text-[#8bc34a] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider shrink-0">Você</span>}
+                </div>
+                {compact && (
+                    <div className="text-xs text-gray-400 mt-0.5 truncate flex items-center gap-2">
+                        <span>{p.score.toLocaleString()} pts</span>
+                        <span className="w-1 h-1 rounded-full bg-gray-600" />
+                        <span>{p.correct_answers || 0} / {currentQuestionIndex + 1} acertos</span>
+                    </div>
+                )}
             </div>
-
-            {/* Pontuação */}
-            <div className="shrink-0 text-right">
-                <span className={`font-black text-xl tabular-nums ${rank === 0 ? 'text-yellow-400' : isMe ? 'text-[#8bc34a]' : 'text-white'}`}>
-                    {p.score.toLocaleString()}
-                </span>
-                <span className="text-gray-500 text-xs ml-1">pts</span>
-            </div>
+            {!compact && (
+                <div className="text-right shrink-0 flex flex-col items-end">
+                    <span className={`font-black tracking-tight ${isMe ? 'text-[#8bc34a]' : 'text-emerald-400'}`}>
+                        {p.score.toLocaleString()} pts
+                    </span>
+                    <span className="text-xs text-gray-500 font-bold">
+                        {p.correct_answers || 0} / {currentQuestionIndex + 1} acertos
+                    </span>
+                </div>
+            )}
 
             {/* Já respondeu */}
             {p.answered_current && (
