@@ -4,6 +4,7 @@ import { useGameSession } from './useGameSession';
 import { QuestionInteraction } from './QuestionInteractions';
 import { GameLogin } from './GameLogin';
 import { LiveLeaderboard } from './LiveLeaderboard';
+import { supabase } from '../../supabaseClient';
 import { Clock, Trophy, CheckCircle, XCircle, Loader, Wifi } from 'lucide-react';
 
 interface StudentPlayViewProps {
@@ -11,15 +12,51 @@ interface StudentPlayViewProps {
 }
 
 const QUESTION_DURATION = 180;
-const GAME_PASSWORD = '123';
+
+/**
+ * Remove acentos e transforma em minúsculas para comparação normalizada.
+ * Ex: "João" → "joao", "Cristina" → "cristina"
+ */
+function normalize(str: string): string {
+    return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, '');
+}
+
+/**
+ * Dado um email "joaogomes@cocpaulinia.com.br", extrai "joaogomes"
+ * e tenta encontrar um aluno cujos dois primeiros nomes, normalizados e concatenados,
+ * correspondam exatamente à parte local do email.
+ */
+function findStudentByEmail(email: string, students: { name: string }[]): { name: string } | null {
+    const localPart = email.split('@')[0].toLowerCase();
+    for (const student of students) {
+        const parts = student.name.trim().split(/\s+/);
+        if (parts.length < 2) continue;
+        // tenta primeiro+segundo nome
+        const combo2 = normalize(parts[0]) + normalize(parts[1]);
+        if (combo2 === localPart) return student;
+        // tenta primeiro nome + terceiro nome (ex: João da Silva → joaosilva)
+        if (parts.length >= 3) {
+            const combo13 = normalize(parts[0]) + normalize(parts[2]);
+            if (combo13 === localPart) return student;
+        }
+    }
+    return null;
+}
 
 export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) => {
-    const [studentName, setStudentName] = useState<string>(() => {
-        return sessionStorage.getItem(`game_student_name_${sessionId}`) || '';
-    });
-    const [participantId, setParticipantId] = useState<string | null>(() => {
-        return sessionStorage.getItem(`game_participant_id_${sessionId}`) || null;
-    });
+    // Estado de autenticação do game — persiste via sessionStorage
+    const [studentName, setStudentName] = useState<string>(() =>
+        sessionStorage.getItem(`game_student_name_${sessionId}`) || ''
+    );
+    const [participantId, setParticipantId] = useState<string | null>(() =>
+        sessionStorage.getItem(`game_participant_id_${sessionId}`) || null
+    );
+    const [loginLoading, setLoginLoading] = useState(false);
+    const [loginError, setLoginError] = useState('');
 
     const { session, participants, myParticipant, timeLeft, loading, joinSession, submitAnswer } =
         useGameSession(sessionId, participantId);
@@ -49,10 +86,9 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
         }
     }, [session?.current_question_index]);
 
-    // Decaimento de pontos ao longo do tempo
+    // Decaimento de pontos
     useEffect(() => {
-        const decayed = Math.max(150, 1000 - (QUESTION_DURATION - timeLeft) * 5);
-        setMaxPoints(decayed);
+        setMaxPoints(Math.max(150, 1000 - (QUESTION_DURATION - timeLeft) * 5));
     }, [timeLeft]);
 
     // Auto-submit quando tempo acaba
@@ -62,13 +98,59 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
         }
     }, [timeLeft]);
 
-    const handleLogin = async (name: string) => {
-        const participant = await joinSession(sessionId, name);
-        if (participant) {
-            setStudentName(name);
-            setParticipantId(participant.id);
-            sessionStorage.setItem(`game_student_name_${sessionId}`, name);
-            sessionStorage.setItem(`game_participant_id_${sessionId}`, participant.id);
+    // ---- Login: valida email e busca nome cadastrado no banco ----
+    const handleLogin = async (email: string) => {
+        setLoginLoading(true);
+        setLoginError('');
+        try {
+            // Busca todos os alunos para matching
+            const { data: students, error } = await supabase
+                .from('students')
+                .select('name')
+                .eq('status', 'ACTIVE');
+
+            if (error) throw error;
+
+            const found = findStudentByEmail(email, students || []);
+
+            if (!found) {
+                setLoginError(
+                    'Email não encontrado. Verifique se digitou corretamente seu primeiro e segundo nome sem acentos. Ex: joaogomes@cocpaulinia.com.br'
+                );
+                setLoginLoading(false);
+                return;
+            }
+
+            // Verifica se já existe um participante com esse nome nessa sessão
+            const { data: existing } = await supabase
+                .from('game_participants')
+                .select('id')
+                .eq('session_id', sessionId)
+                .eq('student_name', found.name)
+                .maybeSingle();
+
+            let pid: string;
+            if (existing) {
+                // Aluno já entrou nesta sessão — retoma pela ID existente
+                pid = existing.id;
+            } else {
+                const participant = await joinSession(sessionId, found.name);
+                if (!participant) {
+                    setLoginError('Erro ao entrar na sessão. Tente novamente.');
+                    setLoginLoading(false);
+                    return;
+                }
+                pid = participant.id;
+            }
+
+            setStudentName(found.name);
+            setParticipantId(pid);
+            sessionStorage.setItem(`game_student_name_${sessionId}`, found.name);
+            sessionStorage.setItem(`game_participant_id_${sessionId}`, pid);
+        } catch (err: any) {
+            setLoginError('Erro de conexão. Verifique sua internet e tente novamente.');
+        } finally {
+            setLoginLoading(false);
         }
     };
 
@@ -84,14 +166,16 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
         await submitAnswer(isCorrect, pts);
     };
 
-    const handleHint = () => {
-        setHintUsed(true);
-        setShowHint(true);
-    };
-
     // ---- Tela de login ----
     if (!studentName || !participantId) {
-        return <GameLogin sessionId={sessionId} onLogin={handleLogin} />;
+        return (
+            <GameLogin
+                sessionId={sessionId}
+                onLogin={handleLogin}
+                error={loginError}
+                loading={loginLoading}
+            />
+        );
     }
 
     if (loading) {
@@ -104,9 +188,9 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
 
     if (!session) {
         return (
-            <div className="min-h-screen flex items-center justify-center flex-col gap-4" style={{ background: '#0a1a0d' }}>
+            <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: '#0a1a0d' }}>
                 <Wifi size={40} className="text-red-400" />
-                <p className="text-red-400 font-bold">Sessão não encontrada. Verifique o código.</p>
+                <p className="text-red-400 font-bold">Sessão não encontrada.</p>
             </div>
         );
     }
@@ -118,9 +202,13 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
                 style={{ background: 'radial-gradient(ellipse at top, #0d2e14 0%, #050d06 100%)' }}>
                 <div className="text-6xl animate-bounce">🎮</div>
                 <h2 className="text-3xl font-black text-white text-center">Aguardando o Professor...</h2>
-                <p className="text-[#8bc34a] font-bold">Preparado para competir, <span className="text-white">{studentName}</span>?</p>
+                <p className="text-[#8bc34a] font-bold">
+                    Preparado para competir, <span className="text-white">{studentName.split(' ')[0]}</span>?
+                </p>
                 <div className="bg-black/40 border border-[#8bc34a]/20 rounded-2xl p-6 w-full max-w-md">
-                    <h3 className="text-[#8bc34a] font-bold mb-3 flex items-center gap-2"><Trophy size={16} /> Participantes ({participants.length})</h3>
+                    <h3 className="text-[#8bc34a] font-bold mb-3 flex items-center gap-2">
+                        <Trophy size={16} /> Participantes ({participants.length})
+                    </h3>
                     <LiveLeaderboard participants={participants} myName={studentName} compact />
                 </div>
             </div>
@@ -129,7 +217,8 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
 
     // ---- Jogo finalizado ----
     if (session.status === 'finished') {
-        const myRank = [...participants].sort((a, b) => b.score - a.score).findIndex(p => p.id === participantId) + 1;
+        const myRank =
+            [...participants].sort((a, b) => b.score - a.score).findIndex(p => p.id === participantId) + 1;
         return (
             <div className="min-h-screen flex flex-col items-center justify-center gap-6 px-4"
                 style={{ background: 'radial-gradient(ellipse at top, #0d2e14 0%, #050d06 100%)' }}>
@@ -152,8 +241,7 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
 
     if (!q || qi < 0) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-4"
-                style={{ background: '#0a1a0d' }}>
+            <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: '#0a1a0d' }}>
                 <div className="text-5xl animate-pulse">⏳</div>
                 <p className="text-white font-bold text-xl">Aguardando próxima questão...</p>
             </div>
@@ -166,6 +254,7 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
     return (
         <div className="min-h-screen flex flex-col"
             style={{ background: 'radial-gradient(ellipse at top, #0d2e14 0%, #050d06 100%)' }}>
+
             {/* HUD */}
             <div className="sticky top-0 z-30 bg-black/70 backdrop-blur-sm border-b border-[#8bc34a]/20 px-4 py-3 flex items-center gap-4">
                 <div className="flex items-center gap-2">
@@ -186,16 +275,14 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
             </div>
 
             <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 flex flex-col gap-4">
-                {/* Banner da questão */}
+                {/* Banner */}
                 <div className="h-28 rounded-2xl flex items-center justify-center text-6xl shadow-xl border border-[#8bc34a]/20"
                     style={{ background: q.banner }}>
                     {q.emoji}
                 </div>
 
-                {/* Título */}
                 <h2 className="text-[#8bc34a] font-black text-xl">{q.title}</h2>
 
-                {/* Enunciado */}
                 <div className="bg-black/60 border-l-4 border-[#8bc34a] px-5 py-4 rounded-xl text-gray-200 text-base leading-relaxed font-medium italic">
                     "{q.text}"
                 </div>
@@ -211,25 +298,22 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
                         />
                     </div>
                 ) : (
-                    /* Feedback pós-resposta */
                     <div className={`rounded-2xl p-6 border text-center ${wasCorrect ? 'bg-emerald-900/30 border-emerald-500/40' : 'bg-red-900/20 border-red-500/30'}`}>
                         <div className="text-5xl mb-3">{wasCorrect ? '🎉' : '😞'}</div>
                         <p className={`text-2xl font-black mb-1 ${wasCorrect ? 'text-emerald-400' : 'text-red-400'}`}>
                             {wasCorrect ? `+${pointsEarned} pontos!` : 'Resposta incorreta'}
                         </p>
-                        {wasCorrect ? (
-                            <CheckCircle size={20} className="text-emerald-400 mx-auto" />
-                        ) : (
-                            <XCircle size={20} className="text-red-400 mx-auto" />
-                        )}
+                        {wasCorrect
+                            ? <CheckCircle size={20} className="text-emerald-400 mx-auto" />
+                            : <XCircle size={20} className="text-red-400 mx-auto" />}
                         <p className="text-gray-400 text-sm mt-3">Aguardando o professor liberar a próxima questão...</p>
                     </div>
                 )}
 
-                {/* Botões de ação */}
+                {/* Botões */}
                 {!answered && (
                     <div className="flex gap-3">
-                        <button onClick={handleHint} disabled={hintUsed}
+                        <button onClick={() => { setHintUsed(true); setShowHint(true); }} disabled={hintUsed}
                             className="flex-shrink-0 px-4 py-3 bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded-xl font-bold text-sm hover:bg-amber-500/25 transition disabled:opacity-40 disabled:cursor-not-allowed">
                             💡 Dica (-30%)
                         </button>
@@ -240,7 +324,6 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
                     </div>
                 )}
 
-                {/* Dica box */}
                 {showHint && (
                     <div className="bg-amber-500/10 border border-amber-500/20 px-5 py-4 rounded-xl text-amber-300 text-center font-medium">
                         <b className="block text-amber-400 mb-1">Fórmula Recomendada:</b>
@@ -248,14 +331,14 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId }) =
                     </div>
                 )}
 
-                {/* Painel das constantes */}
                 <div className="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-center text-gray-400 text-sm">
                     <b className="text-gray-300">Painel do Parque:</b> Gravidade (g) = 10 m/s² | Densidade = 1000 kg/m³ | 1 m/s = 3,6 km/h
                 </div>
 
-                {/* Ranking lateral compacto */}
                 <div className="bg-black/30 border border-[#8bc34a]/10 rounded-2xl p-4">
-                    <h3 className="text-[#8bc34a] font-bold text-sm mb-3 flex items-center gap-2"><Trophy size={14} /> Ranking Ao Vivo</h3>
+                    <h3 className="text-[#8bc34a] font-bold text-sm mb-3 flex items-center gap-2">
+                        <Trophy size={14} /> Ranking Ao Vivo
+                    </h3>
                     <LiveLeaderboard participants={participants} myName={studentName} compact />
                 </div>
             </div>
