@@ -287,7 +287,7 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
         );
     }
 
-    if (session.status === 'waiting') {
+    if (session.status === 'active' && session.current_question_index < 0) {
         return (
             <div className="flex flex-col items-center justify-center py-24 gap-6 relative overflow-hidden min-h-screen">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(139,195,74,0.1)_0%,transparent_60%)] animate-pulse" />

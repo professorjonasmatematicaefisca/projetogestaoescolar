@@ -200,7 +200,7 @@ export function useGameSession(
     const createSession = async (teacherName: string): Promise<GameSession | null> => {
         const { data, error } = await supabase
             .from('game_sessions')
-            .insert({ teacher_name: teacherName, status: 'waiting', current_question_index: -1 })
+            .insert({ teacher_name: teacherName, status: 'active', current_question_index: -1 })
             .select()
             .single();
         if (error) { setError(error.message); return null; }

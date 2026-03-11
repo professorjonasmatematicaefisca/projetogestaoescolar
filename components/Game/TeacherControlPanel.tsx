@@ -85,12 +85,12 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                             Q {qi + 1} / {questions.length}
                         </div>
                     )}
-                    <div className={`px-4 py-2 rounded-xl font-bold text-sm border ${session?.status === 'waiting' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
-                        session?.status === 'active' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
+                    <div className={`px-4 py-2 rounded-xl font-bold text-sm border ${session?.status === 'active' && qi < 0 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' :
+                        session?.status === 'active' && qi >= 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' :
                             'bg-gray-500/10 border-gray-500/20 text-gray-400'
                         }`}>
-                        {session?.status === 'waiting' ? '⏳ Aguardando' :
-                            session?.status === 'active' ? '🔴 Ao Vivo' : '✅ Encerrado'}
+                        {session?.status === 'active' && qi < 0 ? '⏳ Aguardando' :
+                            session?.status === 'active' && qi >= 0 ? '🔴 Ao Vivo' : '✅ Encerrado'}
                     </div>
                 </div>
             </div>
@@ -139,7 +139,7 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                     )}
 
                     {/* Lista de Espera */}
-                    {session?.status === 'waiting' && pendingParticipants.length > 0 && (
+                    {session?.status === 'active' && qi < 0 && pendingParticipants.length > 0 && (
                         <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 mb-2">
                             <div className="text-amber-400 font-black mb-3 flex items-center gap-2">
                                 <AlertTriangle size={18} /> {pendingParticipants.length} aluno(s) aguardando liberação para entrar
@@ -170,7 +170,7 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                                 <button onClick={startNextQuestion}
                                     className="flex items-center gap-2 bg-gradient-to-r from-[#2e7d32] to-[#8bc34a] text-white font-black px-6 py-3 rounded-xl hover:brightness-110 transition shadow-lg text-lg">
                                     <SkipForward size={20} />
-                                    {session?.status === 'waiting' ? '▶ Iniciar Questão 1' : timerExpired ? '▶ Liberar Próxima Questão' : '⏭ Pular para Próxima'}
+                                    {session?.status === 'active' && qi < 0 ? '▶ Iniciar Questão 1' : timerExpired ? '▶ Liberar Próxima Questão' : '⏭ Pular para Próxima'}
                                 </button>
                             )}
                             {session?.status !== 'finished' && (

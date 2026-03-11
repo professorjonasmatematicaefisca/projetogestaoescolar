@@ -81,6 +81,7 @@ interface SessionInfo {
     id: string;
     teacher_name: string;
     status: string;
+    current_question_index: number;
     created_at: string;
 }
 
@@ -108,8 +109,8 @@ const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) 
 
         const { data } = await supabase
             .from('game_sessions')
-            .select('id, teacher_name, status, created_at')
-            .in('status', ['waiting', 'active'])
+            .select('id, teacher_name, status, current_question_index, created_at')
+            .in('status', ['active'])
             .gte('created_at', twelveHoursAgo)
             .order('created_at', { ascending: false });
 
@@ -203,7 +204,7 @@ const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) 
                             <div>
                                 <h3 className="text-white font-black text-lg group-hover:text-[#8bc34a] transition">Sala do Prof. {sess.teacher_name}</h3>
                                 <p className="text-gray-400 text-sm">
-                                    {sess.status === 'waiting' ? '⏳ Aguardando jogadores' : '🔴 Em andamento'}
+                                    {sess.status === 'active' && sess.current_question_index < 0 ? '⏳ Aguardando jogadores' : '🔴 Em andamento'}
                                 </p>
                             </div>
                             <button
