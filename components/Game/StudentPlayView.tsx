@@ -11,6 +11,7 @@ import { Clock, Trophy, CheckCircle, XCircle, Loader, Wifi } from 'lucide-react'
 interface StudentPlayViewProps {
     sessionId: string;
     preAuthName?: string; // nome do aluno já autenticado via login do EduControl
+    onLeave?: () => void;
 }
 
 const QUESTION_DURATION = 180;
@@ -49,7 +50,7 @@ function findStudentByEmail(email: string, students: { name: string }[]): { name
     return null;
 }
 
-export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, preAuthName }) => {
+export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, preAuthName, onLeave }) => {
     // Se preAuthName foi fornecido (aluno logado via EduControl), usá-lo diretamente
     const [studentName, setStudentName] = useState<string>(() => {
         if (preAuthName) return preAuthName;
@@ -82,7 +83,11 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
     const handleLeaveSession = () => {
         sessionStorage.removeItem(`game_student_name_${sessionId}`);
         sessionStorage.removeItem(`game_participant_id_${sessionId}`);
-        window.location.reload();
+        if (onLeave) {
+            onLeave();
+        } else {
+            window.location.reload();
+        }
     };
 
     // Reset ao mudar de questão

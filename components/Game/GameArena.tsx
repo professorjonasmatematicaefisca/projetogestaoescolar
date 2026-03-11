@@ -77,10 +77,17 @@ export const GameArena: React.FC<GameArenaProps> = ({ userRole, userName, onShow
     return <ActiveStudentGame preAuthName={isGameStudent ? userName : undefined} />;
 };
 
+interface SessionInfo {
+    id: string;
+    teacher_name: string;
+    status: string;
+    created_at: string;
+}
+
 // Componente auxiliar: busca a sessão ativa para alunos
 const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) => {
-    const [sessionId, setSessionId] = useState<string | null>(() => {
-        // Verificar sessão salva no sessionStorage
+    // Se já tinha uma sessão selecionada e válida no storage
+    const getSavedSessionId = () => {
         for (let i = 0; i < sessionStorage.length; i++) {
             const key = sessionStorage.key(i);
             if (key?.startsWith('game_student_name_')) {
@@ -88,66 +95,94 @@ const ActiveStudentGame: React.FC<{ preAuthName?: string }> = ({ preAuthName }) 
             }
         }
         return null;
-    });
+    };
+
+    const [selectedSessionId, setSelectedSessionId] = useState<string | null>(getSavedSessionId());
+    const [availableSessions, setAvailableSessions] = useState<SessionInfo[]>([]);
     const [searching, setSearching] = useState(true);
-    const [found, setFound] = useState(false);
+
+    const fetchSessions = async () => {
+        setSearching(true);
+        const { data } = await supabase
+            .from('game_sessions')
+            .select('id, teacher_name, status, created_at')
+            .in('status', ['waiting', 'active'])
+            .order('created_at', { ascending: false });
+
+        setAvailableSessions(data || []);
+
+        // Se temos um ID salvo, mas que não está mais aberto ou disponível
+        if (selectedSessionId && data) {
+            const stillExists = data.find(s => s.id === selectedSessionId) ||
+                // Pode ser que tenhamos uma salva que já está finished, a conferência
+                // de status "finished" agora é feita por dentro do StudentPlayView.
+                // Então deixamos passar se o ID foi recuperado.
+                true;
+        }
+
+        setSearching(false);
+    };
 
     useEffect(() => {
-        const findActiveSession = async () => {
-            if (sessionId) {
-                const { data } = await supabase
-                    .from('game_sessions')
-                    .select('id, status')
-                    .eq('id', sessionId)
-                    .in('status', ['waiting', 'active'])
-                    .single();
-                if (data) { setFound(true); setSearching(false); return; }
-                // Sessão encerrada — limpa sessionStorage ligado a ela
-                sessionStorage.removeItem(`game_student_name_${sessionId}`);
-                sessionStorage.removeItem(`game_participant_id_${sessionId}`);
-                setSessionId(null);
-            }
-            // Procura uma sessão ativa aberta
-            const { data } = await supabase
-                .from('game_sessions')
-                .select('id')
-                .in('status', ['waiting', 'active'])
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-
-            if (data) {
-                setSessionId(data.id);
-                setFound(true);
-            } else {
-                setFound(false);
-            }
+        if (!selectedSessionId) {
+            fetchSessions();
+        } else {
             setSearching(false);
-        };
+        }
+    }, [selectedSessionId]);
 
-        findActiveSession();
-    }, []);
-
-    if (searching) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-                <div className="w-12 h-12 border-4 border-[#8bc34a]/30 border-t-[#8bc34a] rounded-full animate-spin" />
-                <p className="text-gray-400 font-bold">Procurando competição ativa...</p>
-            </div>
-        );
+    // Se tem uma sessão escolhida (seja auto restaurada ou clicada), vai pra view do jogo
+    if (selectedSessionId) {
+        return <StudentPlayView sessionId={selectedSessionId} preAuthName={preAuthName} onLeave={() => {
+            setSelectedSessionId(null);
+            fetchSessions();
+        }} />;
     }
 
-    if (!found || !sessionId) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-                <div className="text-5xl">🎮</div>
-                <h2 className="text-xl font-black text-white">Nenhuma Competição Ativa</h2>
-                <p className="text-gray-400 text-center max-w-sm">
-                    Aguarde o professor iniciar uma nova sessão do WetWit Quest para participar.
-                </p>
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[70vh] py-10 gap-6 w-full max-w-2xl mx-auto px-4">
+            <div className="text-center">
+                <div className="text-6xl mb-4 text-[#8bc34a]">🎮</div>
+                <h2 className="text-3xl font-black text-white mb-2">Desafios Disponíveis</h2>
+                <p className="text-gray-400">Escolha a sala do seu professor para solicitar acesso.</p>
             </div>
-        );
-    }
 
-    return <StudentPlayView sessionId={sessionId} preAuthName={preAuthName} />;
+            {searching ? (
+                <div className="flex flex-col items-center py-10 gap-4">
+                    <div className="w-10 h-10 border-4 border-[#8bc34a]/30 border-t-[#8bc34a] rounded-full animate-spin" />
+                    <p className="text-gray-400 font-bold">Procurando salas...</p>
+                </div>
+            ) : availableSessions.length === 0 ? (
+                <div className="bg-black/40 border border-[#8bc34a]/30 rounded-2xl p-8 w-full text-center">
+                    <p className="text-gray-300 font-bold text-lg mb-4">Nenhuma competição aberta no momento.</p>
+                    <button onClick={fetchSessions} className="bg-white/5 hover:bg-white/10 text-[#8bc34a] border border-[#8bc34a]/30 px-6 py-3 rounded-xl transition font-bold">
+                        Atualizar Lista
+                    </button>
+                </div>
+            ) : (
+                <div className="w-full flex flex-col gap-3">
+                    <div className="flex justify-between items-center mb-2 px-2">
+                        <span className="text-gray-500 font-bold uppercase tracking-wider text-xs">Salas Encontradas ({availableSessions.length})</span>
+                        <button onClick={fetchSessions} className="text-[#8bc34a] text-sm hover:underline font-bold">Atualizar</button>
+                    </div>
+                    {availableSessions.map(sess => (
+                        <div key={sess.id} className="bg-black/50 border border-[#8bc34a]/20 hover:border-[#8bc34a]/60 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition group">
+                            <div>
+                                <h3 className="text-white font-black text-lg group-hover:text-[#8bc34a] transition">Sala do Prof. {sess.teacher_name}</h3>
+                                <p className="text-gray-400 text-sm">
+                                    {sess.status === 'waiting' ? '⏳ Aguardando jogadores' : '🔴 Em andamento'}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setSelectedSessionId(sess.id)}
+                                className="bg-gradient-to-r from-[#2e7d32] to-[#8bc34a] text-white px-6 py-2.5 rounded-lg font-black hover:brightness-110 shadow-lg"
+                            >
+                                Entrar
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
 };
