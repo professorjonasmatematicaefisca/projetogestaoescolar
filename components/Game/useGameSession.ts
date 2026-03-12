@@ -57,21 +57,32 @@ export function useGameSession(
     const [error, setError] = useState<string | null>(null);
 
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const skewOffsetRef = useRef<number>(0);
+    const lastQuestionIndexRef = useRef<number>(-100);
 
-    // Calcula o tempo restante baseado no timestamp do servidor
-    const recalcTimer = useCallback((questionStartTime: string | null, status: string) => {
+    // Calcula o tempo restante compensando o fuso horário (clock skew) entre professor e alunos
+    const recalcTimer = useCallback((questionStartTime: string | null, status: string, questionIndex: number) => {
         if (timerRef.current) clearInterval(timerRef.current);
-        if (!questionStartTime || status !== 'active') {
+        if (!questionStartTime || status !== 'active' || questionIndex < 0) {
             setTimeLeft(QUESTION_DURATION);
             return;
         }
+
+        const dateStr = questionStartTime.endsWith('Z') || questionStartTime.includes('+') || (questionStartTime.includes('-') && questionStartTime.lastIndexOf('-') > 10) 
+            ? questionStartTime 
+            : `${questionStartTime}Z`;
+        const startMs = new Date(dateStr).getTime();
+
+        if (questionIndex !== lastQuestionIndexRef.current) {
+            // Calcula o desvio entre Date.now() local e o tempo de início do professor
+            skewOffsetRef.current = Date.now() - startMs;
+            lastQuestionIndexRef.current = questionIndex;
+        }
+
         const tick = () => {
-            // Garantir que a string de data seja interpretada como UTC adicionando 'Z' se não houver fuso horário explícito
-            const dateStr = questionStartTime.endsWith('Z') || questionStartTime.includes('+') || questionStartTime.includes('-') && questionStartTime.lastIndexOf('-') > 10 
-                ? questionStartTime 
-                : `${questionStartTime}Z`;
-            const elapsed = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
-            setTimeLeft(Math.max(0, QUESTION_DURATION - elapsed));
+            const adjustedStart = startMs + skewOffsetRef.current;
+            const elapsed = Math.floor((Date.now() - adjustedStart) / 1000);
+            setTimeLeft(Math.max(0, Math.min(QUESTION_DURATION, QUESTION_DURATION - elapsed)));
         };
         tick();
         timerRef.current = setInterval(tick, 1000);
@@ -103,7 +114,7 @@ export function useGameSession(
                     const mine = (participantsRes.data ?? []).find((p: GameParticipant) => p.id === participantId) ?? null;
                     setMyParticipant(mine);
                 }
-                recalcTimer(loadedSession.question_start_time, loadedSession.status);
+                recalcTimer(loadedSession.question_start_time, loadedSession.status, loadedSession.current_question_index);
             } catch (err: any) {
                 if (isMounted) setError(err.message);
             } finally {
@@ -123,7 +134,7 @@ export function useGameSession(
                     if (!isMounted) return;
                     const updated = payload.new as GameSession;
                     setSession(updated);
-                    recalcTimer(updated.question_start_time, updated.status);
+                    recalcTimer(updated.question_start_time, updated.status, updated.current_question_index);
                 }
             )
             .subscribe();
@@ -137,7 +148,7 @@ export function useGameSession(
                 const s = sData as GameSession;
                 setSession(prev => {
                     if (prev?.current_question_index !== s.current_question_index || prev?.status !== s.status) {
-                        recalcTimer(s.question_start_time, s.status);
+                        recalcTimer(s.question_start_time, s.status, s.current_question_index);
                         return s;
                     }
                     return prev;
