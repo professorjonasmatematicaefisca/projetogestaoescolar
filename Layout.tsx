@@ -99,7 +99,7 @@ export const Layout: React.FC<LayoutProps> = ({
   const allowedViews = rolePermissions[role] || [];
 
   return (
-    <div className="min-h-screen flex bg-gray-900 text-gray-100 font-sans selection:bg-yellow-500 selection:text-black">
+    <div className="min-h-screen flex bg-gray-900 text-gray-100 font-sans selection:bg-emerald-500 selection:text-black">
       {/* Mobile Overlay */}
       {isSidebarOpen && (
         <div
@@ -122,9 +122,9 @@ export const Layout: React.FC<LayoutProps> = ({
             </div>
             <div>
               <h1 className="text-xl font-extrabold text-white tracking-tight leading-none uppercase">
-                PARTICULAR<span className="text-yellow-500">PRO</span>
+                JF <span className="text-emerald-500">EDUCONTROL</span>
               </h1>
-              <span className="text-[9px] font-bold text-yellow-500/80 tracking-widest uppercase mt-1 block">CONEXÃO COC PAULÍNIA</span>
+              <span className="text-[9px] font-bold text-gray-400 tracking-widest uppercase mt-1 block">CONEXÃO COC PAULÍNIA</span>
             </div>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-white">
@@ -166,14 +166,14 @@ export const Layout: React.FC<LayoutProps> = ({
                     setSidebarOpen(false);
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group relative ${active
-                    ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 shadow-[0_0_20px_rgba(234,179,8,0.1)]'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.1)]'
                     : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200 border border-transparent'
                     }`}
                 >
                   {active && (
-                    <div className="absolute left-0 w-1 h-6 bg-yellow-500 rounded-r-full" />
+                    <div className="absolute left-0 w-1 h-6 bg-emerald-500 rounded-r-full" />
                   )}
-                  <item.icon className={`transition-colors ${active ? 'text-yellow-400' : 'text-gray-400 group-hover:text-gray-200'}`} size={20} />
+                  <item.icon className={`transition-colors ${active ? 'text-emerald-400' : 'text-gray-400 group-hover:text-gray-200'}`} size={20} />
                   <span className="font-semibold">{item.label}</span>
 
                   {item.view === 'MESSAGES' && unreadMessagesCount > 0 && (
@@ -192,11 +192,11 @@ export const Layout: React.FC<LayoutProps> = ({
                   setSidebarOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group ${currentView === 'ADMIN'
-                  ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 shadow-[0_0_20px_rgba(234,179,8,0.1)]'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.1)]'
                   : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200 border border-transparent'
                   }`}
               >
-                <Settings size={20} className={currentView === 'ADMIN' ? 'text-yellow-400' : 'text-gray-500 group-hover:text-gray-300'} />
+                <Settings size={20} className={currentView === 'ADMIN' ? 'text-emerald-400' : 'text-gray-500 group-hover:text-gray-300'} />
                 <span className="font-medium">Administração</span>
               </button>
             )}
@@ -253,7 +253,7 @@ export const Layout: React.FC<LayoutProps> = ({
             <div className="w-12 h-12 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center p-1.5 overflow-hidden">
               <img src="/coc-logo.png" alt="COC Logo" className="w-full h-full object-contain" />
             </div>
-            <h1 className="text-xl font-bold text-white tracking-tight">Particular <span className="text-yellow-500">PRO</span></h1>
+            <h1 className="text-xl font-bold text-white tracking-tight">JF <span className="text-emerald-500">EDUCONTROL</span></h1>
           </div>
 
           <div className="flex flex-1 justify-end items-center mr-4">

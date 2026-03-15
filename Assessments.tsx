@@ -27,6 +27,12 @@ interface AssessmentsProps {
     onShowToast: (msg: string) => void;
 }
 
+const formatGrade = (value: number | undefined): string => {
+    if (value === undefined || value === null) return '-';
+    // Format to 2 decimal places with comma
+    return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 type AssessmentTab = 'ENTRY' | 'REPORT';
 
 const BIMESTRE_RANGES = {
@@ -170,7 +176,9 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
     };
 
     const handleInputChange = (studentId: string, field: keyof Grade, value: string) => {
-        const numValue = value === '' ? undefined : parseFloat(value.replace(',', '.'));
+        // Accept both comma and point
+        const sanitizedValue = value.replace(',', '.');
+        const numValue = value === '' ? undefined : parseFloat(sanitizedValue);
         
         if (numValue !== undefined && (isNaN(numValue) || numValue < 0 || numValue > 10)) {
             return;
@@ -223,7 +231,7 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                     media = Math.min(10, media + atividadesExtras);
                 }
 
-                updated.mediaFinal = parseFloat(media.toFixed(1));
+                updated.mediaFinal = parseFloat(media.toFixed(2));
             }
 
             return { ...prev, [studentId]: updated };
@@ -349,8 +357,8 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                                         placeholder="-"
                                                         data-student={student.id}
                                                         data-field={col.field}
-                                                        className={`w-12 h-10 bg-[#0f172a] border border-gray-700 rounded-lg text-center text-sm font-bold text-white outline-none focus:border-${col.color}-500 transition-all`}
-                                                        value={g[col.field as keyof Grade] !== undefined ? g[col.field as keyof Grade] : ''}
+                                                        className={`w-16 h-10 bg-[#0f172a] border border-gray-700 rounded-lg text-center text-sm font-bold text-white outline-none focus:border-${col.color}-500 transition-all`}
+                                                        value={g[col.field as keyof Grade] !== undefined ? (g[col.field as keyof Grade] as number).toString().replace('.', ',') : ''}
                                                         onChange={(e) => handleInputChange(student.id, col.field as keyof Grade, e.target.value)}
                                                         onBlur={() => handleInputBlur(student.id)}
                                                         onKeyDown={(e) => {
@@ -431,14 +439,14 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                         ))}
 
                                         <td className="p-4 text-center">
-                                            <div className="w-12 h-10 flex items-center justify-center bg-gray-800/30 rounded-lg text-sm font-bold text-gray-400 border border-gray-800/50">
-                                                {part}
+                                            <div className="w-16 h-10 flex items-center justify-center bg-gray-800/30 rounded-lg text-sm font-bold text-gray-400 border border-gray-800/50">
+                                                {formatGrade(part)}
                                             </div>
                                         </td>
 
                                         <td className="p-4 text-center bg-emerald-500/5">
                                             <div className={`text-sm font-extrabold ${g.mediaFinal && g.mediaFinal < 6 ? 'text-red-400' : 'text-emerald-400'}`}>
-                                                {g.mediaFinal || '-'}
+                                                {formatGrade(g.mediaFinal)}
                                             </div>
                                         </td>
                                     </tr>
