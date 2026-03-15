@@ -116,9 +116,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                     </div>
                                     <div>
                                         <h1 className="text-24 font-bold text-white tracking-tight uppercase">
-                                            Particular <span className="text-yellow-500">PRO</span>
+                                            PARTICULAR <span className="text-yellow-500">PRO</span>
                                         </h1>
-                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Conexão COC Paulínia</p>
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">CONEXÃO COC PAULÍNIA</p>
                                     </div>
                                 </div>
 
@@ -281,7 +281,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
                     {/* Support Link */}
                     <div className="mt-8 text-center pt-8 border-t border-gray-800/30">
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 uppercase tracking-widest">
                             Plataforma de Gestão — <span className="text-yellow-500 font-bold">Particular PRO</span>
                         </p>
                     </div>

@@ -121,10 +121,10 @@ export const Layout: React.FC<LayoutProps> = ({
               <img src="/coc-logo.png" alt="COC Logo" className="w-full h-full object-contain scale-110" />
             </div>
             <div>
-              <h1 className="text-xl font-extrabold text-white tracking-tight leading-none">
-                Particular<span className="text-yellow-500">PRO</span>
+              <h1 className="text-xl font-extrabold text-white tracking-tight leading-none uppercase">
+                PARTICULAR<span className="text-yellow-500">PRO</span>
               </h1>
-              <span className="text-[10px] font-bold text-yellow-500 tracking-[0.2em] uppercase">Control Panel</span>
+              <span className="text-[9px] font-bold text-yellow-500/80 tracking-widest uppercase mt-1 block">CONEXÃO COC PAULÍNIA</span>
             </div>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-white">
