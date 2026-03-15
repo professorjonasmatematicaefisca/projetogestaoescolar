@@ -2,6 +2,7 @@ import { supabase } from '../supabaseClient';
 import { Student, ClassRoom, Discipline, Teacher, Occurrence, ClassSession, SessionRecord, UserRole, StudentExit, PlanningModule, PlanningSchedule, StudyGuideItem, RequestItem } from '../types';
 import { SEED_STUDENTS, SEED_CLASSES, SEED_TEACHERS, SEED_OCCURRENCES } from './mockData';
 import { offlineService } from './offlineService';
+import { StorageService } from './storageService';
 
 export const SupabaseService = {
     async getPlanningModules(filters?: { teacherId?: string, classId?: string, disciplineId?: string, unusedOnly?: boolean }): Promise<PlanningModule[]> {
@@ -1636,7 +1637,6 @@ export const SupabaseService = {
 
         const { data, error } = await query;
         if (error) { console.error('getGrades error:', error); return []; }
-
         return data.map((g: any) => ({
             id: g.id,
             studentId: g.student_id,
@@ -1646,11 +1646,14 @@ export const SupabaseService = {
             year: g.year,
             p1: g.p1,
             p2: g.p2,
-            p3: g.p3,
-            p4: g.p4,
             sub: g.sub,
             recuperacao: g.recuperacao,
             atividadesExtras: g.atividades_extras,
+            faltas: g.faltas,
+            p1PdfUrl: g.p1_pdf_url,
+            p2PdfUrl: g.p2_pdf_url,
+            subPdfUrl: g.sub_pdf_url,
+            recPdfUrl: g.rec_pdf_url,
             mediaFinal: g.media_final,
             createdAt: g.created_at,
             updatedAt: g.updated_at
@@ -1667,11 +1670,14 @@ export const SupabaseService = {
             year: g.year,
             p1: g.p1,
             p2: g.p2,
-            p3: g.p3,
-            p4: g.p4,
             sub: g.sub,
             recuperacao: g.recuperacao,
             atividades_extras: g.atividadesExtras,
+            faltas: g.faltas,
+            p1_pdf_url: g.p1PdfUrl,
+            p2_pdf_url: g.p2PdfUrl,
+            sub_pdf_url: g.subPdfUrl,
+            rec_pdf_url: g.recPdfUrl,
             media_final: g.mediaFinal
         }));
 
@@ -1707,20 +1713,66 @@ export const SupabaseService = {
         // 3. Get records for these sessions for the student
         const { data: records, error: recError } = await supabase
             .from('session_records')
-            .select('counters')
+            .select('counters, present, present2, phone_confiscated')
             .eq('student_id', studentId)
             .in('session_id', sessionIds)
             .eq('present', true);
 
         if (recError || !records || records.length === 0) return 0;
 
-        // 4. Calculate average
+        // 4. Calculate average using StorageService logic for behavioral grade
         const total = records.reduce((sum, rec) => {
-            const partCount = (rec.counters as any)?.participation || 0;
-            const sessionGrade = Math.min(10, partCount * 0.5);
-            return sum + sessionGrade;
+            const behavioralGrade = StorageService.calculateGrade({
+                studentId: studentId,
+                present: rec.present,
+                present2: rec.present2,
+                phoneConfiscated: rec.phone_confiscated || false,
+                counters: rec.counters || {}
+            } as any);
+            return sum + behavioralGrade;
         }, 0);
 
         return parseFloat((total / records.length).toFixed(1));
+    },
+
+    /**
+     * Calcula o total de faltas (blocos de aula perdidos) para um aluno.
+     */
+    async getAbsencesCount(studentId: string, disciplineId: string, startDate: string, endDate: string): Promise<number> {
+        const { data: disc } = await supabase.from('disciplines').select('name').eq('id', disciplineId).single();
+        if (!disc) return 0;
+
+        const { data: sessions } = await supabase
+            .from('sessions')
+            .select('id, blocks_count')
+            .eq('subject', disc.name)
+            .gte('date', startDate)
+            .lte('date', endDate);
+
+        if (!sessions || sessions.length === 0) return 0;
+
+        const sessionIds = sessions.map(s => s.id);
+        const sessionWeights = sessions.reduce((acc, s) => ({ ...acc, [s.id]: s.blocks_count || 1 }), {} as Record<string, number>);
+
+        const { data: records } = await supabase
+            .from('session_records')
+            .select('session_id, present, present2')
+            .eq('student_id', studentId)
+            .in('session_id', sessionIds);
+
+        if (!records) return 0;
+
+        let totalFaltas = 0;
+        records.forEach(rec => {
+            const weight = sessionWeights[rec.session_id] || 1;
+            if (weight === 1) {
+                if (!rec.present) totalFaltas += 1;
+            } else {
+                if (!rec.present) totalFaltas += 1;
+                if (!rec.present2) totalFaltas += 1;
+            }
+        });
+
+        return totalFaltas;
     }
 };

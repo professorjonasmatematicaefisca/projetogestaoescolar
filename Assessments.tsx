@@ -11,7 +11,10 @@ import {
     AlertCircle,
     CheckCircle2,
     Calendar,
-    Award
+    Award,
+    FileUp,
+    FileText,
+    Link
 } from 'lucide-react';
 import { SupabaseService } from './services/supabaseService';
 import { Student, ClassRoom, Discipline, Grade, UserRole, User as SystemUser } from './types';
@@ -52,6 +55,7 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
     const [students, setStudents] = useState<Student[]>([]);
     const [grades, setGrades] = useState<Record<string, Grade>>({}); // studentId -> Grade
     const [participationGrades, setParticipationGrades] = useState<Record<string, number>>({}); // studentId -> avg
+    const [absenceGrades, setAbsenceGrades] = useState<Record<string, number>>({}); // studentId -> total
 
     useEffect(() => {
         loadInitialData();
@@ -128,11 +132,17 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
             const endDate = `${selectedYear}${range.end}`;
 
             const partMap: Record<string, number> = {};
+            const absMap: Record<string, number> = {};
             await Promise.all(classStudents.map(async (s) => {
-                const avg = await SupabaseService.getParticipationAverage(s.id, selectedDiscipline, startDate, endDate);
+                const [avg, abs] = await Promise.all([
+                    SupabaseService.getParticipationAverage(s.id, selectedDiscipline, startDate, endDate),
+                    SupabaseService.getAbsencesCount(s.id, selectedDiscipline, startDate, endDate)
+                ]);
                 partMap[s.id] = avg;
+                absMap[s.id] = abs;
             }));
             setParticipationGrades(partMap);
+            setAbsenceGrades(absMap);
 
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -161,15 +171,24 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
             const updated = { ...current, [field]: numValue };
             
             // Recalculate Average
-            const values = [
-                updated.p1, updated.p2, updated.p3, updated.p4, 
-                updated.sub, updated.recuperacao, updated.atividadesExtras,
-                participationGrades[studentId]
-            ].filter(v => v !== undefined) as number[];
+            const { p1 = 0, p2 = 0, sub, recuperacao, atividadesExtras = 0 } = updated;
+            const part = participationGrades[studentId] || 0;
 
-            if (values.length > 0) {
-                const sum = values.reduce((a, b) => a + b, 0);
-                updated.mediaFinal = parseFloat((sum / values.length).toFixed(1));
+            let n1 = p1;
+            let n2 = p2;
+
+            if (sub !== undefined) {
+                if (n1 < n2) n1 = Math.max(n1, sub);
+                else n2 = Math.max(n2, sub);
+            }
+
+            const mediaBase = (n1 + n2) / 2;
+            let parcial = (mediaBase + atividadesExtras + part) / 3;
+
+            if (parcial < 6 && recuperacao !== undefined) {
+                updated.mediaFinal = parseFloat(((parcial + recuperacao) / 2).toFixed(1));
+            } else {
+                updated.mediaFinal = parseFloat(parcial.toFixed(1));
             }
 
             return { ...prev, [studentId]: updated };
@@ -243,10 +262,9 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                         <thead>
                             <tr className="bg-[#0f172a]/80 border-b border-gray-800">
                                 <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Aluno</th>
+                                <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Faltas</th>
                                 <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">P1</th>
                                 <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">P2</th>
-                                <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">P3</th>
-                                <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">P4</th>
                                 <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Sub</th>
                                 <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Rec</th>
                                 <th className="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Extras</th>
@@ -275,25 +293,81 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                                 </span>
                                             </div>
                                         </td>
+
+                                        <td className="p-2 text-center">
+                                            <div className="w-12 h-10 mx-auto flex items-center justify-center bg-red-500/10 border border-red-500/20 rounded-lg text-sm font-bold text-red-400">
+                                                {absenceGrades[student.id] || 0}
+                                            </div>
+                                        </td>
                                         
                                         {[
-                                            { field: 'p1', color: 'blue' },
-                                            { field: 'p2', color: 'blue' },
-                                            { field: 'p3', color: 'blue' },
-                                            { field: 'p4', color: 'blue' },
-                                            { field: 'sub', color: 'orange' },
-                                            { field: 'recuperacao', color: 'red' },
-                                            { field: 'atividadesExtras', color: 'purple' }
+                                            { field: 'p1', color: 'blue', hasPdf: !!g.p1PdfUrl },
+                                            { field: 'p2', color: 'blue', hasPdf: !!g.p2PdfUrl },
+                                            { field: 'sub', color: 'orange', hasPdf: !!g.subPdfUrl },
+                                            { field: 'recuperacao', color: 'red', hasPdf: !!g.recPdfUrl },
+                                            { field: 'atividadesExtras', color: 'purple', noPdf: true }
                                         ].map(col => (
                                             <td key={col.field} className="p-2 text-center">
-                                                <input
-                                                    type="text"
-                                                    placeholder="-"
-                                                    className={`w-12 h-10 bg-[#0f172a] border border-gray-700 rounded-lg text-center text-sm font-bold text-white outline-none focus:border-${col.color}-500 transition-all`}
-                                                    value={g[col.field as keyof Grade] !== undefined ? g[col.field as keyof Grade] : ''}
-                                                    onChange={(e) => handleInputChange(student.id, col.field as keyof Grade, e.target.value)}
-                                                    onBlur={() => handleInputBlur(student.id)}
-                                                />
+                                                <div className="flex items-center justify-center gap-1 group/field">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="-"
+                                                        data-student={student.id}
+                                                        data-field={col.field}
+                                                        className={`w-12 h-10 bg-[#0f172a] border border-gray-700 rounded-lg text-center text-sm font-bold text-white outline-none focus:border-${col.color}-500 transition-all`}
+                                                        value={g[col.field as keyof Grade] !== undefined ? g[col.field as keyof Grade] : ''}
+                                                        onChange={(e) => handleInputChange(student.id, col.field as keyof Grade, e.target.value)}
+                                                        onBlur={() => handleInputBlur(student.id)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Tab' && !e.shiftKey) {
+                                                                const studentIndex = students.findIndex(s => s.id === student.id);
+                                                                if (studentIndex < students.length - 1) {
+                                                                    e.preventDefault();
+                                                                    const nextStudentId = students[studentIndex + 1].id;
+                                                                    const nextInput = document.querySelector(`input[data-student="${nextStudentId}"][data-field="${col.field}"]`) as HTMLInputElement;
+                                                                    if (nextInput) nextInput.focus();
+                                                                }
+                                                            }
+                                                        }}
+                                                    />
+                                                    {!col.noPdf && (
+                                                        <button 
+                                                            onClick={() => {
+                                                                if (col.hasPdf) {
+                                                                    const pdfUrl = (col.field === 'recuperacao' ? g.recPdfUrl : (g as any)[`${col.field}PdfUrl`]);
+                                                                    if (pdfUrl) window.open(pdfUrl, '_blank');
+                                                                } else {
+                                                                    const input = document.createElement('input');
+                                                                    input.type = 'file';
+                                                                    input.accept = 'application/pdf';
+                                                                    input.onchange = async (e) => {
+                                                                        const file = (e.target as HTMLInputElement).files?.[0];
+                                                                        if (file) {
+                                                                            onShowToast(`Arquivando PDF: ${file.name}...`);
+                                                                            const reader = new FileReader();
+                                                                            reader.onload = async (event) => {
+                                                                                const dataUrl = event.target?.result as string;
+                                                                                const pdfField = (col.field === 'recuperacao' ? 'recPdfUrl' : `${col.field}PdfUrl`) as keyof Grade;
+                                                                                setGrades(prev => ({
+                                                                                    ...prev,
+                                                                                    [student.id]: { ...prev[student.id], [pdfField]: dataUrl }
+                                                                                }));
+                                                                                onShowToast("PDF arquivado com sucesso!");
+                                                                                handleInputBlur(student.id);
+                                                                            };
+                                                                            reader.readAsDataURL(file);
+                                                                        }
+                                                                    };
+                                                                    input.click();
+                                                                }
+                                                            }}
+                                                            className={`p-1.5 rounded-lg border transition-all ${col.hasPdf ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-gray-800/50 border-gray-700 text-gray-500 hover:text-gray-300'}`}
+                                                            title={col.hasPdf ? "Ver PDF" : "Arquivar PDF"}
+                                                        >
+                                                            {col.hasPdf ? <FileText size={14} /> : <FileUp size={14} />}
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         ))}
 
@@ -358,12 +432,12 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                     {[
                                         { label: 'P1', val: g?.p1 },
                                         { label: 'P2', val: g?.p2 },
-                                        { label: 'P3', val: g?.p3 },
-                                        { label: 'P4', val: g?.p4 }
+                                        { label: 'Sub', val: g?.sub },
+                                        { label: 'Rec', val: g?.recuperacao }
                                     ].map(item => (
                                         <div key={item.label} className="bg-[#0f172a]/50 p-2 rounded-lg text-center border border-gray-800/50">
                                             <p className="text-[10px] text-gray-500 font-bold mb-1">{item.label}</p>
-                                            <p className="text-xs font-bold text-white">{item.val || '-'}</p>
+                                            <p className="text-xs font-bold text-white">{item.val !== undefined ? item.val : '-'}</p>
                                         </div>
                                     ))}
                                 </div>

@@ -218,11 +218,14 @@ export interface Grade {
   year: number;
   p1?: number;
   p2?: number;
-  p3?: number;
-  p4?: number;
   sub?: number;
   recuperacao?: number;
   atividadesExtras?: number;
+  faltas?: number;
+  p1PdfUrl?: string;
+  p2PdfUrl?: string;
+  subPdfUrl?: string;
+  recPdfUrl?: string;
   mediaFinal?: number;
   createdAt?: string;
   updatedAt?: string;
