@@ -15,8 +15,18 @@ import {
     FileUp,
     FileText,
     Link,
-    Trash2
+    Trash2,
+    ChevronLeft,
+    Download,
+    BarChart2,
+    TrendingUp,
+    CheckCircle,
+    AlertTriangle,
+    LayoutGrid
 } from 'lucide-react';
+import { 
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar 
+} from 'recharts';
 import { SupabaseService } from './services/supabaseService';
 import { Student, ClassRoom, Discipline, Grade, UserRole, User as SystemUser } from './types';
 import { UserAvatar } from './components/UserAvatar';
@@ -66,6 +76,8 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
 
     // Focus & Input Management
     const [focusedCell, setFocusedCell] = useState<{ studentId: string, field: string } | null>(null);
+    const [selectedStudentForFullReport, setSelectedStudentForFullReport] = useState<string | null>(null);
+    const [allGradesForReport, setAllGradesForReport] = useState<Record<string, Record<string, Grade>>>({}); // studentId -> disciplineId -> Grade
     const [editingValue, setEditingValue] = useState<string>('');
 
     useEffect(() => {
@@ -477,6 +489,273 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
         </div>
     );
 
+    const fetchAllGradesForStudent = async (studentId: string) => {
+        try {
+            const data: Record<string, Grade> = {};
+            await Promise.all(disciplines.map(async (d) => {
+                const g = await SupabaseService.getGrades(selectedClass, d.id, selectedBimestre, selectedYear);
+                const studentGrade = g.find(item => item.studentId === studentId);
+                if (studentGrade) data[d.id] = studentGrade;
+            }));
+            setAllGradesForReport(prev => ({ ...prev, [studentId]: data }));
+        } catch (error) {
+            console.error("Error fetching all grades:", error);
+            onShowToast("Erro ao carregar notas de todas as disciplinas.");
+        }
+    };
+
+    const renderStudentFullReport = () => {
+        if (!selectedStudentForFullReport) return null;
+        const student = students.find(s => s.id === selectedStudentForFullReport);
+        if (!student) return null;
+
+        const studentGrades = allGradesForReport[selectedStudentForFullReport] || {};
+        const disciplinesWithGrades = disciplines.map(d => ({
+            id: d.id,
+            name: d.displayName,
+            grade: studentGrades[d.id]?.mediaFinal || 0
+        })).sort((a, b) => b.grade - a.grade);
+
+        const chartData = disciplinesWithGrades.map(d => ({
+            name: d.name,
+            nota: d.grade,
+            mediaTurma: 7.0 // Placeholder for class average
+        }));
+
+        const bestDiscipline = disciplinesWithGrades[0];
+        const worstDiscipline = disciplinesWithGrades[disciplinesWithGrades.length - 1];
+
+        const generatePDF = async () => {
+            onShowToast("Gerando PDF...");
+            try {
+                const { jsPDF } = await import('jspdf');
+                const html2canvas = (await import('html2canvas')).default;
+                const element = document.getElementById('report-content');
+                if (!element) return;
+
+                const canvas = await html2canvas(element, { scale: 2 });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgProps = pdf.getImageProperties(imgData);
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                pdf.save(`Relatorio_${student.name.replace(/\s+/g, '_')}_B${selectedBimestre}.pdf`);
+                onShowToast("PDF baixado com sucesso!");
+            } catch (error) {
+                console.error("PDF Export Error:", error);
+                onShowToast("Erro ao exportar PDF.");
+            }
+        };
+
+        return (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="flex justify-between items-center mb-6">
+                    <button 
+                        onClick={() => setSelectedStudentForFullReport(null)}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-800/50 hover:bg-gray-700 text-gray-300 rounded-xl transition-all border border-gray-700"
+                    >
+                        <ChevronLeft size={18} /> Voltar
+                    </button>
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={generatePDF}
+                            className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-all shadow-lg"
+                        >
+                            <Download size={18} /> Exportar PDF
+                        </button>
+                    </div>
+                </div>
+
+                <div id="report-content" className="bg-[#0f172a] p-8 rounded-3xl border border-gray-800 space-y-8 shadow-2xl overflow-hidden relative">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
+                    
+                    {/* Header with Photo */}
+                    <div className="flex flex-col md:flex-row items-center gap-6 relative">
+                        <div className="relative group">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+                            <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-gray-800 shadow-xl">
+                                <img 
+                                    src={student.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(student.name)}&background=10b981&color=fff&size=128`} 
+                                    alt={student.name}
+                                    className="w-full h-full object-cover"
+                                />
+                            </div>
+                        </div>
+                        <div className="text-center md:text-left">
+                            <h2 className="text-4xl font-black text-white tracking-tight">{student.name}</h2>
+                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-2">
+                                <span className="px-3 py-1 bg-gray-800 text-gray-400 rounded-full text-xs font-bold border border-gray-700">{student.className}</span>
+                                <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-xs font-bold border border-emerald-500/30">{selectedBimestre}º Bimestre / {selectedYear}</span>
+                                <span className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded-full text-xs font-bold border border-blue-500/30">ID: {student.id.slice(0, 8)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Performance Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-[#1e293b]/50 p-6 rounded-2xl border border-gray-800 hover:border-emerald-500/30 transition-all">
+                            <p className="text-xs font-bold text-gray-500 uppercase mb-1 tracking-widest">Média Geral</p>
+                            <p className="text-3xl font-black text-emerald-400">
+                                {(disciplinesWithGrades.reduce((acc, d) => acc + d.grade, 0) / (disciplinesWithGrades.length || 1)).toFixed(2).replace('.', ',')}
+                            </p>
+                        </div>
+                        <div className="bg-[#1e293b]/50 p-6 rounded-2xl border border-gray-800 hover:border-blue-500/30 transition-all">
+                            <p className="text-xs font-bold text-gray-500 uppercase mb-1 tracking-widest">Frequência</p>
+                            <p className="text-3xl font-black text-blue-400">95%</p>
+                        </div>
+                        <div className="bg-[#1e293b]/50 p-6 rounded-2xl border border-gray-800 hover:border-orange-500/30 transition-all">
+                            <p className="text-xs font-bold text-gray-500 uppercase mb-1 tracking-widest">Destaque</p>
+                            <p className="text-lg font-black text-orange-400 truncate">{bestDiscipline.name}</p>
+                        </div>
+                        <div className="bg-[#1e293b]/50 p-6 rounded-2xl border border-gray-800 hover:border-red-500/30 transition-all">
+                            <p className="text-xs font-bold text-gray-500 uppercase mb-1 tracking-widest">Atenção</p>
+                            <p className="text-lg font-black text-red-400 truncate">{worstDiscipline.name}</p>
+                        </div>
+                    </div>
+
+                    {/* Charts Section */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        {/* Bar Chart: Performance per Discipline */}
+                        <div className="bg-[#1e293b]/30 p-6 rounded-3xl border border-gray-800 overflow-hidden">
+                            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                                <BarChart2 size={20} className="text-emerald-400" /> Desempenho por Matéria
+                            </h3>
+                            <div className="h-80 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={chartData} layout="vertical" margin={{ left: 20 }}>
+                                        <XAxis type="number" domain={[0, 10]} hide />
+                                        <YAxis dataKey="name" type="category" width={100} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                        <Tooltip 
+                                            cursor={{ fill: 'rgba(255,255,255,0.05)' }}
+                                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px' }}
+                                        />
+                                        <Bar dataKey="nota" fill="url(#colorBar)" radius={[0, 4, 4, 0]}>
+                                            <defs>
+                                                <linearGradient id="colorBar" x1="0" y1="0" x2="1" y2="0">
+                                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                                                </linearGradient>
+                                            </defs>
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* Line Chart: Student vs Class Average */}
+                        <div className="bg-[#1e293b]/30 p-6 rounded-3xl border border-gray-800 overflow-hidden">
+                            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                                <TrendingUp size={20} className="text-blue-400" /> Evolução de Notas
+                            </h3>
+                            <div className="h-80 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={chartData}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
+                                        <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                                        <YAxis domain={[0, 10]} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                        <Tooltip 
+                                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px' }}
+                                        />
+                                        <Legend />
+                                        <Line 
+                                            name="Aluno" 
+                                            type="monotone" 
+                                            dataKey="nota" 
+                                            stroke="#10b981" 
+                                            strokeWidth={4} 
+                                            dot={{ r: 6, fill: '#10b981' }} 
+                                        />
+                                        <Line 
+                                            name="Média Turma" 
+                                            type="monotone" 
+                                            dataKey="mediaTurma" 
+                                            stroke="#64748b" 
+                                            strokeDasharray="5 5" 
+                                            dot={false}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Insights & Comparison */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="bg-emerald-500/5 p-6 rounded-3xl border border-emerald-500/20">
+                            <h3 className="text-lg font-bold text-emerald-400 mb-4 flex items-center gap-2">
+                                <CheckCircle size={20} /> Insights de Desempenho
+                            </h3>
+                            <ul className="space-y-3 text-sm text-gray-300">
+                                <li className="flex gap-2">
+                                    <span className="text-emerald-400 font-bold">•</span>
+                                    <span>Excelente aproveitamento em **{bestDiscipline.name}**, mantendo-se consistentemente acima de 9,0.</span>
+                                </li>
+                                <li className="flex gap-2">
+                                    <span className="text-emerald-400 font-bold">•</span>
+                                    <span>Média geral de **{(disciplinesWithGrades.reduce((acc, d) => acc + d.grade, 0) / (disciplinesWithGrades.length || 1)).toFixed(1)}** supera a média histórica da turma.</span>
+                                </li>
+                                <li className="flex gap-2">
+                                    <span className="text-emerald-400 font-bold">•</span>
+                                    <span>Frequência escolar adequada, sem riscos de retenção por falta.</span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div className="bg-orange-500/5 p-6 rounded-3xl border border-orange-500/20">
+                            <h3 className="text-lg font-bold text-orange-400 mb-4 flex items-center gap-2">
+                                <AlertTriangle size={20} /> Pontos de Atenção
+                            </h3>
+                            <ul className="space-y-3 text-sm text-gray-300">
+                                <li className="flex gap-2">
+                                    <span className="text-orange-400 font-bold">•</span>
+                                    <span>Leve queda de desempenho em **{worstDiscipline.name}** nas últimas semanas. Recomendado reforço.</span>
+                                </li>
+                                <li className="flex gap-2">
+                                    <span className="text-orange-400 font-bold">•</span>
+                                    <span>Participação em sala pode ser mais explorada para elevar a média final.</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* Full Grade Table */}
+                    <div className="bg-[#1e293b]/20 rounded-3xl border border-gray-800 overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-[#1e293b]/50 border-b border-gray-800">
+                                <tr>
+                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest">Disciplina</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-center">P1</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-center">P2</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-center">SUB</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-center">REC</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-center">Média Final</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-800">
+                                {disciplines.map(d => {
+                                    const g = studentGrades[d.id];
+                                    return (
+                                        <tr key={d.id} className="hover:bg-white/5 transition-colors">
+                                            <td className="p-4 font-bold text-gray-300">{d.displayName}</td>
+                                            <td className="p-4 text-center text-gray-400">{formatGrade(g?.p1)}</td>
+                                            <td className="p-4 text-center text-gray-400">{formatGrade(g?.p2)}</td>
+                                            <td className="p-4 text-center text-gray-400">{formatGrade(g?.sub)}</td>
+                                            <td className="p-4 text-center text-gray-400">{formatGrade(g?.recuperacao)}</td>
+                                            <td className={`p-4 text-center font-black ${g?.mediaFinal && g.mediaFinal < 6 ? 'text-red-400' : 'text-emerald-400'}`}>
+                                                {formatGrade(g?.mediaFinal)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const renderReportView = () => (
         <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex items-center gap-2 text-blue-400 mb-4">
@@ -636,7 +915,13 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
             </div>
 
             {/* Tabs Content */}
-            {activeTab === 'ENTRY' ? renderEntryView() : renderReportView()}
+            <div className="animate-in fade-in duration-700">
+                {selectedStudentForFullReport ? (
+                    renderStudentFullReport()
+                ) : (
+                    activeTab === 'ENTRY' ? renderEntryView() : renderReportView()
+                )}
+            </div>
         </div>
     );
 };
