@@ -12,6 +12,7 @@ import { ClassroomMonitor } from './ClassroomMonitor';
 import { FOA } from './FOA';
 import { StudentReport } from './StudentReport';
 import { StudyGuide } from './StudyGuide';
+import { Planning } from './Planning';
 import { Comunicados } from './Comunicados';
 import { RequestsPanel } from './RequestsPanel';
 import { UserRole, ViewState } from './types';
@@ -209,6 +210,7 @@ function App() {
       case 'FOA': return <FOA userEmail={userEmail} currentUserRole={userRole!} onShowToast={showToast} userName={userName} />;
       case 'REPORTS': return <StudentReport initialStudentId={targetStudentId} currentUserRole={userRole!} onShowToast={showToast} />;
       case 'STUDY_GUIDE': return <StudyGuide userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
+      case 'PLANNING': return <Planning userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
       case 'MESSAGES': return <Comunicados userEmail={userEmail} userRole={userRole!} onShowToast={showToast} userName={userName} />;
       case 'REQUESTS': return <RequestsPanel onShowToast={showToast} userRole={userRole!} userEmail={userEmail} />;
       case 'SETTINGS': return <SettingsView userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;

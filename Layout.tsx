@@ -75,8 +75,8 @@ export const Layout: React.FC<LayoutProps> = ({
 
   // Define allowed views per role
   const rolePermissions: Record<UserRole, ViewState[]> = {
-    [UserRole.COORDINATOR]: ['DASHBOARD', 'ADMIN', 'SETTINGS', 'GAME', 'GRADES', 'CLASSROOM', 'FOA', 'REPORTS', 'STUDY_GUIDE', 'MESSAGES', 'REQUESTS'],
-    [UserRole.TEACHER]: ['DASHBOARD', 'SETTINGS', 'GAME', 'GRADES', 'CLASSROOM', 'FOA', 'REPORTS', 'STUDY_GUIDE', 'MESSAGES'],
+    [UserRole.COORDINATOR]: ['DASHBOARD', 'ADMIN', 'SETTINGS', 'GAME', 'GRADES', 'CLASSROOM', 'FOA', 'REPORTS', 'STUDY_GUIDE', 'PLANNING', 'MESSAGES', 'REQUESTS'],
+    [UserRole.TEACHER]: ['DASHBOARD', 'SETTINGS', 'GAME', 'GRADES', 'CLASSROOM', 'FOA', 'REPORTS', 'STUDY_GUIDE', 'PLANNING', 'MESSAGES'],
     [UserRole.MONITOR]: ['SETTINGS'],
     [UserRole.STUDENT]: ['DASHBOARD', 'SETTINGS', 'GAME', 'MESSAGES'],
     [UserRole.PARENT]: ['DASHBOARD', 'SETTINGS', 'MESSAGES'],
@@ -91,7 +91,8 @@ export const Layout: React.FC<LayoutProps> = ({
     { view: 'GRADES', icon: Award, label: 'Avaliações' },
     { view: 'MESSAGES', icon: MessageSquare, label: 'Comunicados' },
     { view: 'REQUESTS', icon: ClipboardList, label: 'Monitoria' },
-    { view: 'STUDY_GUIDE', icon: BookOpen, label: 'Planejamento' },
+    { view: 'PLANNING', icon: BookOpen, label: 'Planejamento' },
+    { view: 'STUDY_GUIDE', icon: ClipboardList, label: 'Roteiro de Estudos' },
     { view: 'GAME', icon: Gamepad2, label: '🎮 Game' },
   ] as const;
 
