@@ -82,6 +82,7 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
     const [pendingSaves, setPendingSaves] = useState<Set<string>>(new Set());
     const [selectedDisciplineForEvolution, setSelectedDisciplineForEvolution] = useState<string>('all');
     const [classGradesForReport, setClassGradesForReport] = useState<Grade[]>([]);
+    const [selectedAssessmentFilter, setSelectedAssessmentFilter] = useState<string>('all');
 
     useEffect(() => {
         loadInitialData();
@@ -592,15 +593,32 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
             }).sort((a, b) => b.grade - a.grade);
 
         const chartData = disciplinesWithGrades.map(d => {
-            const disciplineClassGrades = classGradesForReport.filter(cg => cg.disciplineId === d.id && cg.mediaFinal !== undefined);
-            const avg = disciplineClassGrades.length > 0 
-                ? disciplineClassGrades.reduce((acc, current) => acc + (current.mediaFinal || 0), 0) / disciplineClassGrades.length 
-                : 0;
+            const disciplineClassGrades = classGradesForReport.filter(cg => cg.disciplineId === d.id);
+            
+            let studentVal = d.grade;
+            let classAvg = 0;
+
+            if (selectedAssessmentFilter === 'p1') {
+                studentVal = d.g?.p1 || 0;
+                const filtered = disciplineClassGrades.filter(cg => cg.p1 !== undefined && cg.p1 !== null);
+                classAvg = filtered.length > 0 ? filtered.reduce((acc, curr) => acc + (curr.p1 || 0), 0) / filtered.length : 0;
+            } else if (selectedAssessmentFilter === 'p2') {
+                studentVal = d.g?.p2 || 0;
+                const filtered = disciplineClassGrades.filter(cg => cg.p2 !== undefined && cg.p2 !== null);
+                classAvg = filtered.length > 0 ? filtered.reduce((acc, curr) => acc + (curr.p2 || 0), 0) / filtered.length : 0;
+            } else if (selectedAssessmentFilter === 'part') {
+                studentVal = d.participation;
+                classAvg = 7.5; // Placeholder for class participation average
+            } else {
+                studentVal = d.grade;
+                const filtered = disciplineClassGrades.filter(cg => cg.mediaFinal !== undefined && cg.mediaFinal !== null);
+                classAvg = filtered.length > 0 ? filtered.reduce((acc, curr) => acc + (curr.mediaFinal || 0), 0) / filtered.length : 0;
+            }
 
             return {
                 name: d.name,
-                nota: d.grade,
-                mediaTurma: parseFloat(avg.toFixed(2))
+                nota: studentVal,
+                mediaTurma: parseFloat(classAvg.toFixed(2))
             };
         });
 
@@ -721,9 +739,21 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         {/* Bar Chart: Performance per Discipline */}
                         <div className="bg-[#1e293b]/30 p-6 rounded-3xl border border-gray-800 overflow-hidden">
-                            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                                <BarChart2 size={20} className="text-emerald-400" /> Desempenho por Matéria
-                            </h3>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <BarChart2 size={20} className="text-emerald-400" /> Desempenho por Matéria
+                                </h3>
+                                <select 
+                                    className="bg-[#1e293b] text-gray-300 text-xs font-bold px-3 py-1 rounded-lg border border-gray-700 outline-none focus:border-emerald-500"
+                                    value={selectedAssessmentFilter}
+                                    onChange={(e) => setSelectedAssessmentFilter(e.target.value)}
+                                >
+                                    <option value="all">Média Final</option>
+                                    <option value="p1">Prova P1</option>
+                                    <option value="p2">Prova P2</option>
+                                    <option value="part">Participação</option>
+                                </select>
+                            </div>
                             <div className="h-80 w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
