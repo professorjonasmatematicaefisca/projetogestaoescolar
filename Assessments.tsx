@@ -79,10 +79,29 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
     const [selectedStudentForFullReport, setSelectedStudentForFullReport] = useState<string | null>(null);
     const [allGradesForReport, setAllGradesForReport] = useState<Record<string, Record<string, Grade>>>({}); // studentId -> disciplineId -> Grade
     const [editingValue, setEditingValue] = useState<string>('');
+    const [pendingSaves, setPendingSaves] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         loadInitialData();
     }, []);
+
+    // Debounced Auto-save Effect
+    useEffect(() => {
+        if (pendingSaves.size === 0) return;
+        
+        const timeout = setTimeout(async () => {
+            const studentIds = Array.from(pendingSaves);
+            setPendingSaves(new Set()); // Reset
+            
+            const toSave = studentIds.map(id => grades[id]).filter(Boolean);
+            if (toSave.length > 0) {
+                console.log(`Auto-saving ${toSave.length} records...`);
+                await SupabaseService.saveGrades(toSave);
+            }
+        }, 3000); // 3 seconds delay for typing
+        
+        return () => clearTimeout(timeout);
+    }, [pendingSaves, grades]);
 
     const loadInitialData = async () => {
         setLoading(true);
@@ -250,16 +269,23 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                 updated.mediaFinal = parseFloat(media.toFixed(2));
             }
 
-            return { ...prev, [studentId]: updated };
+            const finalUpdated = { ...prev, [studentId]: updated };
+            // Trigger auto-save
+            setPendingSaves(p => new Set(p).add(studentId));
+            
+            return finalUpdated;
         });
     };
 
-    const handleInputBlur = async (studentId: string) => {
-        const grade = grades[studentId];
+    const handleInputBlur = async (studentId: string, updatedGrade?: Grade) => {
+        const grade = updatedGrade || grades[studentId];
         if (!grade) return;
         
         try {
-            await SupabaseService.saveGrades([grade]);
+            const success = await SupabaseService.saveGrades([grade]);
+            if (!success) {
+                console.error('Auto-save failed');
+            }
         } catch (error) {
             console.error('Auto-save error:', error);
         }
@@ -524,11 +550,17 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
         if (!student) return null;
 
         const studentGrades = allGradesForReport[selectedStudentForFullReport] || {};
-        const disciplinesWithGrades = disciplines.map(d => ({
-            id: d.id,
-            name: d.displayName,
-            grade: studentGrades[d.id]?.mediaFinal || 0
-        })).sort((a, b) => b.grade - a.grade);
+        const disciplinesWithGrades = disciplines.map(d => {
+            const g = studentGrades[d.id];
+            // If the grade exists, we use its mediaFinal or calculate based on our rules
+            return {
+                id: d.id,
+                name: d.displayName,
+                grade: g?.mediaFinal || 0,
+                participation: participationGrades[selectedStudentForFullReport] || 0,
+                g: g
+            };
+        }).sort((a, b) => b.grade - a.grade);
 
         const chartData = disciplinesWithGrades.map(d => ({
             name: d.name,
@@ -616,8 +648,10 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                             </p>
                         </div>
                         <div className="bg-[#1e293b]/50 p-6 rounded-2xl border border-gray-800 hover:border-blue-500/30 transition-all">
-                            <p className="text-xs font-bold text-gray-500 uppercase mb-1 tracking-widest">Frequência</p>
-                            <p className="text-3xl font-black text-blue-400">95%</p>
+                            <p className="text-xs font-bold text-gray-500 uppercase mb-1 tracking-widest">Participação</p>
+                            <p className="text-3xl font-black text-blue-400">
+                                {(participationGrades[student.id] || 0).toFixed(2).replace('.', ',')}
+                            </p>
                         </div>
                         <div className="bg-[#1e293b]/50 p-6 rounded-2xl border border-gray-800 hover:border-orange-500/30 transition-all">
                             <p className="text-xs font-bold text-gray-500 uppercase mb-1 tracking-widest">Destaque</p>
@@ -743,12 +777,14 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-center">P2</th>
                                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-center">SUB</th>
                                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-center">REC</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-center">Participação</th>
                                     <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-widest text-center">Média Final</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-800">
                                 {disciplines.map(d => {
                                     const g = studentGrades[d.id];
+                                    const part = participationGrades[student.id] || 0;
                                     return (
                                         <tr key={d.id} className="hover:bg-white/5 transition-colors">
                                             <td className="p-4 font-bold text-gray-300">{d.displayName}</td>
@@ -756,6 +792,7 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                             <td className="p-4 text-center text-gray-400">{formatGrade(g?.p2)}</td>
                                             <td className="p-4 text-center text-gray-400">{formatGrade(g?.sub)}</td>
                                             <td className="p-4 text-center text-gray-400">{formatGrade(g?.recuperacao)}</td>
+                                            <td className="p-4 text-center text-emerald-400 font-bold">{formatGrade(part)}</td>
                                             <td className={`p-4 text-center font-black ${g?.mediaFinal && g.mediaFinal < 6 ? 'text-red-400' : 'text-emerald-400'}`}>
                                                 {formatGrade(g?.mediaFinal)}
                                             </td>
@@ -821,7 +858,13 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                 </div>
                             </div>
 
-                            <button className="w-full mt-6 py-2 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-xl text-xs font-bold transition-all border border-blue-500/20 group-hover:border-blue-500/50">
+                            <button 
+                                onClick={() => {
+                                    setSelectedStudentForFullReport(student.id);
+                                    fetchAllGradesForStudent(student.id);
+                                }}
+                                className="w-full mt-6 py-2 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-xl text-xs font-bold transition-all border border-blue-500/20 group-hover:border-blue-500/50"
+                            >
                                 Ver Relatório Completo
                             </button>
                         </div>
