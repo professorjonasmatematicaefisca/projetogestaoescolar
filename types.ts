@@ -171,7 +171,7 @@ export interface StudyGuideItem {
   createdAt?: string;
 }
 
-export type ViewState = 'DASHBOARD' | 'ADMIN' | 'SETTINGS' | 'GAME' | 'GRADES';
+export type ViewState = 'DASHBOARD' | 'ADMIN' | 'SETTINGS' | 'GAME' | 'GRADES' | 'CLASSROOM' | 'FOA' | 'REPORTS' | 'STUDY_GUIDE' | 'MESSAGES' | 'REQUESTS';
 
 export interface RequestItem {
   id: string;

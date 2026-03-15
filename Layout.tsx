@@ -10,7 +10,13 @@ import {
   Lock,
   CloudOff,
   Gamepad2,
-  Award
+  Award,
+  School,
+  ClipboardList,
+  FileText,
+  MessageSquare,
+  BookOpen,
+  BarChart3
 } from 'lucide-react';
 import { UserAvatar } from './components/UserAvatar';
 import { offlineService } from './services/offlineService';
@@ -69,17 +75,23 @@ export const Layout: React.FC<LayoutProps> = ({
 
   // Define allowed views per role
   const rolePermissions: Record<UserRole, ViewState[]> = {
-    [UserRole.COORDINATOR]: ['DASHBOARD', 'ADMIN', 'SETTINGS', 'GAME', 'GRADES'],
-    [UserRole.TEACHER]: ['DASHBOARD', 'SETTINGS', 'GAME', 'GRADES'],
+    [UserRole.COORDINATOR]: ['DASHBOARD', 'ADMIN', 'SETTINGS', 'GAME', 'GRADES', 'CLASSROOM', 'FOA', 'REPORTS', 'STUDY_GUIDE', 'MESSAGES', 'REQUESTS'],
+    [UserRole.TEACHER]: ['DASHBOARD', 'SETTINGS', 'GAME', 'GRADES', 'CLASSROOM', 'FOA', 'REPORTS', 'STUDY_GUIDE', 'MESSAGES'],
     [UserRole.MONITOR]: ['SETTINGS'],
-    [UserRole.STUDENT]: ['DASHBOARD', 'SETTINGS', 'GAME'],
-    [UserRole.PARENT]: ['DASHBOARD', 'SETTINGS'],
+    [UserRole.STUDENT]: ['DASHBOARD', 'SETTINGS', 'GAME', 'MESSAGES'],
+    [UserRole.PARENT]: ['DASHBOARD', 'SETTINGS', 'MESSAGES'],
     [UserRole.GAME_STUDENT]: ['GAME'],
   };
 
   const menuItems = [
     { view: 'DASHBOARD', icon: LayoutDashboard, label: 'Dashboard' },
+    { view: 'CLASSROOM', icon: School, label: 'Sala de Aula' },
+    { view: 'FOA', icon: FileText, label: 'FOA' },
+    { view: 'REPORTS', icon: BarChart3, label: 'Relatórios' },
     { view: 'GRADES', icon: Award, label: 'Avaliações' },
+    { view: 'MESSAGES', icon: MessageSquare, label: 'Comunicados' },
+    { view: 'REQUESTS', icon: ClipboardList, label: 'Monitoria' },
+    { view: 'STUDY_GUIDE', icon: BookOpen, label: 'Planejamento' },
     { view: 'GAME', icon: Gamepad2, label: '🎮 Game' },
   ] as const;
 
@@ -163,16 +175,19 @@ export const Layout: React.FC<LayoutProps> = ({
                   <item.icon className={`transition-colors ${active ? 'text-yellow-400' : 'text-gray-400 group-hover:text-gray-200'}`} size={20} />
                   <span className="font-semibold">{item.label}</span>
 
-                  {/* Removemos a badge de MENSAGENS que dependia da view MESSAGES inativa */}
+                  {item.view === 'MESSAGES' && unreadMessagesCount > 0 && (
+                    <span className="absolute right-4 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-[#0f172a]">
+                      {unreadMessagesCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
-
-            {/* Admin Link */}
-            {role === UserRole.COORDINATOR && (
-              <button
-                onClick={() => {
-                  onViewChange('ADMIN');
+ 
+             {role === UserRole.COORDINATOR && (
+               <button
+                 onClick={() => {
+                   onViewChange('ADMIN');
                   setSidebarOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group ${currentView === 'ADMIN'

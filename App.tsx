@@ -8,6 +8,12 @@ import { PortalDashboard } from './PortalDashboard';
 import { UpdatePassword } from './UpdatePassword';
 import { GameArena } from './components/Game/GameArena';
 import { Assessments } from './Assessments';
+import { ClassroomMonitor } from './ClassroomMonitor';
+import { FOA } from './FOA';
+import { StudentReport } from './StudentReport';
+import { StudyGuide } from './StudyGuide';
+import { Comunicados } from './Comunicados';
+import { RequestsPanel } from './RequestsPanel';
 import { UserRole, ViewState } from './types';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -165,7 +171,7 @@ function App() {
   // Helper to switch view and select student
   const handleNavigateToStudent = (studentId: string) => {
     setTargetStudentId(studentId);
-    // setCurrentView('REPORTS'); // removed as reports is gone
+    setCurrentView('REPORTS');
   };
 
   // Reset when changing views manually
@@ -199,6 +205,12 @@ function App() {
         return <Dashboard onNavigateToStudent={handleNavigateToStudent} />;
       case 'ADMIN': return <AdminPanel onShowToast={showToast} />;
       case 'GRADES': return <Assessments userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
+      case 'CLASSROOM': return <ClassroomMonitor userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
+      case 'FOA': return <FOA userEmail={userEmail} currentUserRole={userRole!} onShowToast={showToast} userName={userName} />;
+      case 'REPORTS': return <StudentReport initialStudentId={targetStudentId} currentUserRole={userRole!} onShowToast={showToast} />;
+      case 'STUDY_GUIDE': return <StudyGuide userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
+      case 'MESSAGES': return <Comunicados userEmail={userEmail} userRole={userRole!} onShowToast={showToast} userName={userName} />;
+      case 'REQUESTS': return <RequestsPanel onShowToast={showToast} userRole={userRole!} userEmail={userEmail} />;
       case 'SETTINGS': return <SettingsView userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
       case 'GAME': return <GameArena userRole={userRole!} userName={userName} onShowToast={showToast} />;
       default: return <Dashboard onNavigateToStudent={handleNavigateToStudent} />;

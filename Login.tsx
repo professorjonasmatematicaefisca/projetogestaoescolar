@@ -116,7 +116,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                     </div>
                                     <div>
                                         <h1 className="text-24 font-bold text-white tracking-tight uppercase">
-                                            JF <span className="text-emerald-500">EduControl</span>
+                                            Particular <span className="text-yellow-500">PRO</span>
                                         </h1>
                                         <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Conexão COC Paulínia</p>
                                     </div>
@@ -138,7 +138,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                             type="email"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
-                                            className="w-full bg-[#0f1621] border border-gray-700/50 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                            className="w-full bg-[#0f1621] border border-gray-700/50 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 outline-none transition-all"
                                             placeholder="seu@email.com"
                                             required
                                         />
@@ -155,7 +155,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                             type={showPassword ? "text" : "password"}
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
-                                            className="w-full bg-[#0f1621] border border-gray-700/50 rounded-xl py-3.5 pl-12 pr-12 text-white placeholder-gray-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                            className="w-full bg-[#0f1621] border border-gray-700/50 rounded-xl py-3.5 pl-12 pr-12 text-white placeholder-gray-600 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500/20 outline-none transition-all"
                                             placeholder="••••••••••••"
                                             required
                                         />
@@ -181,14 +181,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                             type="checkbox"
                                             checked={rememberMe}
                                             onChange={(e) => setRememberMe(e.target.checked)}
-                                            className="w-4 h-4 rounded border-gray-600 bg-[#0f1621] text-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                                            className="w-4 h-4 rounded border-gray-600 bg-[#0f1621] text-yellow-500 focus:ring-2 focus:ring-yellow-500/20"
                                         />
                                         <span className="text-gray-400 text-xs group-hover:text-gray-300 transition-colors">Lembrar acesso</span>
                                     </label>
                                     <button
                                         type="button"
                                         onClick={() => setView('FORGOT_PASSWORD')}
-                                        className="text-xs text-emerald-500 hover:text-emerald-400 font-bold transition-colors"
+                                        className="text-xs text-yellow-500 hover:text-yellow-400 font-bold transition-colors"
                                     >
                                         Esqueci a senha
                                     </button>
@@ -197,7 +197,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 group"
+                                    className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold py-3.5 rounded-xl shadow-[0_0_15px_rgba(234,179,8,0.2)] transition-all flex items-center justify-center gap-2 group"
                                 >
                                     {loading ? (
                                         <LoadingSpinner size="sm" text="Autenticando..." />
@@ -236,7 +236,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                             type="email"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
-                                            className="w-full bg-[#0f1621] border border-gray-700/50 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:border-emerald-500 outline-none"
+                                            className="w-full bg-[#0f1621] border border-gray-700/50 rounded-xl py-3.5 pl-12 pr-4 text-white placeholder-gray-600 focus:border-yellow-500 outline-none"
                                             placeholder="exemplo@email.com"
                                             required
                                         />
@@ -252,7 +252,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+                                    className="w-full bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-black font-bold py-3.5 rounded-xl transition-all shadow-[0_0_15px_rgba(234,179,8,0.2)]"
                                 >
                                     {loading ? 'ENVIANDO...' : 'ENVIAR LINK DE RECUPERAÇÃO'}
                                 </button>
@@ -262,8 +262,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
                     {view === 'SUCCESS_SENT' && (
                         <div className="text-center animate-in zoom-in duration-500">
-                            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-                                <CheckCircle className="text-emerald-500" size={40} />
+                            <div className="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-6 border border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,0.2)]">
+                                <CheckCircle className="text-yellow-500" size={40} />
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-4">Email Enviado!</h2>
                             <p className="text-gray-400 text-sm mb-8 leading-relaxed px-4">
@@ -282,67 +282,67 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     {/* Support Link */}
                     <div className="mt-8 text-center pt-8 border-t border-gray-800/30">
                         <p className="text-xs text-gray-500">
-                            Suporte técnico: <a href="#" className="text-emerald-500 hover:underline">cocpaulinia.com.br</a>
+                            Plataforma de Gestão — <span className="text-yellow-500 font-bold">Particular PRO</span>
                         </p>
                     </div>
                 </div>
 
                 {/* Right Side - Branding */}
-                <div className="hidden md:flex bg-gradient-to-br from-[#0f1e2e] via-[#1a2f3f] to-[#0f1e2e] p-12 flex-col items-center justify-center relative overflow-hidden">
+                <div className="hidden md:flex bg-gradient-to-br from-[#1e1c14] via-[#262419] to-[#1e1c14] p-12 flex-col items-center justify-center relative overflow-hidden">
                     {/* Decorative Elements */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl"></div>
-                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl"></div>
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl"></div>
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-500/5 rounded-full blur-3xl"></div>
 
                     {/* Geometric Shapes */}
-                    <div className="absolute top-20 right-20 w-20 h-20 border-2 border-emerald-500/20 rounded-2xl rotate-12 animate-pulse"></div>
-                    <div className="absolute bottom-32 right-32 w-16 h-16 border-2 border-blue-500/20 rounded-full"></div>
+                    <div className="absolute top-20 right-20 w-20 h-20 border-2 border-yellow-500/20 rounded-2xl rotate-12 animate-pulse"></div>
+                    <div className="absolute bottom-32 right-32 w-16 h-16 border-2 border-teal-500/20 rounded-full"></div>
 
                     {/* Main Content */}
                     <div className="relative z-10 text-center">
                         {/* COC Logo - Substituindo o círculo com "C" */}
                         <div className="w-64 h-64 bg-white/5 backdrop-blur-md rounded-[2.5rem] flex items-center justify-center mb-8 mx-auto shadow-2xl border border-white/10 p-8 group transition-all duration-500 hover:scale-105">
                             <div className="w-full h-full relative">
-                                <img src="/coc-logo.png" alt="Branding" className="w-full h-full object-contain filter drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] group-hover:drop-shadow-[0_0_30px_rgba(16,185,129,0.6)] transition-all scale-110" />
+                                <img src="/coc-logo.png" alt="Branding" className="w-full h-full object-contain filter drop-shadow-[0_0_20px_rgba(255,255,255,0.4)] group-hover:drop-shadow-[0_0_30px_rgba(234,179,8,0.6)] transition-all scale-110" />
                             </div>
                         </div>
 
                         {/* Title */}
                         <h1 className="text-6xl font-black text-white mb-2 tracking-tight">
-                            JF
+                            PARTICULAR
                         </h1>
-                        <h2 className="text-6xl font-black text-emerald-500 mb-6 drop-shadow-lg">
-                            EduControl
+                        <h2 className="text-6xl font-black text-yellow-500 mb-6 drop-shadow-md">
+                            PRO
                         </h2>
 
                         {/* Decorative Line */}
                         <div className="flex items-center justify-center gap-2 mb-8">
-                            <div className="h-1 w-16 bg-emerald-500 rounded-full"></div>
-                            <div className="h-0.5 w-6 bg-blue-500/50 rounded-full"></div>
-                            <div className="h-1 w-16 bg-emerald-500 rounded-full"></div>
+                            <div className="h-1 w-16 bg-yellow-500 rounded-full"></div>
+                            <div className="h-0.5 w-6 bg-teal-500/50 rounded-full"></div>
+                            <div className="h-1 w-16 bg-yellow-500 rounded-full"></div>
                         </div>
 
                         {/* Subtitle */}
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-12">
-                            EDUCONTROL ECOSYSTEM
+                            ECOSSISTEMA PARA DOCENTES
                         </p>
 
                         {/* Feature Icons */}
                         <div className="flex items-center justify-center gap-6">
-                            <div className="w-14 h-14 bg-[#1a2332] rounded-xl flex items-center justify-center border border-gray-700/50 hover:border-emerald-500/50 transition-all group shadow-lg">
-                                <Zap className="w-6 h-6 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                            <div className="w-14 h-14 bg-[#1a2332] rounded-xl flex items-center justify-center border border-gray-700/50 hover:border-yellow-500/50 transition-all group shadow-lg">
+                                <Zap className="w-6 h-6 text-gray-400 group-hover:text-yellow-500 transition-colors" />
                             </div>
-                            <div className="w-14 h-14 bg-[#1a2332] rounded-xl flex items-center justify-center border border-gray-700/50 hover:border-emerald-500/50 transition-all group shadow-lg">
-                                <TrendingUp className="w-6 h-6 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                            <div className="w-14 h-14 bg-[#1a2332] rounded-xl flex items-center justify-center border border-gray-700/50 hover:border-teal-500/50 transition-all group shadow-lg">
+                                <TrendingUp className="w-6 h-6 text-gray-400 group-hover:text-teal-400 transition-colors" />
                             </div>
-                            <div className="w-14 h-14 bg-[#1a2332] rounded-xl flex items-center justify-center border border-gray-700/50 hover:border-emerald-500/50 transition-all group shadow-lg">
-                                <Rocket className="w-6 h-6 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                            <div className="w-14 h-14 bg-[#1a2332] rounded-xl flex items-center justify-center border border-gray-700/50 hover:border-yellow-500/50 transition-all group shadow-lg">
+                                <Rocket className="w-6 h-6 text-gray-400 group-hover:text-yellow-500 transition-colors" />
                             </div>
                         </div>
                     </div>
 
                     {/* Bottom Indicator */}
                     <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-1.5">
-                        <div className="w-8 h-1 bg-emerald-500 rounded-full"></div>
+                        <div className="w-8 h-1 bg-yellow-500 rounded-full"></div>
                         <div className="w-2 h-1 bg-gray-700 rounded-full"></div>
                         <div className="w-2 h-1 bg-gray-700 rounded-full"></div>
                     </div>
