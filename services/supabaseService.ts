@@ -1622,5 +1622,105 @@ export const SupabaseService = {
             return false;
         }
         return true;
+    },
+
+    // --- GRADES ---
+
+    async getGrades(filters: { bimestre?: number; year?: number; disciplineId?: string; studentId?: string }): Promise<import('../types').Grade[]> {
+        let query = supabase.from('grades').select('*');
+
+        if (filters.bimestre) query = query.eq('bimestre', filters.bimestre);
+        if (filters.year) query = query.eq('year', filters.year);
+        if (filters.disciplineId) query = query.eq('discipline_id', filters.disciplineId);
+        if (filters.studentId) query = query.eq('student_id', filters.studentId);
+
+        const { data, error } = await query;
+        if (error) { console.error('getGrades error:', error); return []; }
+
+        return data.map((g: any) => ({
+            id: g.id,
+            studentId: g.student_id,
+            disciplineId: g.discipline_id,
+            teacherId: g.teacher_id,
+            bimestre: g.bimestre,
+            year: g.year,
+            p1: g.p1,
+            p2: g.p2,
+            p3: g.p3,
+            p4: g.p4,
+            sub: g.sub,
+            recuperacao: g.recuperacao,
+            atividadesExtras: g.atividades_extras,
+            mediaFinal: g.media_final,
+            createdAt: g.created_at,
+            updatedAt: g.updated_at
+        }));
+    },
+
+    async saveGrades(grades: import('../types').Grade[]): Promise<boolean> {
+        const toSave = grades.map(g => ({
+            id: g.id, // Supabase allows providing ID for upsert
+            student_id: g.studentId,
+            discipline_id: g.disciplineId,
+            teacher_id: g.teacherId,
+            bimestre: g.bimestre,
+            year: g.year,
+            p1: g.p1,
+            p2: g.p2,
+            p3: g.p3,
+            p4: g.p4,
+            sub: g.sub,
+            recuperacao: g.recuperacao,
+            atividades_extras: g.atividadesExtras,
+            media_final: g.mediaFinal
+        }));
+
+        const { error } = await supabase
+            .from('grades')
+            .upsert(toSave, { onConflict: 'student_id,discipline_id,bimestre,year' });
+
+        if (error) { console.error('saveGrades error:', error); return false; }
+        return true;
+    },
+
+    /**
+     * Calcula a média da nota de participação do monitor para um aluno em uma disciplina num período.
+     * Basado na lógica: participation_grade = counters.participation * 0.5 (capped at 10)
+     */
+    async getParticipationAverage(studentId: string, disciplineId: string, startDate: string, endDate: string): Promise<number> {
+        // 1. Get Discipline Name (since sessions use names)
+        const { data: disc } = await supabase.from('disciplines').select('name').eq('id', disciplineId).single();
+        if (!disc) return 0;
+
+        // 2. Get sessions for this discipline in range
+        const { data: sessions, error: sessError } = await supabase
+            .from('sessions')
+            .select('id')
+            .eq('subject', disc.name)
+            .gte('date', startDate)
+            .lte('date', endDate);
+
+        if (sessError || !sessions || sessions.length === 0) return 0;
+
+        const sessionIds = sessions.map(s => s.id);
+
+        // 3. Get records for these sessions for the student
+        const { data: records, error: recError } = await supabase
+            .from('session_records')
+            .select('counters')
+            .eq('student_id', studentId)
+            .in('session_id', sessionIds)
+            .eq('present', true);
+
+        if (recError || !records || records.length === 0) return 0;
+
+        // 4. Calculate average
+        const total = records.reduce((sum, rec) => {
+            const partCount = (rec.counters as any)?.participation || 0;
+            const sessionGrade = Math.min(10, partCount * 0.5);
+            return sum + sessionGrade;
+        }, 0);
+
+        return parseFloat((total / records.length).toFixed(1));
     }
 };

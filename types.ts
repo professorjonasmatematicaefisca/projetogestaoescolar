@@ -171,7 +171,7 @@ export interface StudyGuideItem {
   createdAt?: string;
 }
 
-export type ViewState = 'MONITORING' | 'DASHBOARD' | 'REPORTS' | 'OCCURRENCES' | 'ADMIN' | 'SETTINGS' | 'FOA' | 'PLANNING' | 'STUDY_GUIDE' | 'REQUESTS' | 'MESSAGES' | 'GAME';
+export type ViewState = 'DASHBOARD' | 'ADMIN' | 'SETTINGS' | 'GAME' | 'GRADES';
 
 export interface RequestItem {
   id: string;
@@ -209,3 +209,21 @@ export interface MessageItem {
   createdAt: string;
 }
 
+export interface Grade {
+  id?: string;
+  studentId: string;
+  disciplineId: string;
+  teacherId?: string;
+  bimestre: number;
+  year: number;
+  p1?: number;
+  p2?: number;
+  p3?: number;
+  p4?: number;
+  sub?: number;
+  recuperacao?: number;
+  atividadesExtras?: number;
+  mediaFinal?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}

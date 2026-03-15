@@ -1,20 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from './Layout';
 import { Login } from './Login';
-import { ClassroomMonitor } from './ClassroomMonitor';
 import { Dashboard } from './Dashboard';
-import { StudentReport } from './StudentReport';
-import { Occurrences } from './Occurrences';
 import { AdminPanel } from './AdminPanel';
 import { Settings as SettingsView } from './Settings';
-import { FOA } from './FOA';
-import { Planning } from './Planning';
-import { StudyGuide } from './StudyGuide';
-import { RequestsPanel } from './RequestsPanel';
-import { Comunicados } from './Comunicados';
 import { PortalDashboard } from './PortalDashboard';
 import { UpdatePassword } from './UpdatePassword';
 import { GameArena } from './components/Game/GameArena';
+import { Assessments } from './Assessments';
 import { UserRole, ViewState } from './types';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -25,7 +18,7 @@ import { offlineService } from './services/offlineService';
 function App() {
 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentView, setCurrentView] = useState<ViewState>('MONITORING');
+  const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
   const [userName, setUserName] = useState<string>('');
@@ -62,10 +55,10 @@ function App() {
         setCurrentView(storedView as ViewState);
       } else {
         if (storedRole === UserRole.COORDINATOR) setCurrentView('DASHBOARD');
-        else if (storedRole === UserRole.TEACHER) setCurrentView('MONITORING');
-        else if (storedRole === UserRole.STUDENT || storedRole === UserRole.PARENT) setCurrentView('MESSAGES');
+        else if (storedRole === UserRole.TEACHER) setCurrentView('DASHBOARD');
+        else if (storedRole === UserRole.STUDENT || storedRole === UserRole.PARENT) setCurrentView('DASHBOARD');
         else if (storedRole === UserRole.GAME_STUDENT) setCurrentView('GAME');
-        else setCurrentView('OCCURRENCES');
+        else setCurrentView('DASHBOARD');
       }
     }
 
@@ -157,26 +150,27 @@ function App() {
     if (photoUrl) localStorage.setItem('educontrol_photo', photoUrl);
 
     // Set initial view based on role
-    let initialView: ViewState = 'MONITORING';
+    let initialView: ViewState = 'DASHBOARD';
     if (role === UserRole.COORDINATOR) initialView = 'DASHBOARD';
-    else if (role === UserRole.TEACHER) initialView = 'MONITORING';
-    else if (role === UserRole.STUDENT || role === UserRole.PARENT) initialView = 'MESSAGES';
+    else if (role === UserRole.TEACHER) initialView = 'DASHBOARD';
+    else if (role === UserRole.STUDENT || role === UserRole.PARENT) initialView = 'DASHBOARD';
     else if (role === UserRole.GAME_STUDENT) initialView = 'GAME';
-    else initialView = 'OCCURRENCES';
+    else initialView = 'DASHBOARD';
 
     setCurrentView(initialView);
     localStorage.setItem('educontrol_view', initialView);
   };
 
   // Helper to switch view and select student
+  // Helper to switch view and select student
   const handleNavigateToStudent = (studentId: string) => {
     setTargetStudentId(studentId);
-    setCurrentView('REPORTS');
+    // setCurrentView('REPORTS'); // removed as reports is gone
   };
 
   // Reset when changing views manually
   const handleViewChange = (view: ViewState) => {
-    if (view !== 'REPORTS') setTargetStudentId(undefined);
+    setTargetStudentId(undefined); // simplified
     setCurrentView(view);
     localStorage.setItem('educontrol_view', view);
   };
@@ -198,23 +192,16 @@ function App() {
 
   const renderView = () => {
     switch (currentView) {
-      case 'MONITORING': return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole!} />;
       case 'DASHBOARD':
         if (userRole === UserRole.STUDENT || userRole === UserRole.PARENT) {
           return <PortalDashboard userEmail={userEmail} userRole={userRole} onNavigate={handleViewChange} />;
         }
         return <Dashboard onNavigateToStudent={handleNavigateToStudent} />;
-      case 'REPORTS': return <StudentReport onShowToast={showToast} currentUserRole={userRole!} initialStudentId={targetStudentId} />;
-      case 'PLANNING': return <Planning userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
-      case 'STUDY_GUIDE': return <StudyGuide userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
-      case 'FOA': return <FOA onShowToast={showToast} currentUserRole={userRole!} userEmail={userEmail} userName={userName} />;
-      case 'OCCURRENCES': return <Occurrences onShowToast={showToast} />;
       case 'ADMIN': return <AdminPanel onShowToast={showToast} />;
-      case 'REQUESTS': return <RequestsPanel onShowToast={showToast} userEmail={userEmail} userRole={userRole!} />;
-      case 'MESSAGES': return <Comunicados onShowToast={showToast} userEmail={userEmail} userName={userName} userRole={userRole!} />;
+      case 'GRADES': return <Assessments userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
       case 'SETTINGS': return <SettingsView userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
       case 'GAME': return <GameArena userRole={userRole!} userName={userName} onShowToast={showToast} />;
-      default: return <ClassroomMonitor onShowToast={showToast} userEmail={userEmail} userRole={userRole!} />;
+      default: return <Dashboard onNavigateToStudent={handleNavigateToStudent} />;
     }
   };
 
@@ -256,8 +243,8 @@ function App() {
         </Layout>
 
         {/* Global Toast Notification */}
-        <div className={`fixed bottom-6 right-6 bg-emerald-800 text-white px-6 py-3 rounded-lg shadow-xl transition-all duration-300 transform ${toast.visible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'} z-50 flex items-center gap-2`}>
-          <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+        <div className={`fixed bottom-6 right-6 bg-yellow-600 text-black font-semibold px-6 py-3 rounded-lg shadow-xl transition-all duration-300 transform ${toast.visible ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'} z-50 flex items-center gap-2`}>
+          <div className="w-2 h-2 rounded-full bg-black"></div>
           {toast.msg}
         </div>
       </div>
