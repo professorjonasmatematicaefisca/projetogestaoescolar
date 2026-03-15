@@ -16,7 +16,8 @@ import {
   FileText,
   MessageSquare,
   BookOpen,
-  BarChart3
+  BarChart3,
+  AlertTriangle
 } from 'lucide-react';
 import { UserAvatar } from './components/UserAvatar';
 import { offlineService } from './services/offlineService';
@@ -33,6 +34,7 @@ interface LayoutProps {
   userPhoto?: string;
   userName?: string;
   unreadMessagesCount?: number;
+  pendingRequestsCount?: number;
 }
 
 export const Layout: React.FC<LayoutProps> = ({
@@ -43,7 +45,8 @@ export const Layout: React.FC<LayoutProps> = ({
   onLogout,
   userPhoto,
   userName,
-  unreadMessagesCount = 0
+  unreadMessagesCount = 0,
+  pendingRequestsCount = 0
 }) => {
   const [isSidebarOpen, setSidebarOpen] = React.useState(false);
   const [isOnline, setIsOnline] = React.useState(navigator.onLine);
@@ -75,9 +78,9 @@ export const Layout: React.FC<LayoutProps> = ({
 
   // Define allowed views per role
   const rolePermissions: Record<UserRole, ViewState[]> = {
-    [UserRole.COORDINATOR]: ['DASHBOARD', 'ADMIN', 'SETTINGS', 'GAME', 'GRADES', 'CLASSROOM', 'FOA', 'REPORTS', 'STUDY_GUIDE', 'PLANNING', 'MESSAGES', 'REQUESTS'],
-    [UserRole.TEACHER]: ['DASHBOARD', 'SETTINGS', 'GAME', 'GRADES', 'CLASSROOM', 'FOA', 'REPORTS', 'STUDY_GUIDE', 'PLANNING', 'MESSAGES'],
-    [UserRole.MONITOR]: ['SETTINGS'],
+    [UserRole.COORDINATOR]: ['DASHBOARD', 'ADMIN', 'SETTINGS', 'GAME', 'GRADES', 'CLASSROOM', 'FOA', 'REPORTS', 'STUDY_GUIDE', 'PLANNING', 'MESSAGES', 'REQUESTS', 'OCCURRENCES'],
+    [UserRole.TEACHER]: ['DASHBOARD', 'SETTINGS', 'GAME', 'GRADES', 'CLASSROOM', 'FOA', 'REPORTS', 'STUDY_GUIDE', 'PLANNING', 'MESSAGES', 'OCCURRENCES'],
+    [UserRole.MONITOR]: ['SETTINGS', 'OCCURRENCES'],
     [UserRole.STUDENT]: ['DASHBOARD', 'SETTINGS', 'GAME', 'MESSAGES'],
     [UserRole.PARENT]: ['DASHBOARD', 'SETTINGS', 'MESSAGES'],
     [UserRole.GAME_STUDENT]: ['GAME'],
@@ -90,7 +93,8 @@ export const Layout: React.FC<LayoutProps> = ({
     { view: 'REPORTS', icon: BarChart3, label: 'Relatórios' },
     { view: 'GRADES', icon: Award, label: 'Avaliações' },
     { view: 'MESSAGES', icon: MessageSquare, label: 'Comunicados' },
-    { view: 'REQUESTS', icon: ClipboardList, label: 'Monitoria' },
+    { view: 'REQUESTS', icon: ClipboardList, label: 'Solicitações' },
+    { view: 'OCCURRENCES', icon: AlertTriangle, label: 'Monitoria' },
     { view: 'PLANNING', icon: BookOpen, label: 'Planejamento' },
     { view: 'STUDY_GUIDE', icon: ClipboardList, label: 'Roteiro de Estudos' },
     { view: 'GAME', icon: Gamepad2, label: '🎮 Game' },
@@ -179,6 +183,12 @@ export const Layout: React.FC<LayoutProps> = ({
                   {item.view === 'MESSAGES' && unreadMessagesCount > 0 && (
                     <span className="absolute right-4 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-[#0f172a]">
                       {unreadMessagesCount}
+                    </span>
+                  )}
+
+                  {item.view === 'REQUESTS' && pendingRequestsCount > 0 && (
+                    <span className="absolute right-4 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-[#0f172a]">
+                      {pendingRequestsCount}
                     </span>
                   )}
                 </button>

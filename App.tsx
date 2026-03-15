@@ -15,6 +15,7 @@ import { StudyGuide } from './StudyGuide';
 import { Planning } from './Planning';
 import { Comunicados } from './Comunicados';
 import { RequestsPanel } from './RequestsPanel';
+import { Occurrences } from './Occurrences';
 import { UserRole, ViewState } from './types';
 import { ErrorBoundary } from './ErrorBoundary';
 
@@ -31,6 +32,7 @@ function App() {
   const [userName, setUserName] = useState<string>('');
   const [userPhoto, setUserPhoto] = useState<string>('');
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   const [targetStudentId, setTargetStudentId] = useState<string | undefined>(undefined);
   const [isDark, setIsDark] = useState(false);
   const [toast, setToast] = useState<{ msg: string, visible: boolean }>({ msg: '', visible: false });
@@ -91,6 +93,16 @@ function App() {
   useEffect(() => {
     if (isAuthenticated && userEmail && userRole) {
       SupabaseService.getUnreadMessagesCount(userEmail, userRole).then(setUnreadCount);
+      
+      // Fetch pending requests count for coordinators
+      if (userRole === UserRole.COORDINATOR) {
+        SupabaseService.getRequests().then(reqs => {
+          const pending = reqs.filter(r => r.status === 'pending').length;
+          setPendingRequestsCount(pending);
+        });
+      } else {
+        setPendingRequestsCount(0);
+      }
     }
   }, [isAuthenticated, userEmail, userRole, currentView]);
 
@@ -203,7 +215,7 @@ function App() {
         if (userRole === UserRole.STUDENT || userRole === UserRole.PARENT) {
           return <PortalDashboard userEmail={userEmail} userRole={userRole} onNavigate={handleViewChange} />;
         }
-        return <Dashboard onNavigateToStudent={handleNavigateToStudent} />;
+        return <Dashboard onNavigateToStudent={handleNavigateToStudent} userRole={userRole!} onNavigate={handleViewChange} />;
       case 'ADMIN': return <AdminPanel onShowToast={showToast} />;
       case 'GRADES': return <Assessments userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
       case 'CLASSROOM': return <ClassroomMonitor userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
@@ -213,9 +225,10 @@ function App() {
       case 'PLANNING': return <Planning userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
       case 'MESSAGES': return <Comunicados userEmail={userEmail} userRole={userRole!} onShowToast={showToast} userName={userName} />;
       case 'REQUESTS': return <RequestsPanel onShowToast={showToast} userRole={userRole!} userEmail={userEmail} />;
+      case 'OCCURRENCES': return <Occurrences onShowToast={showToast} />;
       case 'SETTINGS': return <SettingsView userEmail={userEmail} userRole={userRole!} onShowToast={showToast} />;
       case 'GAME': return <GameArena userRole={userRole!} userName={userName} onShowToast={showToast} />;
-      default: return <Dashboard onNavigateToStudent={handleNavigateToStudent} />;
+      default: return <Dashboard onNavigateToStudent={handleNavigateToStudent} userRole={userRole!} onNavigate={handleViewChange} />;
     }
   };
 
@@ -252,6 +265,7 @@ function App() {
           userPhoto={userPhoto}
           userName={userName}
           unreadMessagesCount={unreadCount}
+          pendingRequestsCount={pendingRequestsCount}
         >
           {renderView()}
         </Layout>

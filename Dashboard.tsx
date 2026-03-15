@@ -11,12 +11,15 @@ import { UserAvatar } from './components/UserAvatar';
 
 interface DashboardProps {
     onNavigateToStudent?: (studentId: string) => void;
+    onNavigate?: (view: any) => void;
+    userRole?: string;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent, onNavigate, userRole }) => {
     const [sessions, setSessions] = React.useState<ClassSession[]>([]);
     const [classes, setClasses] = React.useState<ClassRoom[]>([]);
     const [students, setStudents] = React.useState<any[]>([]); // Need students for risk analysis
+    const [pendingRequests, setPendingRequests] = React.useState(0);
     const [loading, setLoading] = React.useState(true);
 
     React.useEffect(() => {
@@ -30,6 +33,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent }) => 
                 setSessions(s);
                 setClasses(c);
                 setStudents(stu);
+
+                if (userRole === 'COORDINATOR') {
+                    const reqs = await SupabaseService.getRequests();
+                    setPendingRequests(reqs.filter(r => r.status === 'pending').length);
+                }
             } catch (err) {
                 console.error(err);
             } finally {
@@ -257,6 +265,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent }) => 
                     bgColor="bg-red-500/10"
                     borderColor="border-red-500/20"
                 />
+                {userRole === 'COORDINATOR' && pendingRequests > 0 && (
+                    <div onClick={() => onNavigate && onNavigate('REQUESTS')} className="cursor-pointer">
+                        <KPICard
+                            icon={AlertTriangle}
+                            label="Solicitações Pendentes"
+                            value={pendingRequests.toString()}
+                            trend="Aguardando Aprovação"
+                            trendPositive={false}
+                            color="text-amber-400"
+                            bgColor="bg-amber-500/10"
+                            borderColor="border-amber-500/20"
+                        />
+                    </div>
+                )}
             </div>
 
             {/* NEW: Focus Students Card & Insights */}
