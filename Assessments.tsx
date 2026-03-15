@@ -64,6 +64,10 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
     const [participationGrades, setParticipationGrades] = useState<Record<string, number>>({}); // studentId -> avg
     const [absenceGrades, setAbsenceGrades] = useState<Record<string, number>>({}); // studentId -> total
 
+    // Focus & Input Management
+    const [focusedCell, setFocusedCell] = useState<{ studentId: string, field: string } | null>(null);
+    const [editingValue, setEditingValue] = useState<string>('');
+
     useEffect(() => {
         loadInitialData();
     }, []);
@@ -358,9 +362,23 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                                         data-student={student.id}
                                                         data-field={col.field}
                                                         className={`w-16 h-10 bg-[#0f172a] border border-gray-700 rounded-lg text-center text-sm font-bold text-white outline-none focus:border-${col.color}-500 transition-all`}
-                                                        value={g[col.field as keyof Grade] !== undefined ? (g[col.field as keyof Grade] as number).toString().replace('.', ',') : ''}
-                                                        onChange={(e) => handleInputChange(student.id, col.field as keyof Grade, e.target.value)}
-                                                        onBlur={() => handleInputBlur(student.id)}
+                                                        value={focusedCell?.studentId === student.id && focusedCell?.field === col.field 
+                                                            ? editingValue 
+                                                            : (g[col.field as keyof Grade] !== undefined ? formatGrade(g[col.field as keyof Grade] as number).replace('-', '') : '')}
+                                                        onFocus={() => {
+                                                            setFocusedCell({ studentId: student.id, field: col.field });
+                                                            setEditingValue(g[col.field as keyof Grade] !== undefined ? (g[col.field as keyof Grade] as number).toString().replace('.', ',') : '');
+                                                        }}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            setEditingValue(val);
+                                                            handleInputChange(student.id, col.field as keyof Grade, val);
+                                                        }}
+                                                        onBlur={() => {
+                                                            handleInputBlur(student.id);
+                                                            setFocusedCell(null);
+                                                            setEditingValue('');
+                                                        }}
                                                         onKeyDown={(e) => {
                                                             if (e.key === 'Tab' && !e.shiftKey) {
                                                                 const studentIndex = students.findIndex(s => s.id === student.id);
