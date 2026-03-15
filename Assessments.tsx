@@ -80,6 +80,8 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
     const [allGradesForReport, setAllGradesForReport] = useState<Record<string, Record<string, Grade>>>({}); // studentId -> disciplineId -> Grade
     const [editingValue, setEditingValue] = useState<string>('');
     const [pendingSaves, setPendingSaves] = useState<Set<string>>(new Set());
+    const [selectedDisciplineForEvolution, setSelectedDisciplineForEvolution] = useState<string>('all');
+    const [classGradesForReport, setClassGradesForReport] = useState<Grade[]>([]);
 
     useEffect(() => {
         loadInitialData();
@@ -528,6 +530,7 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
     const fetchAllGradesForStudent = async (studentId: string) => {
         try {
             const data: Record<string, Grade> = {};
+            // Fetch for current student in all disciplines for SELECTED BIMESTRE
             await Promise.all(disciplines.map(async (d) => {
                 const g = await SupabaseService.getGrades({
                     disciplineId: d.id,
@@ -538,6 +541,26 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                 if (studentGrade) data[d.id] = studentGrade;
             }));
             setAllGradesForReport(prev => ({ ...prev, [studentId]: data }));
+
+            // Fetch ALL historical grades for the student (for evolution chart)
+            const historicalGrades = await SupabaseService.getGrades({
+                studentId: studentId,
+                year: selectedYear
+            });
+
+            // Fetch all grades for the class (current bimestre) to calculate averages
+            const allGrades = await SupabaseService.getGrades({
+                bimestre: selectedBimestre,
+                year: selectedYear
+            });
+            
+            // Filter by students in the SAME CLASS
+            const student = students.find(s => s.id === studentId);
+            const classmatesIds = students.filter(s => s.className === student?.className).map(s => s.id);
+            const classGrades = allGrades.filter(g => classmatesIds.includes(g.studentId));
+            
+            setClassGradesForReport(classGrades);
+            setAllGradesForReport(prev => ({ ...prev, [`${studentId}_history`]: historicalGrades as any }));
         } catch (error) {
             console.error("Error fetching all grades:", error);
             onShowToast("Erro ao carregar notas de todas as disciplinas.");
@@ -550,23 +573,54 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
         if (!student) return null;
 
         const studentGrades = allGradesForReport[selectedStudentForFullReport] || {};
-        const disciplinesWithGrades = disciplines.map(d => {
-            const g = studentGrades[d.id];
-            // If the grade exists, we use its mediaFinal or calculate based on our rules
-            return {
-                id: d.id,
-                name: d.displayName,
-                grade: g?.mediaFinal || 0,
-                participation: participationGrades[selectedStudentForFullReport] || 0,
-                g: g
-            };
-        }).sort((a, b) => b.grade - a.grade);
+        
+        // Filter disciplines to only those in the student's class
+        const studentClass = classes.find(c => c.name === student.className);
+        const classDisciplineIds = studentClass?.disciplineIds || [];
+        
+        const disciplinesWithGrades = disciplines
+            .filter(d => classDisciplineIds.includes(d.id))
+            .map(d => {
+                const g = studentGrades[d.id];
+                return {
+                    id: d.id,
+                    name: d.displayName || d.name,
+                    grade: g?.mediaFinal || 0,
+                    participation: participationGrades[selectedStudentForFullReport] || 0,
+                    g: g
+                };
+            }).sort((a, b) => b.grade - a.grade);
 
-        const chartData = disciplinesWithGrades.map(d => ({
-            name: d.name,
-            nota: d.grade,
-            mediaTurma: 7.0 // Placeholder for class average
-        }));
+        const chartData = disciplinesWithGrades.map(d => {
+            const disciplineClassGrades = classGradesForReport.filter(cg => cg.disciplineId === d.id && cg.mediaFinal !== undefined);
+            const avg = disciplineClassGrades.length > 0 
+                ? disciplineClassGrades.reduce((acc, current) => acc + (current.mediaFinal || 0), 0) / disciplineClassGrades.length 
+                : 0;
+
+            return {
+                name: d.name,
+                nota: d.grade,
+                mediaTurma: parseFloat(avg.toFixed(2))
+            };
+        });
+
+        // Evolution data calculation
+        const history = (allGradesForReport[`${selectedStudentForFullReport}_history`] || []) as Grade[];
+        const evolutionData = [1, 2, 3, 4].map(b => {
+            let grade = 0;
+            if (selectedDisciplineForEvolution === 'all') {
+                const bGrades = history.filter(h => h.bimestre === b && h.mediaFinal !== undefined);
+                grade = bGrades.length > 0 ? bGrades.reduce((acc, current) => acc + (current.mediaFinal || 0), 0) / bGrades.length : 0;
+            } else {
+                const bGrade = history.find(h => h.bimestre === b && h.disciplineId === selectedDisciplineForEvolution);
+                grade = bGrade?.mediaFinal || 0;
+            }
+            return {
+                name: `${b}º Bim`,
+                nota: parseFloat(grade.toFixed(2)),
+                mediaTurma: 7.0 // Placeholder for historical class average (too complex to fetch all for now)
+            };
+        });
 
         const bestDiscipline = disciplinesWithGrades[0];
         const worstDiscipline = disciplinesWithGrades[disciplinesWithGrades.length - 1];
@@ -672,14 +726,15 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                             </h3>
                             <div className="h-80 w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={chartData} layout="vertical" margin={{ left: 20 }}>
+                                    <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
                                         <XAxis type="number" domain={[0, 10]} hide />
                                         <YAxis dataKey="name" type="category" width={100} tick={{ fill: '#94a3b8', fontSize: 12 }} />
                                         <Tooltip 
                                             cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                                             contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px' }}
                                         />
-                                        <Bar dataKey="nota" fill="url(#colorBar)" radius={[0, 4, 4, 0]}>
+                                        <Legend verticalAlign="top" height={36}/>
+                                        <Bar name="Nota do Aluno" dataKey="nota" fill="url(#colorBar)" radius={[0, 4, 4, 0]}>
                                             <defs>
                                                 <linearGradient id="colorBar" x1="0" y1="0" x2="1" y2="0">
                                                     <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
@@ -687,6 +742,7 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                                 </linearGradient>
                                             </defs>
                                         </Bar>
+                                        <Bar name="Média da Turma" dataKey="mediaTurma" fill="#64748b" radius={[0, 4, 4, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -694,12 +750,24 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
 
                         {/* Line Chart: Student vs Class Average */}
                         <div className="bg-[#1e293b]/30 p-6 rounded-3xl border border-gray-800 overflow-hidden">
-                            <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                                <TrendingUp size={20} className="text-blue-400" /> Evolução de Notas
-                            </h3>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <TrendingUp size={20} className="text-blue-400" /> Evolução de Notas
+                                </h3>
+                                <select 
+                                    className="bg-[#1e293b] text-gray-300 text-xs font-bold px-3 py-1 rounded-lg border border-gray-700 outline-none focus:border-blue-500"
+                                    value={selectedDisciplineForEvolution}
+                                    onChange={(e) => setSelectedDisciplineForEvolution(e.target.value)}
+                                >
+                                    <option value="all">Média Geral</option>
+                                    {disciplinesWithGrades.map(d => (
+                                        <option key={d.id} value={d.id}>{d.name}</option>
+                                    ))}
+                                </select>
+                            </div>
                             <div className="h-80 w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={chartData}>
+                                    <LineChart data={evolutionData}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" />
                                         <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 10 }} />
                                         <YAxis domain={[0, 10]} tick={{ fill: '#94a3b8', fontSize: 12 }} />
@@ -716,7 +784,7 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                             dot={{ r: 6, fill: '#10b981' }} 
                                         />
                                         <Line 
-                                            name="Média Turma" 
+                                            name="Média de Referência" 
                                             type="monotone" 
                                             dataKey="mediaTurma" 
                                             stroke="#64748b" 
@@ -782,17 +850,16 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-800">
-                                {disciplines.map(d => {
-                                    const g = studentGrades[d.id];
-                                    const part = participationGrades[student.id] || 0;
+                                {disciplinesWithGrades.map(d => {
+                                    const g = d.g;
                                     return (
                                         <tr key={d.id} className="hover:bg-white/5 transition-colors">
-                                            <td className="p-4 font-bold text-gray-300">{d.displayName}</td>
+                                            <td className="p-4 font-bold text-gray-300">{d.name}</td>
                                             <td className="p-4 text-center text-gray-400">{formatGrade(g?.p1)}</td>
                                             <td className="p-4 text-center text-gray-400">{formatGrade(g?.p2)}</td>
                                             <td className="p-4 text-center text-gray-400">{formatGrade(g?.sub)}</td>
                                             <td className="p-4 text-center text-gray-400">{formatGrade(g?.recuperacao)}</td>
-                                            <td className="p-4 text-center text-emerald-400 font-bold">{formatGrade(part)}</td>
+                                            <td className="p-4 text-center text-emerald-400 font-bold">{formatGrade(d.participation)}</td>
                                             <td className={`p-4 text-center font-black ${g?.mediaFinal && g.mediaFinal < 6 ? 'text-red-400' : 'text-emerald-400'}`}>
                                                 {formatGrade(g?.mediaFinal)}
                                             </td>

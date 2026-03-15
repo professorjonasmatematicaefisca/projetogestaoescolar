@@ -1661,31 +1661,44 @@ export const SupabaseService = {
     },
 
     async saveGrades(grades: import('../types').Grade[]): Promise<boolean> {
-        const toSave = grades.map(g => ({
-            student_id: g.studentId,
-            discipline_id: g.disciplineId,
-            teacher_id: g.teacherId,
-            bimestre: g.bimestre,
-            year: g.year,
-            p1: g.p1,
-            p2: g.p2,
-            sub: g.sub,
-            recuperacao: g.recuperacao,
-            atividades_extras: g.atividadesExtras,
-            faltas: g.faltas,
-            p1_pdf_url: g.p1PdfUrl,
-            p2_pdf_url: g.p2PdfUrl,
-            sub_pdf_url: g.subPdfUrl,
-            rec_pdf_url: g.recPdfUrl,
-            media_final: g.mediaFinal
-        }));
+        try {
+            const toSave = grades.map(g => ({
+                student_id: g.studentId,
+                discipline_id: g.disciplineId,
+                teacher_id: g.teacherId,
+                bimestre: g.bimestre,
+                year: g.year,
+                p1: g.p1,
+                p2: g.p2,
+                sub: g.sub,
+                recuperacao: g.recuperacao,
+                atividades_extras: g.atividadesExtras,
+                faltas: g.faltas,
+                p1_pdf_url: g.p1PdfUrl,
+                p2_pdf_url: g.p2PdfUrl,
+                sub_pdf_url: g.subPdfUrl,
+                rec_pdf_url: g.recPdfUrl,
+                media_final: g.mediaFinal,
+                updated_at: new Date().toISOString()
+            }));
 
-        const { error } = await supabase
-            .from('grades')
-            .upsert(toSave, { onConflict: 'student_id,discipline_id,bimestre,year' });
+            // Log size for debugging 413 errors
+            const size = JSON.stringify(toSave).length;
+            console.log(`[saveGrades] Saving ${toSave.length} records. Payload size: ${(size / 1024).toFixed(2)} KB`);
 
-        if (error) { console.error('saveGrades error:', error); return false; }
-        return true;
+            const { error } = await supabase
+                .from('grades')
+                .upsert(toSave, { onConflict: 'student_id,discipline_id,bimestre,year' });
+
+            if (error) { 
+                console.error('saveGrades error:', error); 
+                return false; 
+            }
+            return true;
+        } catch (err) {
+            console.error('saveGrades unexpected error:', err);
+            return false;
+        }
     },
 
     /**
