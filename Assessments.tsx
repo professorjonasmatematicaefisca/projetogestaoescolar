@@ -14,7 +14,8 @@ import {
     Award,
     FileUp,
     FileText,
-    Link
+    Link,
+    Trash2
 } from 'lucide-react';
 import { SupabaseService } from './services/supabaseService';
 import { Student, ClassRoom, Discipline, Grade, UserRole, User as SystemUser } from './types';
@@ -144,11 +145,27 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
             setParticipationGrades(partMap);
             setAbsenceGrades(absMap);
 
-        } catch (error) {
-            console.error('Error fetching data:', error);
-            onShowToast('Erro ao carregar dados dos alunos');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const removePdf = async (studentId: string, field: string) => {
+        if (!confirm('Deseja realmente excluir este PDF?')) return;
+
+        try {
+            const pdfField = (field === 'recuperacao' ? 'recPdfUrl' : `${field}PdfUrl`) as keyof Grade;
+            setGrades(prev => {
+                const current = prev[studentId];
+                if (!current) return prev;
+                const updated = { ...current };
+                delete (updated as any)[pdfField];
+                return { ...prev, [studentId]: updated };
+            });
+            onShowToast("PDF excluído.");
+        } catch (error) {
+            console.error('Error removing PDF:', error);
+            onShowToast("Erro ao excluir PDF.");
         }
     };
 
@@ -170,25 +187,43 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
 
             const updated = { ...current, [field]: numValue };
             
-            // Recalculate Average
-            const { p1 = 0, p2 = 0, sub, recuperacao, atividadesExtras = 0 } = updated;
+            // Recalculate Average according to New Rules
+            const { p1, p2, sub, recuperacao, atividadesExtras = 0 } = updated;
             const part = participationGrades[studentId] || 0;
 
-            let n1 = p1;
-            let n2 = p2;
-
-            if (sub !== undefined) {
-                if (n1 < n2) n1 = Math.max(n1, sub);
-                else n2 = Math.max(n2, sub);
-            }
-
-            const mediaBase = (n1 + n2) / 2;
-            let parcial = (mediaBase + atividadesExtras + part) / 3;
-
-            if (parcial < 6 && recuperacao !== undefined) {
-                updated.mediaFinal = parseFloat(((parcial + recuperacao) / 2).toFixed(1));
+            // Rule 1: Only show if at least one grade exists
+            const hasAnyGrade = [p1, p2, sub, recuperacao, atividadesExtras].some(v => v !== undefined) || part > 0;
+            
+            if (!hasAnyGrade) {
+                updated.mediaFinal = undefined;
             } else {
-                updated.mediaFinal = parseFloat(parcial.toFixed(1));
+                // Rule 2 & 3 & 4: (NOTA1 + NOTA2 + PART) / 3
+                let n1 = p1 ?? 0;
+                let n2 = p2 ?? 0;
+
+                if (p1 !== undefined && p2 === undefined && sub !== undefined) {
+                    n2 = sub;
+                } else if (p2 !== undefined && p1 === undefined && sub !== undefined) {
+                    n1 = sub;
+                } else if (p1 === undefined && p2 === undefined && sub !== undefined) {
+                    n1 = sub;
+                }
+
+                let media = (n1 + n2 + part) / 3;
+
+                // Rule 5: Recuperação
+                if (media < 6 && recuperacao !== undefined) {
+                    if (recuperacao >= 6) {
+                        media = 6.0;
+                    }
+                }
+
+                // Rule 6: Extras
+                if (media < 10) {
+                    media = Math.min(10, media + atividadesExtras);
+                }
+
+                updated.mediaFinal = parseFloat(media.toFixed(1));
             }
 
             return { ...prev, [studentId]: updated };
@@ -331,41 +366,65 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                                         }}
                                                     />
                                                     {!col.noPdf && (
-                                                        <button 
-                                                            onClick={() => {
-                                                                if (col.hasPdf) {
-                                                                    const pdfUrl = (col.field === 'recuperacao' ? g.recPdfUrl : (g as any)[`${col.field}PdfUrl`]);
-                                                                    if (pdfUrl) window.open(pdfUrl, '_blank');
-                                                                } else {
-                                                                    const input = document.createElement('input');
-                                                                    input.type = 'file';
-                                                                    input.accept = 'application/pdf';
-                                                                    input.onchange = async (e) => {
-                                                                        const file = (e.target as HTMLInputElement).files?.[0];
-                                                                        if (file) {
-                                                                            onShowToast(`Arquivando PDF: ${file.name}...`);
-                                                                            const reader = new FileReader();
-                                                                            reader.onload = async (event) => {
-                                                                                const dataUrl = event.target?.result as string;
-                                                                                const pdfField = (col.field === 'recuperacao' ? 'recPdfUrl' : `${col.field}PdfUrl`) as keyof Grade;
-                                                                                setGrades(prev => ({
-                                                                                    ...prev,
-                                                                                    [student.id]: { ...prev[student.id], [pdfField]: dataUrl }
-                                                                                }));
-                                                                                onShowToast("PDF arquivado com sucesso!");
-                                                                                handleInputBlur(student.id);
-                                                                            };
-                                                                            reader.readAsDataURL(file);
+                                                        <div className="flex items-center gap-1 opacity-0 group-hover/field:opacity-100 transition-opacity">
+                                                            <button 
+                                                                onClick={async () => {
+                                                                    if (col.hasPdf) {
+                                                                        const pdfUrl = (col.field === 'recuperacao' ? g.recPdfUrl : (g as any)[`${col.field}PdfUrl`]);
+                                                                        if (pdfUrl) {
+                                                                            try {
+                                                                                // Fix: Convert DataURL to Blob for reliable opening
+                                                                                const res = await fetch(pdfUrl);
+                                                                                const blob = await res.blob();
+                                                                                const url = URL.createObjectURL(blob);
+                                                                                const win = window.open(url, '_blank');
+                                                                                if (!win) onShowToast("Bloqueador de popups impediu a abertura.");
+                                                                            } catch (e) {
+                                                                                console.error("PDF Open error:", e);
+                                                                                window.open(pdfUrl, '_blank');
+                                                                            }
                                                                         }
-                                                                    };
-                                                                    input.click();
-                                                                }
-                                                            }}
-                                                            className={`p-1.5 rounded-lg border transition-all ${col.hasPdf ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-gray-800/50 border-gray-700 text-gray-500 hover:text-gray-300'}`}
-                                                            title={col.hasPdf ? "Ver PDF" : "Arquivar PDF"}
-                                                        >
-                                                            {col.hasPdf ? <FileText size={14} /> : <FileUp size={14} />}
-                                                        </button>
+                                                                    } else {
+                                                                        const input = document.createElement('input');
+                                                                        input.type = 'file';
+                                                                        input.accept = 'application/pdf';
+                                                                        input.onchange = async (e) => {
+                                                                            const file = (e.target as HTMLInputElement).files?.[0];
+                                                                            if (file) {
+                                                                                onShowToast(`Arquivando PDF: ${file.name}...`);
+                                                                                const reader = new FileReader();
+                                                                                reader.onload = async (event) => {
+                                                                                    const dataUrl = event.target?.result as string;
+                                                                                    const pdfField = (col.field === 'recuperacao' ? 'recPdfUrl' : `${col.field}PdfUrl`) as keyof Grade;
+                                                                                    setGrades(prev => ({
+                                                                                        ...prev,
+                                                                                        [student.id]: { ...prev[student.id], [pdfField]: dataUrl }
+                                                                                    }));
+                                                                                    onShowToast("PDF arquivado com sucesso!");
+                                                                                    handleInputBlur(student.id);
+                                                                                };
+                                                                                reader.readAsDataURL(file);
+                                                                            }
+                                                                        };
+                                                                        input.click();
+                                                                    }
+                                                                }}
+                                                                className={`p-1.5 rounded-lg border transition-all ${col.hasPdf ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-gray-800/50 border-gray-700 text-gray-500 hover:text-gray-300'}`}
+                                                                title={col.hasPdf ? "Ver PDF" : "Arquivar PDF"}
+                                                            >
+                                                                {col.hasPdf ? <FileText size={14} /> : <FileUp size={14} />}
+                                                            </button>
+
+                                                            {col.hasPdf && (
+                                                                <button
+                                                                    onClick={() => removePdf(student.id, col.field)}
+                                                                    className="p-1.5 rounded-lg border bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white transition-all"
+                                                                    title="Remover PDF"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
                                             </td>
