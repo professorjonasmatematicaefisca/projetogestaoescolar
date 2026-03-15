@@ -291,9 +291,19 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
         : classes.filter(c => currentUser?.assignments?.some(a => a.classId === c.name));
 
     // Derived: Available disciplines for the selected class
-    const availableDisciplines = userRole === UserRole.COORDINATOR
-        ? disciplines
-        : disciplines.filter(d => currentUser?.assignments?.some(a => a.classId === selectedClass && a.subject === d.name));
+    const availableDisciplines = disciplines.filter(d => {
+        // Find the selected class object to get its disciplineIds
+        const classObj = classes.find(c => c.name === selectedClass);
+        
+        // If teacher, check assignments PLUS class discipline list
+        if (userRole === UserRole.TEACHER) {
+            const isAssigned = currentUser?.assignments?.some(a => a.classId === selectedClass && a.subject === d.name);
+            return isAssigned && classObj?.disciplineIds?.includes(d.id);
+        }
+        
+        // If coordinator or other, check if discipline belongs to the class
+        return classObj?.disciplineIds?.includes(d.id);
+    });
 
     const renderEntryView = () => (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -493,7 +503,11 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
         try {
             const data: Record<string, Grade> = {};
             await Promise.all(disciplines.map(async (d) => {
-                const g = await SupabaseService.getGrades(selectedClass, d.id, selectedBimestre, selectedYear);
+                const g = await SupabaseService.getGrades({
+                    disciplineId: d.id,
+                    bimestre: selectedBimestre,
+                    year: selectedYear
+                });
                 const studentGrade = g.find(item => item.studentId === studentId);
                 if (studentGrade) data[d.id] = studentGrade;
             }));

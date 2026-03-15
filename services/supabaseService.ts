@@ -1662,7 +1662,6 @@ export const SupabaseService = {
 
     async saveGrades(grades: import('../types').Grade[]): Promise<boolean> {
         const toSave = grades.map(g => ({
-            id: g.id, // Supabase allows providing ID for upsert
             student_id: g.studentId,
             discipline_id: g.disciplineId,
             teacher_id: g.teacherId,
