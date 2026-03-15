@@ -366,7 +366,7 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
                                                         }}
                                                     />
                                                     {!col.noPdf && (
-                                                        <div className="flex items-center gap-1 opacity-0 group-hover/field:opacity-100 transition-opacity">
+                                                        <div className="flex items-center gap-1 transition-opacity">
                                                             <button 
                                                                 onClick={async () => {
                                                                     if (col.hasPdf) {
