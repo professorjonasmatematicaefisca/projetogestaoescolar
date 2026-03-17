@@ -88,55 +88,62 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
         loadInitialData();
     }, []);
 
-    // Debounced Auto-save Effect
+    // Auto-save com debounce: salva apenas os registros pendentes após 2s de inatividade
     useEffect(() => {
         if (pendingSaves.size === 0) return;
         
         const timeout = setTimeout(async () => {
             const studentIds = Array.from(pendingSaves);
-            setPendingSaves(new Set()); // Reset
+            setPendingSaves(new Set());
             
-            const toSave = studentIds.map(id => grades[id]).filter(Boolean);
-            if (toSave.length > 0) {
-                console.log(`Auto-saving ${toSave.length} records...`);
-                await SupabaseService.saveGrades(toSave);
-            }
-        }, 3000); // 3 seconds delay for typing
+            // Captura snapshot atual das notas para evitar closure stale
+            setGrades(currentGrades => {
+                const toSave = studentIds.map(id => currentGrades[id]).filter(Boolean);
+                if (toSave.length > 0) {
+                    console.log(`[AutoSave] Salvando ${toSave.length} registros...`);
+                    SupabaseService.saveGrades(toSave).then(ok => {
+                        if (!ok) console.error('[AutoSave] Falha ao salvar.');
+                    });
+                }
+                return currentGrades;
+            });
+        }, 2000);
         
         return () => clearTimeout(timeout);
-    }, [pendingSaves, grades]);
+    }, [pendingSaves]);
 
     const loadInitialData = async () => {
         setLoading(true);
         try {
-            // 1. Get current user profile for assignments
-            const users = await SupabaseService.getTeachers(); // For simplicity, teachers are in this list
-            const profile = users.find(u => u.email === userEmail);
-            setCurrentUser(profile as any);
-
-            // 2. Get All Classes and Disciplines for reference
-            const [allClasses, allDisciplines] = await Promise.all([
+            // Buscar turmas, disciplinas e perfil do usuário em paralelo
+            const [allClasses, allDisciplines, allUsers] = await Promise.all([
                 SupabaseService.getClasses(),
-                SupabaseService.getDisciplines()
+                SupabaseService.getDisciplines(),
+                SupabaseService.getTeachers()
             ]);
 
+            const profile = allUsers.find(u => u.email === userEmail);
+            setCurrentUser(profile as any);
             setClasses(allClasses);
             setDisciplines(allDisciplines);
 
-            // 3. Set initial filters if teacher
+            // Definir filtros iniciais baseado no perfil/role
             if (profile && profile.assignments && profile.assignments.length > 0) {
                 const first = profile.assignments[0];
                 setSelectedClass(first.classId);
-                
-                // Find discipline ID for the subject name
                 const discObj = allDisciplines.find(d => d.name === first.subject);
                 if (discObj) setSelectedDiscipline(discObj.id);
             } else if (allClasses.length > 0) {
                 setSelectedClass(allClasses[0].name);
+                // Para coordenador: pré-selecionar a primeira disciplina da primeira turma
+                const firstClass = allClasses[0];
+                if (firstClass.disciplineIds && firstClass.disciplineIds.length > 0) {
+                    setSelectedDiscipline(firstClass.disciplineIds[0]);
+                }
             }
 
         } catch (error) {
-            console.error('Error loading initial data:', error);
+            console.error('Erro ao carregar dados iniciais:', error);
             onShowToast('Erro ao carregar configurações');
         } finally {
             setLoading(false);
@@ -153,42 +160,45 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Fetch students from the class
-            const allStudents = await SupabaseService.getStudents();
-            const classStudents = allStudents.filter(s => s.className === selectedClass && s.status !== 'INACTIVE');
+            // 1. Buscar apenas os alunos da turma selecionada (query filtrada no banco)
+            const classStudents = await SupabaseService.getStudentsByClass(selectedClass);
             setStudents(classStudents);
 
-            // Fetch existing grades
-            const fetchedGrades = await SupabaseService.getGrades({
-                bimestre: selectedBimestre,
-                year: selectedYear,
-                disciplineId: selectedDiscipline
-            });
-
-            const gradeMap: Record<string, Grade> = {};
-            fetchedGrades.forEach(g => {
-                gradeMap[g.studentId] = g;
-            });
-            setGrades(gradeMap);
-
-            // Fetch Participation averages
+            // 2. Intervalo de datas do bimestre
             const range = BIMESTRE_RANGES[selectedBimestre as keyof typeof BIMESTRE_RANGES];
             const startDate = `${selectedYear}${range.start}`;
             const endDate = `${selectedYear}${range.end}`;
 
-            const partMap: Record<string, number> = {};
-            const absMap: Record<string, number> = {};
-            await Promise.all(classStudents.map(async (s) => {
-                const [avg, abs] = await Promise.all([
-                    SupabaseService.getParticipationAverage(s.id, selectedDiscipline, startDate, endDate),
-                    SupabaseService.getAbsencesCount(s.id, selectedDiscipline, startDate, endDate)
-                ]);
-                partMap[s.id] = avg;
-                absMap[s.id] = abs;
-            }));
-            setParticipationGrades(partMap);
-            setAbsenceGrades(absMap);
+            // 3. Buscar notas e participação/faltas em paralelo (batch)
+            const studentIds = classStudents.map(s => s.id);
+            const [fetchedGrades, { participation, absences }] = await Promise.all([
+                SupabaseService.getGrades({
+                    bimestre: selectedBimestre,
+                    year: selectedYear,
+                    disciplineId: selectedDiscipline
+                }),
+                // BATCH: 3 queries no total em vez de N×6
+                SupabaseService.getClassParticipationAndAbsences(
+                    studentIds,
+                    selectedDiscipline,
+                    startDate,
+                    endDate
+                )
+            ]);
 
+            // 4. Montar mapa de notas filtrado pelos alunos da turma
+            const gradeMap: Record<string, Grade> = {};
+            fetchedGrades
+                .filter(g => studentIds.includes(g.studentId))
+                .forEach(g => { gradeMap[g.studentId] = g; });
+
+            setGrades(gradeMap);
+            setParticipationGrades(participation);
+            setAbsenceGrades(absences);
+
+        } catch (error) {
+            console.error('Erro ao carregar dados das notas:', error);
+            onShowToast('Erro ao carregar os dados. Verifique a conexão.');
         } finally {
             setLoading(false);
         }
@@ -296,19 +306,25 @@ export const Assessments: React.FC<AssessmentsProps> = ({ userEmail, userRole, o
 
     const saveAll = async () => {
         setSaving(true);
+        // Limpar pendingSaves imediatamente para evitar autosave duplicado
+        setPendingSaves(new Set());
         try {
             const gradesToSave = Object.values(grades);
-            if (gradesToSave.length === 0) return;
+            if (gradesToSave.length === 0) {
+                onShowToast('Nenhuma nota para salvar.');
+                return;
+            }
 
             const success = await SupabaseService.saveGrades(gradesToSave);
             if (success) {
-                onShowToast('Notas salvas com sucesso!');
-                fetchData(); // Refresh to get IDs for new items
+                onShowToast('Notas salvas com sucesso! ✓');
+                await fetchData(); // Atualizar para obter IDs dos novos registros
             } else {
-                onShowToast('Erro ao salvar notas.');
+                onShowToast('Erro ao salvar notas. Tente novamente.');
             }
         } catch (error) {
-            onShowToast('Erro na conexão ao salvar.');
+            console.error('saveAll error:', error);
+            onShowToast('Erro de conexão ao salvar. Verifique a internet.');
         } finally {
             setSaving(false);
         }

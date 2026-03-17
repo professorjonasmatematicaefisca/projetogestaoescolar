@@ -430,6 +430,35 @@ export const SupabaseService = {
         return students;
     },
 
+    /**
+     * Busca apenas os alunos ATIVOS de uma turma específica.
+     * Muito mais eficiente que getStudents() + filtro no cliente.
+     */
+    async getStudentsByClass(className: string): Promise<Student[]> {
+        const { data, error } = await supabase
+            .from('students')
+            .select('*')
+            .eq('class_name', className)
+            .eq('status', 'ACTIVE')
+            .order('name', { ascending: true });
+
+        if (error) {
+            console.error('getStudentsByClass error:', error);
+            return [];
+        }
+
+        return data.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            photoUrl: s.photo_url,
+            parentEmail: s.parent_email,
+            className: s.class_name,
+            status: s.status,
+            inactiveReason: s.inactive_reason,
+            inactiveDate: s.inactive_date
+        }));
+    },
+
     async createStudent(student: Omit<Student, 'id'>): Promise<boolean> {
         const { data, error } = await supabase.from('students').insert({
             name: student.name,
@@ -1662,55 +1691,74 @@ export const SupabaseService = {
 
     async saveGrades(grades: import('../types').Grade[]): Promise<boolean> {
         try {
+            // Helper: verifica se a URL é um base64 DataURL (não deve ir para o banco)
+            const isBase64 = (url?: string) => url?.startsWith('data:') ?? false;
+
             const toSave = grades.map(g => ({
                 student_id: g.studentId,
                 discipline_id: g.disciplineId,
-                teacher_id: g.teacherId,
+                teacher_id: g.teacherId || null,
                 bimestre: g.bimestre,
                 year: g.year,
-                p1: g.p1,
-                p2: g.p2,
-                sub: g.sub,
-                recuperacao: g.recuperacao,
-                atividades_extras: g.atividadesExtras,
-                faltas: g.faltas,
-                p1_pdf_url: g.p1PdfUrl,
-                p2_pdf_url: g.p2PdfUrl,
-                sub_pdf_url: g.subPdfUrl,
-                rec_pdf_url: g.recPdfUrl,
-                media_final: g.mediaFinal,
+                p1: g.p1 ?? null,
+                p2: g.p2 ?? null,
+                sub: g.sub ?? null,
+                recuperacao: g.recuperacao ?? null,
+                atividades_extras: g.atividadesExtras ?? null,
+                faltas: g.faltas ?? null,
+                // Nunca salvar base64 no banco — apenas URLs reais do Storage
+                p1_pdf_url: isBase64(g.p1PdfUrl) ? undefined : (g.p1PdfUrl ?? null),
+                p2_pdf_url: isBase64(g.p2PdfUrl) ? undefined : (g.p2PdfUrl ?? null),
+                sub_pdf_url: isBase64(g.subPdfUrl) ? undefined : (g.subPdfUrl ?? null),
+                rec_pdf_url: isBase64(g.recPdfUrl) ? undefined : (g.recPdfUrl ?? null),
+                media_final: g.mediaFinal ?? null,
                 updated_at: new Date().toISOString()
             }));
 
-            // Log size for debugging 413 errors
+            // Log do tamanho para diagnóstico
             const size = JSON.stringify(toSave).length;
-            console.log(`[saveGrades] Saving ${toSave.length} records. Payload size: ${(size / 1024).toFixed(2)} KB`);
+            console.log(`[saveGrades] Salvando ${toSave.length} registros. Tamanho: ${(size / 1024).toFixed(2)} KB`);
+
+            if (size > 900 * 1024) {
+                // Payload muito grande: salvar em lotes de 10
+                console.warn('[saveGrades] Payload grande, salvando em lotes...');
+                const BATCH = 10;
+                for (let i = 0; i < toSave.length; i += BATCH) {
+                    const batch = toSave.slice(i, i + BATCH);
+                    const { error } = await supabase
+                        .from('grades')
+                        .upsert(batch, { onConflict: 'student_id,discipline_id,bimestre,year' });
+                    if (error) {
+                        console.error('saveGrades batch error:', error);
+                        return false;
+                    }
+                }
+                return true;
+            }
 
             const { error } = await supabase
                 .from('grades')
                 .upsert(toSave, { onConflict: 'student_id,discipline_id,bimestre,year' });
 
-            if (error) { 
-                console.error('saveGrades error:', error); 
-                return false; 
+            if (error) {
+                console.error('saveGrades error:', error);
+                return false;
             }
             return true;
         } catch (err) {
-            console.error('saveGrades unexpected error:', err);
+            console.error('saveGrades erro inesperado:', err);
             return false;
         }
     },
 
     /**
-     * Calcula a média da nota de participação do monitor para um aluno em uma disciplina num período.
-     * Basado na lógica: participation_grade = counters.participation * 0.5 (capped at 10)
+     * MÉTODO LEGADO — mantido para compatibilidade.
+     * Para melhor performance use getClassParticipationAndAbsences().
      */
     async getParticipationAverage(studentId: string, disciplineId: string, startDate: string, endDate: string): Promise<number> {
-        // 1. Get Discipline Name (since sessions use names)
         const { data: disc } = await supabase.from('disciplines').select('name').eq('id', disciplineId).single();
         if (!disc) return 0;
 
-        // 2. Get sessions for this discipline in range
         const { data: sessions, error: sessError } = await supabase
             .from('sessions')
             .select('id')
@@ -1722,7 +1770,6 @@ export const SupabaseService = {
 
         const sessionIds = sessions.map(s => s.id);
 
-        // 3. Get records for these sessions for the student
         const { data: records, error: recError } = await supabase
             .from('session_records')
             .select('counters, present, present2, phone_confiscated')
@@ -1732,7 +1779,6 @@ export const SupabaseService = {
 
         if (recError || !records || records.length === 0) return 0;
 
-        // 4. Calculate average using StorageService logic for behavioral grade
         const total = records.reduce((sum, rec) => {
             const behavioralGrade = StorageService.calculateGrade({
                 studentId: studentId,
@@ -1745,6 +1791,101 @@ export const SupabaseService = {
         }, 0);
 
         return parseFloat((total / records.length).toFixed(1));
+    },
+
+    /**
+     * MÉTODO BATCH — substitui getParticipationAverage e getAbsencesCount em loop.
+     * Faz apenas 3 queries no banco independente do número de alunos.
+     * @returns { participation: Record<studentId, avg>, absences: Record<studentId, count> }
+     */
+    async getClassParticipationAndAbsences(
+        studentIds: string[],
+        disciplineId: string,
+        startDate: string,
+        endDate: string
+    ): Promise<{ participation: Record<string, number>; absences: Record<string, number> }> {
+        const empty = { participation: {}, absences: {} };
+        if (studentIds.length === 0) return empty;
+
+        try {
+            // 1. Buscar nome da disciplina
+            const { data: disc } = await supabase
+                .from('disciplines')
+                .select('name')
+                .eq('id', disciplineId)
+                .single();
+            if (!disc) return empty;
+
+            // 2. Buscar todas as sessões do período para essa disciplina
+            const { data: sessions, error: sessError } = await supabase
+                .from('sessions')
+                .select('id, blocks_count')
+                .eq('subject', disc.name)
+                .gte('date', startDate)
+                .lte('date', endDate);
+
+            if (sessError || !sessions || sessions.length === 0) return empty;
+
+            const sessionIds = sessions.map(s => s.id);
+            const sessionWeights: Record<string, number> = {};
+            sessions.forEach(s => { sessionWeights[s.id] = s.blocks_count || 1; });
+
+            // 3. Buscar TODOS os registros de TODOS os alunos de uma só vez
+            const { data: records, error: recError } = await supabase
+                .from('session_records')
+                .select('student_id, session_id, present, present2, phone_confiscated, counters')
+                .in('student_id', studentIds)
+                .in('session_id', sessionIds);
+
+            if (recError || !records) return empty;
+
+            // 4. Calcular participação e faltas por aluno no cliente
+            const participation: Record<string, number> = {};
+            const absences: Record<string, number> = {};
+            const participationSums: Record<string, { sum: number; count: number }> = {};
+
+            studentIds.forEach(id => {
+                participationSums[id] = { sum: 0, count: 0 };
+                absences[id] = 0;
+            });
+
+            records.forEach(rec => {
+                const sid = rec.student_id;
+                const weight = sessionWeights[rec.session_id] || 1;
+
+                // Faltas
+                if (weight === 1) {
+                    if (!rec.present) absences[sid] = (absences[sid] || 0) + 1;
+                } else {
+                    if (!rec.present) absences[sid] = (absences[sid] || 0) + 1;
+                    if (!rec.present2) absences[sid] = (absences[sid] || 0) + 1;
+                }
+
+                // Participação (apenas para alunos presentes)
+                if (rec.present) {
+                    const grade = StorageService.calculateGrade({
+                        studentId: sid,
+                        present: rec.present,
+                        present2: rec.present2,
+                        phoneConfiscated: rec.phone_confiscated || false,
+                        counters: rec.counters || {}
+                    } as any);
+                    participationSums[sid].sum += grade;
+                    participationSums[sid].count += 1;
+                }
+            });
+
+            // Converter somas para médias
+            studentIds.forEach(id => {
+                const { sum, count } = participationSums[id];
+                participation[id] = count > 0 ? parseFloat((sum / count).toFixed(1)) : 0;
+            });
+
+            return { participation, absences };
+        } catch (err) {
+            console.error('[getClassParticipationAndAbsences] erro:', err);
+            return empty;
+        }
     },
 
     /**
