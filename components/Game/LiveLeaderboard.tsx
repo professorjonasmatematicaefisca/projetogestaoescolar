@@ -105,7 +105,13 @@ export const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({ participants, 
 
     // Lógica de Modo em Grupo
     if (gameMode === 'group') {
-        const groups: Record<string, { id: string; name: string; totalScore: number; count: number; members: string[] }> = {};
+        const groups: Record<string, { 
+            id: string; 
+            name: string; 
+            totalScore: number; 
+            count: number; 
+            members: { name: string; score: number; answered: boolean; isMe: boolean }[] 
+        }> = {};
 
         participants.forEach(p => {
             const gId = p.group_id || 'sem_grupo';
@@ -115,7 +121,12 @@ export const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({ participants, 
             }
             groups[gId].totalScore += p.score;
             groups[gId].count += 1;
-            groups[gId].members.push(p.student_name);
+            groups[gId].members.push({
+                name: p.student_name,
+                score: p.score,
+                answered: p.answered_current,
+                isMe: p.student_name === myName
+            });
         });
 
         const groupList = Object.values(groups).map(g => ({
@@ -123,7 +134,7 @@ export const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({ participants, 
             name: g.name,
             score: Math.round(g.totalScore / g.count),
             members: g.members,
-            isMe: g.members.some(m => m === myName)
+            isMe: g.members.some(m => m.isMe)
         })).sort((a, b) => b.score - a.score);
 
         // Se onlyMe, filtramos apenas o grupo do aluno
@@ -135,7 +146,7 @@ export const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({ participants, 
             <div className="w-full space-y-3">
                 {displayGroups.map((g, i) => (
                     <div key={g.id} className={`p-4 rounded-xl border transition-all duration-500 animation-fade-in ${g.isMe ? 'bg-[#8bc34a]/10 border-[#8bc34a]/30 shadow-[0_4px_20px_rgba(139,195,74,0.1)]' : 'bg-white/5 border-white/5'}`}>
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
                                 <span className="font-black text-xl text-amber-500 w-6">
                                     {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
@@ -148,11 +159,22 @@ export const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({ participants, 
                                 <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">Média do Grupo</p>
                             </div>
                         </div>
-                        <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5">
+                        
+                        {/* Detalhamento dos Membros */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-3 border-t border-white/5">
                             {g.members.map(m => (
-                                <span key={m} className={`text-[10px] px-2 py-0.5 rounded font-bold ${m === myName ? 'text-[#8bc34a]' : 'text-gray-400'}`}>
-                                    {m}
-                                </span>
+                                <div key={m.name} className="flex items-center justify-between bg-black/20 px-2.5 py-1.5 rounded-lg border border-white/5">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${m.answered ? 'bg-emerald-400' : 'bg-gray-600'}`} 
+                                             title={m.answered ? 'Já respondeu' : 'Aguardando...'} />
+                                        <span className={`text-[10px] font-bold truncate ${m.isMe ? 'text-[#8bc34a]' : 'text-gray-300'}`}>
+                                            {m.name}
+                                        </span>
+                                    </div>
+                                    <span className="text-[10px] font-mono text-gray-500 shrink-0">
+                                        {(showFeedback || !myName) ? `${m.score} pts` : '—'}
+                                    </span>
+                                </div>
                             ))}
                         </div>
                     </div>
