@@ -321,6 +321,33 @@ export const InteractionFractionCombo: React.FC<InteractionProps> = ({ onAnswerC
     );
 };
 
+// ---- Multiple Choice ----
+export const InteractionMultipleChoice: React.FC<InteractionProps> = ({ question, onAnswerChange, currentAnswer, disabled }) => {
+    return (
+        <div className="flex flex-col gap-3 w-full max-w-md">
+            {question.options?.map((opt, i) => (
+                <button
+                    key={i}
+                    onClick={() => onAnswerChange(i)}
+                    disabled={disabled}
+                    className={`w-full px-4 py-3 rounded-xl text-left transition-all border cursor-pointer flex items-center gap-3 ${
+                        Number(currentAnswer) === i
+                            ? 'bg-[#8bc34a] text-black font-bold border-[#8bc34a] shadow-[0_0_15px_rgba(139,195,74,0.4)]'
+                            : 'bg-[#8bc34a]/10 text-white border-[#8bc34a]/30 hover:bg-[#8bc34a]/20'
+                    }`}
+                >
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                        Number(currentAnswer) === i ? 'border-black' : 'border-[#8bc34a]/50'
+                    }`}>
+                        {Number(currentAnswer) === i && <div className="w-3 h-3 rounded-full bg-black" />}
+                    </div>
+                    <span className="text-sm md:text-base">{opt}</span>
+                </button>
+            ))}
+        </div>
+    );
+};
+
 // ---- Factory: retorna o componente correto para cada tipo ----
 export const QuestionInteraction: React.FC<InteractionProps> = (props) => {
     const { question } = props;
@@ -338,6 +365,7 @@ export const QuestionInteraction: React.FC<InteractionProps> = (props) => {
         case 'number': return <InteractionNumber {...props} />;
         case 'equation-builder': return <InteractionEquationBuilder {...props} />;
         case 'fraction-combo': return <InteractionFractionCombo {...props} />;
+        case 'multiple-choice': return <InteractionMultipleChoice {...props} />;
         default: return <div className="text-gray-400">Tipo de interação não suportado</div>;
     }
 };
