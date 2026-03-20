@@ -16,7 +16,7 @@ type TabId = 'controle' | 'questao' | 'ranking';
 export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
     teacherName, sessionId, onCreateSession,
 }) => {
-    const { session, participants, timeLeft, loading, startNextQuestion, finishGame, approveParticipant, rejectParticipant } =
+    const { session, participants, timeLeft, loading, startNextQuestion, finishGame, approveParticipant, rejectParticipant, toggleFeedback } =
         useGameSession(sessionId, null);
     const [confirming, setConfirming] = useState(false);
     const [tab, setTab] = useState<TabId>('controle');
@@ -24,6 +24,15 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
     const qi = session?.current_question_index ?? -1;
     const isLast = qi >= questions.length - 1;
     const currentQ = qi >= 0 ? questions[qi] : null;
+
+    // Helper para formatar a resposta correta
+    const getCorrectAnswerText = () => {
+        if (!currentQ) return '';
+        if (currentQ.type === 'multiple-choice' && currentQ.options && typeof currentQ.correct === 'number') {
+            return currentQ.options[currentQ.correct];
+        }
+        return String(currentQ.correct);
+    };
     const approvedParticipants = participants.filter(p => p.status === 'approved');
     const pendingParticipants = participants.filter(p => p.status === 'pending');
 
@@ -166,6 +175,17 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                     <div className="bg-black/40 border border-[#8bc34a]/20 rounded-2xl p-5">
                         <div className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-4">Controles da Competição</div>
                         <div className="flex flex-wrap gap-3">
+                            {session?.status !== 'finished' && qi >= 0 && (
+                                <button onClick={() => toggleFeedback(!session?.show_feedback)}
+                                    className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition border shadow-lg ${session?.show_feedback
+                                        ? 'bg-amber-500 text-black border-amber-600'
+                                        : 'bg-amber-500/10 text-amber-500 border-amber-500/30 hover:bg-amber-500/20'
+                                        }`}>
+                                    <Trophy size={20} />
+                                    {session?.show_feedback ? 'Feedback Liberado!' : 'Liberar Feedback Parcial'}
+                                </button>
+                            )}
+
                             {session?.status !== 'finished' && !isLast && (
                                 <button onClick={startNextQuestion}
                                     className="flex items-center gap-2 bg-gradient-to-r from-[#2e7d32] to-[#8bc34a] text-white font-black px-6 py-3 rounded-xl hover:brightness-110 transition shadow-lg text-lg">
@@ -221,26 +241,28 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                             <div className="bg-black/60 border-l-4 border-[#8bc34a] px-5 py-4 rounded-xl text-gray-200 text-base leading-relaxed italic">
                                 "{currentQ.text}"
                             </div>
-                            {currentQ.optsA && (
-                                <div>
-                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">Opções A</p>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {currentQ.optsA.map(o => (
-                                            <div key={o.id} className="bg-[#8bc34a]/5 border border-[#8bc34a]/20 rounded-lg px-3 py-2 text-sm text-gray-300">
-                                                <MathText text={o.val} />
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
-                                <span className="text-amber-400 font-bold text-xs uppercase tracking-wider">Resposta correta: </span>
-                                <span className="text-white font-bold">{currentQ.correct}</span>
-                            </div>
-                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-3 text-blue-300 text-sm">
-                                <b className="block text-blue-400 mb-1">💡 Dica da questão:</b>
-                                {currentQ.hint}
-                            </div>
+                             {currentQ.optsA && (
+                                 <div>
+                                     <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">Opções A</p>
+                                     <div className="grid grid-cols-2 gap-2">
+                                         {currentQ.optsA.map(o => (
+                                             <div key={o.id} className="bg-[#8bc34a]/5 border border-[#8bc34a]/20 rounded-lg px-3 py-2 text-sm text-gray-300">
+                                                 <MathText text={o.val} />
+                                             </div>
+                                         ))}
+                                     </div>
+                                 </div>
+                             )}
+                             <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3">
+                                 <span className="text-amber-400 font-bold text-xs uppercase tracking-wider">Resposta correta: </span>
+                                 <div className="text-white font-black text-xl mt-1">
+                                     <MathText text={getCorrectAnswerText()} />
+                                 </div>
+                             </div>
+                             <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-3 text-blue-300 text-sm">
+                                 <b className="block text-blue-400 mb-1">💡 Dica da questão:</b>
+                                 {currentQ.hint}
+                             </div>
                         </div>
                     )}
                 </div>
@@ -254,7 +276,7 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                         <h3 className="text-white font-black">Ranking Ao Vivo</h3>
                         <span className="ml-auto text-xs text-gray-500">{approvedParticipants.length} participante(s)</span>
                     </div>
-                    <LiveLeaderboard participants={approvedParticipants} currentQuestionIndex={session?.current_question_index} />
+                    <LiveLeaderboard participants={approvedParticipants} currentQuestionIndex={session?.current_question_index} showFeedback={session?.show_feedback} />
                 </div>
             )}
         </div>

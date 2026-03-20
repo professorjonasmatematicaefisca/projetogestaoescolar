@@ -8,6 +8,7 @@ export interface GameSession {
     question_start_time: string | null;
     teacher_id: string | null;
     teacher_name: string | null;
+    show_feedback?: boolean; // Nova flag
     created_at: string;
     updated_at: string;
 }
@@ -38,6 +39,7 @@ interface UseGameSessionReturn {
     finishGame: () => Promise<void>;
     approveParticipant: (id: string) => Promise<void>;
     rejectParticipant: (id: string) => Promise<void>;
+    toggleFeedback: (show: boolean) => Promise<void>;
     // Student actions
     joinSession: (sessionId: string, studentName: string) => Promise<GameParticipant | null>;
     submitAnswer: (isCorrect: boolean, pointsEarned: number) => Promise<void>;
@@ -194,7 +196,7 @@ export function useGameSession(
         const nextIndex = session.current_question_index + 1;
 
         // Reseta Flag de resposta de todos os participantes PRIMEIRO
-        // Assim, quando a nova questão for exibida (via realtime de session), o participant já está "limpo" no banco
+        // E reseta show_feedback para false
         const { error: partErr } = await supabase
             .from('game_participants')
             .update({ answered_current: false })
@@ -208,6 +210,7 @@ export function useGameSession(
                     current_question_index: nextIndex,
                     question_start_time: new Date().toISOString(),
                     status: 'active',
+                    show_feedback: false, // Resetar feedback na nova questão
                 })
                 .eq('id', session.id);
         }
@@ -244,6 +247,14 @@ export function useGameSession(
         await supabase.from('game_participants').update({ status: 'rejected' }).eq('id', id);
     };
 
+    const toggleFeedback = async (show: boolean) => {
+        if (!session) return;
+        await supabase
+            .from('game_sessions')
+            .update({ show_feedback: show })
+            .eq('id', session.id);
+    };
+
     // ─── Ações do Aluno ───
 
     const joinSession = async (sid: string, studentName: string): Promise<GameParticipant | null> => {
@@ -273,6 +284,6 @@ export function useGameSession(
 
     return {
         session, participants, myParticipant, timeLeft, loading, error,
-        createSession, startNextQuestion, finishGame, approveParticipant, rejectParticipant, joinSession, submitAnswer,
+        createSession, startNextQuestion, finishGame, approveParticipant, rejectParticipant, toggleFeedback, joinSession, submitAnswer,
     };
 }

@@ -9,6 +9,7 @@ interface LiveLeaderboardProps {
     /** Se true, aluno só vê sua própria posição (modo aluno) */
     onlyMe?: boolean;
     currentQuestionIndex?: number;
+    showFeedback?: boolean;
 }
 
 function getInitials(name: string): string {
@@ -37,7 +38,9 @@ const ParticipantRow: React.FC<{
     totalCount?: number;
     compact?: boolean;
     currentQuestionIndex?: number;
-}> = ({ p, rank, isMe, totalCount, compact, currentQuestionIndex = 0 }) => {
+    showFeedback?: boolean;
+    isTeacher?: boolean;
+}> = ({ p, rank, isMe, totalCount, compact, currentQuestionIndex = 0, showFeedback = true, isTeacher = false }) => {
     const medal = medalColors[rank];
     const avatarColor = getAvatarColor(p.student_name);
 
@@ -67,19 +70,19 @@ const ParticipantRow: React.FC<{
                 </div>
                 {compact && (
                     <div className="text-xs text-gray-400 mt-0.5 truncate flex items-center gap-2">
-                        <span>{p.score.toLocaleString()} pts</span>
+                        <span>{(showFeedback || isTeacher) ? `${p.score.toLocaleString()} pts` : '??? pts'}</span>
                         <span className="w-1 h-1 rounded-full bg-gray-600" />
-                        <span>{p.correct_answers || 0} / {currentQuestionIndex + 1} acertos</span>
+                        <span>{(showFeedback || isTeacher) ? `${p.correct_answers || 0} / ${currentQuestionIndex + 1} acertos` : '??? acertos'}</span>
                     </div>
                 )}
             </div>
             {!compact && (
                 <div className="text-right shrink-0 flex flex-col items-end">
                     <span className={`font-black tracking-tight ${isMe ? 'text-[#8bc34a]' : 'text-emerald-400'}`}>
-                        {p.score.toLocaleString()} pts
+                        {(showFeedback || isTeacher) ? `${p.score.toLocaleString()} pts` : '??? pts'}
                     </span>
                     <span className="text-xs text-gray-500 font-bold">
-                        {p.correct_answers || 0} / {currentQuestionIndex + 1} acertos
+                        {(showFeedback || isTeacher) ? `${p.correct_answers || 0} / ${currentQuestionIndex + 1} acertos` : '??? acertos'}
                     </span>
                 </div>
             )}
@@ -92,7 +95,7 @@ const ParticipantRow: React.FC<{
     );
 };
 
-export const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({ participants, myName, compact, onlyMe }) => {
+export const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({ participants, myName, compact, onlyMe, currentQuestionIndex, showFeedback }) => {
     const sorted = [...participants].sort((a, b) => b.score - a.score);
 
     if (participants.length === 0) {
@@ -130,6 +133,9 @@ export const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({ participants, 
                     rank={i}
                     isMe={p.student_name === myName}
                     totalCount={participants.length}
+                    showFeedback={showFeedback}
+                    isTeacher={!myName} // Se não tem myName, assumimos que é a visão do professor
+                    currentQuestionIndex={currentQuestionIndex}
                 />
             ))}
         </div>

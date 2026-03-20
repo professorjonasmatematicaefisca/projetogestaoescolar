@@ -339,7 +339,7 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                     <h3 className="text-[#8bc34a] font-bold text-lg mb-4 flex items-center gap-2 justify-center">
                         <Trophy size={18} /> Ranking Final
                     </h3>
-                    <LiveLeaderboard participants={participants.filter(p => p.status === 'approved')} myName={studentName} currentQuestionIndex={session?.current_question_index} />
+                    <LiveLeaderboard participants={participants.filter(p => p.status === 'approved')} myName={studentName} currentQuestionIndex={session?.current_question_index} showFeedback={true} />
                 </div>
 
                 <button onClick={handleLeaveSession}
@@ -391,8 +391,15 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                     <span className="text-gray-500 text-xs ml-1">pts</span>
                 </div>
                 <div className="flex flex-col text-right">
-                   <div className="text-[#8bc34a] font-black text-sm">{myParticipant?.score?.toLocaleString() ?? 0} pts total</div>
-                   <div className="text-gray-400 font-bold text-xs">{myParticipant?.correct_answers ?? 0}/{qi > 0 ? (answered ? qi + 1 : qi) : (answered ? 1 : 0)} acertos</div>
+                   {session?.show_feedback && (
+                       <>
+                           <div className="text-[#8bc34a] font-black text-sm">{myParticipant?.score?.toLocaleString() ?? 0} pts total</div>
+                           <div className="text-gray-400 font-bold text-xs">{myParticipant?.correct_answers ?? 0}/{qi > 0 ? (answered ? qi + 1 : qi) : (answered ? 1 : 0)} acertos</div>
+                       </>
+                   )}
+                   {!session?.show_feedback && (
+                       <div className="text-gray-500 font-bold text-xs">Pontuação Oculta</div>
+                   )}
                 </div>
             </div>
 
@@ -420,15 +427,44 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                         />
                     </div>
                 ) : (
-                    <div className="rounded-2xl p-6 border text-center bg-[#8bc34a]/10 border-[#8bc34a]/30">
-                        <div className="text-5xl mb-3">✅</div>
-                        <p className="text-2xl font-black mb-1 text-[#8bc34a]">
-                            Resposta registrada!
+                    <div className={`rounded-2xl p-6 border text-center transition-all duration-500 ${session?.show_feedback 
+                        ? (wasCorrect ? 'bg-emerald-500/20 border-emerald-500/40' : 'bg-red-500/20 border-red-500/40')
+                        : 'bg-[#8bc34a]/10 border-[#8bc34a]/30'}`}>
+                        
+                        <div className="text-5xl mb-3">
+                            {session?.show_feedback ? (wasCorrect ? '✅' : '❌') : '⌛'}
+                        </div>
+                        
+                        <p className={`text-2xl font-black mb-1 ${session?.show_feedback 
+                            ? (wasCorrect ? 'text-emerald-400' : 'text-red-400') 
+                            : 'text-[#8bc34a]'}`}>
+                            {session?.show_feedback 
+                                ? (wasCorrect ? 'Você Acertou!' : 'Não foi dessa vez...') 
+                                : 'Resposta registrada!'}
                         </p>
-                        <CheckCircle size={20} className="text-[#8bc34a] mx-auto" />
-                        <p className="text-gray-400 text-sm mt-3">
-                            Aguardando o professor liberar a próxima etapa...
-                        </p>
+
+                        {session?.show_feedback && (
+                            <div className="mt-2 flex flex-col gap-1">
+                                <p className="text-white font-bold text-lg">
+                                    {wasCorrect ? `+${pointsEarned} pontos` : '0 pontos'}
+                                </p>
+                                <p className="text-gray-400 text-sm">
+                                    A resposta correta era: <span className="text-white font-bold">{questions[qi].options ? questions[qi].options[Number(questions[qi].correct)] : questions[qi].correct}</span>
+                                </p>
+                                <div className="mt-4 p-3 bg-black/40 rounded-xl border border-white/5 text-sm text-gray-300 italic">
+                                    <MathText text={questions[qi].res} />
+                                </div>
+                            </div>
+                        )}
+
+                        {!session?.show_feedback && (
+                            <>
+                                <CheckCircle size={20} className="text-[#8bc34a] mx-auto" />
+                                <p className="text-gray-400 text-sm mt-3">
+                                    Aguardando o professor liberar o gabarito...
+                                </p>
+                            </>
+                        )}
                     </div>
                 )}
 
@@ -479,7 +515,7 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                         <h3 className="text-[#8bc34a] font-bold text-sm mb-3 flex items-center gap-2">
                             <Trophy size={14} /> Sua Posição (Tempo Esgotado)
                         </h3>
-                        <LiveLeaderboard participants={participants} myName={studentName} onlyMe compact currentQuestionIndex={session?.current_question_index} />
+                        <LiveLeaderboard participants={participants} myName={studentName} onlyMe compact currentQuestionIndex={session?.current_question_index} showFeedback={session?.show_feedback} />
                     </div>
                 )}
             </div>
