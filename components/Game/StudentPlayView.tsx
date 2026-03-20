@@ -339,7 +339,7 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                     <h3 className="text-[#8bc34a] font-bold text-lg mb-4 flex items-center gap-2 justify-center">
                         <Trophy size={18} /> Ranking Final
                     </h3>
-                    <LiveLeaderboard participants={participants.filter(p => p.status === 'approved')} myName={studentName} currentQuestionIndex={session?.current_question_index} showFeedback={true} />
+                    <LiveLeaderboard participants={participants.filter(p => p.status === 'approved')} myName={studentName} currentQuestionIndex={session?.current_question_index} showFeedback={true} gameMode={session?.game_mode} />
                 </div>
 
                 <button onClick={handleLeaveSession}
@@ -404,6 +404,28 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
             </div>
 
             <div className="flex-1 max-w-2xl mx-auto w-full px-4 py-6 flex flex-col gap-4">
+                {/* Info do Grupo (se houver) */}
+                {session?.game_mode === 'group' && myParticipant?.group_id && (
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-2 animation-fade-in shadow-lg">
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center text-black font-black text-xs shadow-md">
+                                {myParticipant.group_name?.split(' ')[1] || '?'}
+                            </div>
+                            <div>
+                                <h4 className="text-amber-400 font-black text-sm uppercase tracking-wider leading-none">{myParticipant.group_name}</h4>
+                                <p className="text-[10px] text-gray-500 font-bold mt-1">Sua Equipe (Média de pontos de todos)</p>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {participants.filter(p => p.group_id === myParticipant.group_id).map(p => (
+                                <span key={p.id} className={`text-[10px] px-2 py-1 rounded-md font-bold transition-all ${p.id === myParticipant.id ? 'bg-[#8bc34a]/30 text-[#8bc34a]' : 'bg-white/5 text-gray-400'}`}>
+                                    {p.student_name}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Banner */}
                 <div className="h-28 rounded-2xl flex items-center justify-center text-6xl shadow-xl border border-[#8bc34a]/20"
                     style={{ background: q.banner }}>
@@ -515,7 +537,7 @@ export const StudentPlayView: React.FC<StudentPlayViewProps> = ({ sessionId, pre
                         <h3 className="text-[#8bc34a] font-bold text-sm mb-3 flex items-center gap-2">
                             <Trophy size={14} /> Sua Posição (Tempo Esgotado)
                         </h3>
-                        <LiveLeaderboard participants={participants} myName={studentName} onlyMe compact currentQuestionIndex={session?.current_question_index} showFeedback={session?.show_feedback} />
+                        <LiveLeaderboard participants={participants} myName={studentName} onlyMe compact currentQuestionIndex={session?.current_question_index} showFeedback={session?.show_feedback} gameMode={session?.game_mode} />
                     </div>
                 )}
             </div>

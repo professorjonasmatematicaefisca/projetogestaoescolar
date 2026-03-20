@@ -8,7 +8,9 @@ export interface GameSession {
     question_start_time: string | null;
     teacher_id: string | null;
     teacher_name: string | null;
-    show_feedback?: boolean; // Nova flag
+    show_feedback?: boolean;
+    game_mode?: 'individual' | 'group';
+    group_size?: number;
     created_at: string;
     updated_at: string;
 }
@@ -22,6 +24,8 @@ export interface GameParticipant {
     answered_current: boolean;
     last_seen: string;
     status: 'pending' | 'approved' | 'rejected';
+    group_id?: string | null;
+    group_name?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -40,6 +44,8 @@ interface UseGameSessionReturn {
     approveParticipant: (id: string) => Promise<void>;
     rejectParticipant: (id: string) => Promise<void>;
     toggleFeedback: (show: boolean) => Promise<void>;
+    setGameMode: (mode: 'individual' | 'group', size?: number) => Promise<void>;
+    assignGroups: (size: number) => Promise<void>;
     // Student actions
     joinSession: (sessionId: string, studentName: string) => Promise<GameParticipant | null>;
     submitAnswer: (isCorrect: boolean, pointsEarned: number) => Promise<void>;
@@ -255,6 +261,47 @@ export function useGameSession(
             .eq('id', session.id);
     };
 
+    const setGameMode = async (mode: 'individual' | 'group', size: number = 0) => {
+        if (!session) return;
+        await supabase
+            .from('game_sessions')
+            .update({ game_mode: mode, group_size: size })
+            .eq('id', session.id);
+
+        if (mode === 'individual') {
+            // Limpa grupos se voltar para individual
+            await supabase
+                .from('game_participants')
+                .update({ group_id: null, group_name: null })
+                .eq('session_id', session.id);
+        }
+    };
+
+    const assignGroups = async (size: number) => {
+        if (!session) return;
+
+        // 1. Pega alunos aprovados
+        const approved = participants.filter(p => p.status === 'approved');
+        if (approved.length === 0) return;
+
+        // 2. Embaralha
+        const shuffled = [...approved].sort(() => Math.random() - 0.5);
+
+        // 3. Atribui grupos
+        // Usamos um loop simples para atualizar cada um
+        for (let i = 0; i < shuffled.length; i++) {
+            const p = shuffled[i];
+            const groupNum = Math.floor(i / size) + 1;
+            const gId = `group_${groupNum}`;
+            const gName = `Grupo ${groupNum}`;
+
+            await supabase
+                .from('game_participants')
+                .update({ group_id: gId, group_name: gName })
+                .eq('id', p.id);
+        }
+    };
+
     // ─── Ações do Aluno ───
 
     const joinSession = async (sid: string, studentName: string): Promise<GameParticipant | null> => {
@@ -284,6 +331,7 @@ export function useGameSession(
 
     return {
         session, participants, myParticipant, timeLeft, loading, error,
-        createSession, startNextQuestion, finishGame, approveParticipant, rejectParticipant, toggleFeedback, joinSession, submitAnswer,
+        createSession, startNextQuestion, finishGame, approveParticipant, rejectParticipant, toggleFeedback, 
+        setGameMode, assignGroups, joinSession, submitAnswer,
     };
 }

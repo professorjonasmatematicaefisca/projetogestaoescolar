@@ -16,7 +16,7 @@ type TabId = 'controle' | 'questao' | 'ranking';
 export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
     teacherName, sessionId, onCreateSession,
 }) => {
-    const { session, participants, timeLeft, loading, startNextQuestion, finishGame, approveParticipant, rejectParticipant, toggleFeedback } =
+    const { session, participants, timeLeft, loading, startNextQuestion, finishGame, approveParticipant, rejectParticipant, toggleFeedback, setGameMode, assignGroups } =
         useGameSession(sessionId, null);
     const [confirming, setConfirming] = useState(false);
     const [tab, setTab] = useState<TabId>('controle');
@@ -118,6 +118,49 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
             {/* ─── ABA CONTROLE ─── */}
             {tab === 'controle' && (
                 <div className="flex flex-col gap-4">
+                    {/* Modo em Grupo (visível antes do início se > 10 alunos) */}
+                    {session?.status === 'active' && qi < 0 && approvedParticipants.length > 10 && (
+                        <div className="bg-black/40 border border-[#8bc34a]/20 rounded-2xl p-5">
+                            <div className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-3">Configurações da Partida (Modo de Jogo)</div>
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={() => setGameMode('individual')}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold border transition ${session.game_mode !== 'group' ? 'bg-[#8bc34a] text-black border-[#8bc34a]' : 'text-gray-400 border-white/10 hover:bg-white/5'}`}>
+                                        Individual
+                                    </button>
+                                    <button
+                                        onClick={() => setGameMode('group', 3)}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold border transition ${session.game_mode === 'group' ? 'bg-[#8bc34a] text-black border-[#8bc34a]' : 'text-gray-400 border-white/10 hover:bg-white/5'}`}>
+                                        <Users size={18} /> Em Grupo
+                                    </button>
+                                </div>
+
+                                {session.game_mode === 'group' && (
+                                    <div className="p-4 bg-white/5 rounded-xl border border-white/10 animation-fade-in">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="text-sm font-bold text-gray-300">Tamanho dos Grupos:</span>
+                                            <select
+                                                value={session.group_size}
+                                                onChange={(e) => setGameMode('group', Number(e.target.value))}
+                                                className="bg-black/50 border border-white/20 rounded-lg px-3 py-1.5 text-[#8bc34a] font-bold outline-none focus:border-[#8bc34a]">
+                                                {[3, 4, 5, 6].map(v => <option key={v} value={v}>{v} Alunos</option>)}
+                                            </select>
+                                        </div>
+                                        <button
+                                            onClick={() => assignGroups(session.group_size || 3)}
+                                            className="w-full py-3 bg-amber-500/20 text-amber-500 border border-amber-500/30 rounded-xl font-black hover:bg-amber-500/30 transition flex items-center justify-center gap-2">
+                                            <Users size={18} /> Sortear Equipes Aleatoriamente
+                                        </button>
+                                        {approvedParticipants.some(p => p.group_id) && (
+                                            <p className="text-center text-[10px] text-emerald-400 font-bold mt-2 uppercase tracking-tighter">Equipes Sorteadas! ✓</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Timer (apenas quando ativo) */}
                     {session?.status === 'active' && qi >= 0 && (
                         <div className="bg-black/40 border border-[#8bc34a]/20 rounded-2xl p-5 flex flex-col gap-3">
@@ -276,7 +319,7 @@ export const TeacherControlPanel: React.FC<TeacherControlPanelProps> = ({
                         <h3 className="text-white font-black">Ranking Ao Vivo</h3>
                         <span className="ml-auto text-xs text-gray-500">{approvedParticipants.length} participante(s)</span>
                     </div>
-                    <LiveLeaderboard participants={approvedParticipants} currentQuestionIndex={session?.current_question_index} showFeedback={session?.show_feedback} />
+                    <LiveLeaderboard participants={approvedParticipants} currentQuestionIndex={session?.current_question_index} showFeedback={session?.show_feedback} gameMode={session?.game_mode} />
                 </div>
             )}
         </div>

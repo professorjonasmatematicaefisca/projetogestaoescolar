@@ -10,6 +10,7 @@ interface LiveLeaderboardProps {
     onlyMe?: boolean;
     currentQuestionIndex?: number;
     showFeedback?: boolean;
+    gameMode?: 'individual' | 'group';
 }
 
 function getInitials(name: string): string {
@@ -95,14 +96,72 @@ const ParticipantRow: React.FC<{
     );
 };
 
-export const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({ participants, myName, compact, onlyMe, currentQuestionIndex, showFeedback }) => {
+export const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({ participants, myName, compact, onlyMe, currentQuestionIndex, showFeedback, gameMode }) => {
     const sorted = [...participants].sort((a, b) => b.score - a.score);
 
     if (participants.length === 0) {
         return <div className="text-center text-gray-500 py-6 text-sm">Nenhum participante ainda...</div>;
     }
 
-    // Modo aluno — só mostra o próprio aluno com sua posição
+    // Lógica de Modo em Grupo
+    if (gameMode === 'group') {
+        const groups: Record<string, { id: string; name: string; totalScore: number; count: number; members: string[] }> = {};
+
+        participants.forEach(p => {
+            const gId = p.group_id || 'sem_grupo';
+            const gName = p.group_name || 'Sem Grupo';
+            if (!groups[gId]) {
+                groups[gId] = { id: gId, name: gName, totalScore: 0, count: 0, members: [] };
+            }
+            groups[gId].totalScore += p.score;
+            groups[gId].count += 1;
+            groups[gId].members.push(p.student_name);
+        });
+
+        const groupList = Object.values(groups).map(g => ({
+            id: g.id,
+            name: g.name,
+            score: Math.round(g.totalScore / g.count),
+            members: g.members,
+            isMe: g.members.some(m => m === myName)
+        })).sort((a, b) => b.score - a.score);
+
+        // Se onlyMe, filtramos apenas o grupo do aluno
+        const displayGroups = onlyMe && myName 
+            ? groupList.filter(g => g.isMe) 
+            : (compact ? groupList.slice(0, 5) : groupList);
+
+        return (
+            <div className="w-full space-y-3">
+                {displayGroups.map((g, i) => (
+                    <div key={g.id} className={`p-4 rounded-xl border transition-all duration-500 animation-fade-in ${g.isMe ? 'bg-[#8bc34a]/10 border-[#8bc34a]/30 shadow-[0_4px_20px_rgba(139,195,74,0.1)]' : 'bg-white/5 border-white/5'}`}>
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                                <span className="font-black text-xl text-amber-500 w-6">
+                                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                                </span>
+                                <span className="font-black text-white">{g.name}</span>
+                                {g.isMe && <span className="text-[10px] bg-[#8bc34a]/20 text-[#8bc34a] px-1.5 py-0.5 rounded font-bold uppercase">Sua Equipe</span>}
+                            </div>
+                            <div className="text-right">
+                                <span className="text-[#8bc34a] font-black text-lg">{(showFeedback || !myName) ? `${g.score} pts` : '??? pts'}</span>
+                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">Média do Grupo</p>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5">
+                            {g.members.map(m => (
+                                <span key={m} className={`text-[10px] px-2 py-0.5 rounded font-bold ${m === myName ? 'text-[#8bc34a]' : 'text-gray-400'}`}>
+                                    {m}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    // Modo Aluno Individual
     if (onlyMe && myName) {
         const myRank = sorted.findIndex(p => p.student_name === myName);
         const me = sorted[myRank];
