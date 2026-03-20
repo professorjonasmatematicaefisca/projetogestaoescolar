@@ -68,7 +68,7 @@ export function useGameSession(
     const skewOffsetRef = useRef<number>(0);
     const lastQuestionIndexRef = useRef<number>(-100);
 
-    // Calcula o tempo restante compensando o fuso horário (clock skew) entre professor e alunos
+    // Calcula o tempo restante baseado no timestamp do servidor/professor
     const recalcTimer = useCallback((questionStartTime: string | null, status: string, questionIndex: number) => {
         if (timerRef.current) clearInterval(timerRef.current);
         if (!questionStartTime || status !== 'active' || questionIndex < 0) {
@@ -76,22 +76,26 @@ export function useGameSession(
             return;
         }
 
+        // Garante formato ISO/Z para consistência UTC
         const dateStr = questionStartTime.endsWith('Z') || questionStartTime.includes('+') || (questionStartTime.includes('-') && questionStartTime.lastIndexOf('-') > 10) 
             ? questionStartTime 
             : `${questionStartTime}Z`;
+            
         const startMs = new Date(dateStr).getTime();
 
-        if (questionIndex !== lastQuestionIndexRef.current) {
-            // Calcula o desvio entre Date.now() local e o tempo de início do professor
-            skewOffsetRef.current = Date.now() - startMs;
-            lastQuestionIndexRef.current = questionIndex;
-        }
-
         const tick = () => {
-            const adjustedStart = startMs + skewOffsetRef.current;
-            const elapsed = Math.floor((Date.now() - adjustedStart) / 1000);
-            setTimeLeft(Math.max(0, Math.min(QUESTION_DURATION, QUESTION_DURATION - elapsed)));
+            const now = Date.now();
+            const elapsed = Math.floor((now - startMs) / 1000);
+            const remaining = QUESTION_DURATION - elapsed;
+            
+            if (remaining <= 0) {
+                setTimeLeft(0);
+                if (timerRef.current) clearInterval(timerRef.current);
+            } else {
+                setTimeLeft(Math.min(QUESTION_DURATION, remaining));
+            }
         };
+
         tick();
         timerRef.current = setInterval(tick, 1000);
     }, []);
