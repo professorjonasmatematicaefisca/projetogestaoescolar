@@ -121,7 +121,8 @@ const generateMockHistory = (): ClassSession[] => {
             material: 1,
             activity,
             homework: Math.random() > 0.2 ? 1 : 0, // 80% chance done
-            participation: Math.random() > 0.5 ? 1 : 0
+            participation: Math.random() > 0.5 ? 1 : 0,
+            prontidao: 0
           },
           justifiedAbsence: false
         };
@@ -144,21 +145,26 @@ export const StorageService = {
     let grade = 10.0;
 
     // 2. Deductions
-    // Conversa (Talk): -2.5 per occurrence
-    grade -= (record.counters.talk * 2.5);
-
-    // Dormir (Sleep): -2.5 per occurrence
-    grade -= (record.counters.sleep * 2.5);
-
-    // Material: If 0 (missing), deduct 1.5
-    if (record.counters.material === 0) {
-      grade -= 1.5;
+    // Prontidão: -2.0 per occurrence (0-3)
+    if (record.counters.prontidao && record.counters.prontidao > 0) {
+      grade -= (record.counters.prontidao * 2.0);
     }
 
-    // Atividade (Activity): Starts at 3. Deduct 2.0 per tick lost.
+    // Conversa (Talk): -3.0 per occurrence
+    grade -= (record.counters.talk * 3.0);
+
+    // Dormir (Sleep): -3.0 per occurrence
+    grade -= (record.counters.sleep * 3.0);
+
+    // Material: If 0 (missing), deduct 2.5
+    if (record.counters.material === 0) {
+      grade -= 2.5;
+    }
+
+    // Atividade (Activity): Starts at 3. Deduct 2.5 per tick lost.
     const lostActivityLevels = 3 - record.counters.activity;
     if (lostActivityLevels > 0) {
-      grade -= (lostActivityLevels * 2.0);
+      grade -= (lostActivityLevels * 2.5);
     }
 
     // Tarefas (Homework): If 0 (missing), deduct 2.5
@@ -166,8 +172,8 @@ export const StorageService = {
       grade -= 2.5;
     }
 
-    // Banheiro (Bathroom): -2.5 per occurrence
-    grade -= (record.counters.bathroom * 2.5);
+    // Banheiro (Bathroom): -3.0 per occurrence
+    grade -= (record.counters.bathroom * 3.0);
 
     // Celular (Phone): If SIM (true), deduct 5.0
     if (record.phoneConfiscated) {

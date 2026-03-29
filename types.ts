@@ -67,6 +67,7 @@ export interface Counters {
   activity: number;
   homework: number; // New: 0 (No) or 1 (Yes)
   participation: number; // New: Total ticks (0-10)
+  prontidao: number; // New: 0-3, deducts 2 pts each occurrence
 }
 
 export interface SessionRecord {

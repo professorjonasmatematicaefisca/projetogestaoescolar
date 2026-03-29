@@ -349,7 +349,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 phoneConfiscated: false,
                 justifiedAbsence: false,
                 // Material starts at 1. Activity starts at 3. Homework starts at 1 (Done). Participation starts at 0.
-                counters: { talk: 0, bathroom: 0, sleep: 0, material: 1, activity: 3, homework: 1, participation: 0 },
+                counters: { talk: 0, bathroom: 0, sleep: 0, material: 1, activity: 3, homework: 1, participation: 0, prontidao: 0 },
                 photos: []
             })),
             generalNotes: '',
@@ -378,6 +378,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 newVal = Math.max(0, Math.min(1, newVal)); // 0 or 1 for Toggles
             } else if (type === 'activity' || type === 'talk' || type === 'bathroom' || type === 'sleep') {
                 newVal = Math.max(0, Math.min(3, newVal)); // 0 to 3 for Activity, Talk, Bathroom, Sleep
+            } else if (type === 'prontidao') {
+                newVal = Math.max(0, Math.min(3, newVal)); // 0 to 3 for Prontidão
             } else if (type === 'participation') {
                 newVal = Math.max(0, Math.min(10, newVal)); // 0 to 10 for Participation Ticks
             } else {
@@ -1131,6 +1133,15 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                             </div>
                                         )}
 
+                                        <CounterRow
+                                            label="Prontidão"
+                                            icon={() => <span style={{fontSize: '18px'}} title="Prontidão">✍️</span>}
+                                            value={record.counters.prontidao ?? 0}
+                                            max={3}
+                                            customColor={record.counters.prontidao > 0 ? 'text-yellow-400' : 'text-gray-500'}
+                                            onMinus={() => handleCounter(student.id, 'prontidao', -1)}
+                                            onPlus={() => handleCounter(student.id, 'prontidao', 1)}
+                                        />
                                         <CounterRow
                                             label="Conversa"
                                             icon={MessageSquare}

@@ -5,7 +5,7 @@ import { SupabaseService } from './services/supabaseService';
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar
 } from 'recharts';
-import { Mail, Calendar, GraduationCap, Eye, MoreHorizontal, TrendingUp, AlertCircle, CheckCircle2, Users, BarChart2, Download, Send, Filter } from 'lucide-react';
+import { Mail, Calendar, GraduationCap, Eye, MoreHorizontal, TrendingUp, AlertCircle, CheckCircle2, Users, BarChart2, Download, Send, Filter, Layers } from 'lucide-react';
 import { format, subDays, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { UserRole, Student, ClassSession, ClassRoom } from './types';
@@ -400,6 +400,138 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
         }
     };
 
+    const handleBulkPDF = async () => {
+        // Get list of students to export
+        const studentsToExport = studentFilterClass
+            ? students.filter(s => s.className === studentFilterClass)
+            : students;
+
+        if (studentsToExport.length === 0) {
+            onShowToast('Nenhum aluno encontrado para exportar.');
+            return;
+        }
+
+        onShowToast(`Gerando PDF para ${studentsToExport.length} alunos... Aguarde.`);
+
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const jsPDF = (await import('jspdf')).default;
+
+            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+            const imgWidth = 297;
+            let firstPage = true;
+
+            for (const student of studentsToExport) {
+                // Create a temporary div to render each student report
+                const container = document.createElement('div');
+                container.style.position = 'absolute';
+                container.style.left = '-9999px';
+                container.style.top = '0';
+                container.style.width = '1122px'; // ~A4 landscape at 96dpi
+                container.style.background = '#ffffff';
+                container.style.padding = '24px';
+                container.style.fontFamily = 'Inter, sans-serif';
+                document.body.appendChild(container);
+
+                const { chartData, avgGrade, totalClasses } = getStudentData(student.id);
+
+                const deductionRows = chartData.slice().reverse().map(d => {
+                    const r = d.record!;
+                    const ded: string[] = [];
+                    if (!r.present) {
+                        ded.push(r.justifiedAbsence ? 'Falta Justificada (5.0)' : 'Falta (0.0)');
+                    } else {
+                        if (r.counters.prontidao > 0) ded.push(`${r.counters.prontidao}x Prontidão (-${(r.counters.prontidao * 2.0).toFixed(1)})`);
+                        if (r.counters.talk > 0) ded.push(`${r.counters.talk}x Conversa (-${(r.counters.talk * 3.0).toFixed(1)})`);
+                        if (r.counters.bathroom > 0) ded.push(`${r.counters.bathroom}x Banheiro (-${(r.counters.bathroom * 3.0).toFixed(1)})`);
+                        if (r.counters.sleep > 0) ded.push(`${r.counters.sleep}x Sono (-${(r.counters.sleep * 3.0).toFixed(1)})`);
+                        if (r.counters.material === 0) ded.push('Sem Material (-2.5)');
+                        if (r.counters.homework === 0) ded.push('Sem Tarefa (-2.5)');
+                        if (r.counters.activity < 3) ded.push(`Ativ. Incompleta (-${((3 - r.counters.activity) * 2.5).toFixed(1)})`);
+                        if (r.phoneConfiscated) ded.push('Celular (-5.0)');
+                        if (r.counters.participation > 0) ded.push(`Participação (+${(r.counters.participation * 0.5).toFixed(1)})`);
+                    }
+                    return `<tr style="border-bottom:1px solid #e5e7eb">
+                        <td style="padding:6px 8px;color:#374151;font-size:11px">${format(new Date(d.fullDate), "dd/MM/yyyy")}</td>
+                        <td style="padding:6px 8px;color:#6b7280;font-size:11px">${d.teacherName || '—'}</td>
+                        <td style="padding:6px 8px;font-size:11px">${r.present ? '<span style="color:#10b981">✓ SIM</span>' : '<span style="color:#ef4444">✗ NÃO</span>'}</td>
+                        <td style="padding:6px 8px;font-size:11px;color:#ef4444">${ded.length > 0 ? ded.join(' | ') : '<span style="color:#9ca3af">Sem deduções</span>'}</td>
+                        <td style="padding:6px 8px;text-align:right;font-weight:bold;font-size:13px;color:${Number(d.aluno) >= 7 ? '#10b981' : '#ef4444'}">${d.aluno?.toFixed(1)}</td>
+                    </tr>`;
+                }).join('');
+
+                container.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #065f46;padding-bottom:8px;margin-bottom:16px">
+                    <div>
+                        <h1 style="font-size:20px;font-weight:bold;color:#065f46;margin:0">Relatório Individual do Aluno</h1>
+                        <p style="font-size:11px;color:#374151;margin:4px 0 0">Ano Letivo ${academicYear} &nbsp;|&nbsp; Período: ${startDate} a ${endDate}</p>
+                    </div>
+                    <span style="font-size:11px;color:#6b7280">EduControl PRO</span>
+                </div>
+                <div style="display:grid;grid-template-columns:200px 1fr;gap:16px">
+                    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;text-align:center">
+                        <img src="${student.photoUrl}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;margin:0 auto 8px;border:2px solid #10b981" />
+                        <h2 style="font-size:15px;font-weight:bold;color:#111827;margin:0 0 4px">${student.name}</h2>
+                        <p style="font-size:12px;color:#6b7280;margin:0 0 12px">${student.className}</p>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px">
+                                <p style="font-size:9px;color:#9ca3af;font-weight:bold;margin:0 0 2px">MÉDIA GERAL</p>
+                                <p style="font-size:22px;font-weight:bold;color:${Number(avgGrade) >= 7 ? '#10b981' : '#f97316'};margin:0">${avgGrade}</p>
+                            </div>
+                            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px">
+                                <p style="font-size:9px;color:#9ca3af;font-weight:bold;margin:0 0 2px">TOTAL AULAS</p>
+                                <p style="font-size:22px;font-weight:bold;color:#111827;margin:0">${totalClasses}</p>
+                            </div>
+                        </div>
+                        <div style="margin-top:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px;text-align:left">
+                            <p style="font-size:9px;color:#9ca3af;font-weight:bold;margin:0 0 6px">CRITÉRIOS</p>
+                            <p style="font-size:9px;color:#374151;margin:2px 0">✍️ Prontidão: -2,0/ocor.</p>
+                            <p style="font-size:9px;color:#374151;margin:2px 0">💬 Conversa: -3,0/ocor.</p>
+                            <p style="font-size:9px;color:#374151;margin:2px 0">🚽 Banheiro: -3,0/saída</p>
+                            <p style="font-size:9px;color:#374151;margin:2px 0">😴 Dormir: -3,0/ocor.</p>
+                            <p style="font-size:9px;color:#374151;margin:2px 0">📚 Material: -2,5</p>
+                            <p style="font-size:9px;color:#374151;margin:2px 0">📝 Tarefa: -2,5</p>
+                            <p style="font-size:9px;color:#374151;margin:2px 0">⚡ Atividade: -2,5/nível</p>
+                            <p style="font-size:9px;color:#374151;margin:2px 0">📱 Celular: -5,0</p>
+                        </div>
+                    </div>
+                    <div style="overflow:auto">
+                        <h3 style="font-size:14px;font-weight:bold;color:#111827;margin:0 0 10px">Histórico Detalhado</h3>
+                        <table style="width:100%;border-collapse:collapse;font-family:Inter,sans-serif">
+                            <thead style="background:#f3f4f6">
+                                <tr>
+                                    <th style="padding:6px 8px;font-size:10px;color:#6b7280;text-align:left;font-weight:bold">DATA</th>
+                                    <th style="padding:6px 8px;font-size:10px;color:#6b7280;text-align:left;font-weight:bold">PROFESSOR</th>
+                                    <th style="padding:6px 8px;font-size:10px;color:#6b7280;text-align:left;font-weight:bold">PRESENÇA</th>
+                                    <th style="padding:6px 8px;font-size:10px;color:#6b7280;text-align:left;font-weight:bold">OCORRÊNCIAS</th>
+                                    <th style="padding:6px 8px;font-size:10px;color:#6b7280;text-align:right;font-weight:bold">NOTA</th>
+                                </tr>
+                            </thead>
+                            <tbody>${deductionRows || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#9ca3af">Nenhum registro no período.</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+
+                await new Promise(res => setTimeout(res, 50));
+                const canvas = await html2canvas(container, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
+                document.body.removeChild(container);
+
+                const imgData = canvas.toDataURL('image/png');
+                if (!firstPage) pdf.addPage();
+                const pageWidth = 297;
+                const pageHeight = (canvas.height * pageWidth) / canvas.width;
+                pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, Math.min(pageHeight, 210));
+                firstPage = false;
+            }
+
+            pdf.save(`Relatorio_Turma_${studentFilterClass || 'Todos'}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
+            onShowToast(`PDF gerado com ${studentsToExport.length} relatórios!`);
+        } catch (error) {
+            console.error('Bulk PDF Error:', error);
+            onShowToast('Erro ao gerar PDF em massa.');
+        }
+    };
+
     const handleSendEmail = () => {
         if (currentUserRole !== UserRole.COORDINATOR) return;
         onShowToast("E-mail enviado ao responsável com sucesso!");
@@ -440,6 +572,17 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                         <Download size={14} />
                         PDF
                     </button>
+
+                    {reportType === 'STUDENT' && (
+                        <button
+                            onClick={handleBulkPDF}
+                            className="flex items-center gap-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-200 transition-colors"
+                            title="Exportar relatório individual de todos os alunos da turma em um PDF"
+                        >
+                            <Layers size={14} />
+                            Exportar Todos (PDF)
+                        </button>
+                    )}
 
                     {reportType === 'STUDENT' && currentUserRole === UserRole.COORDINATOR && (
                         <button
@@ -594,11 +737,13 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                             <AlertCircle size={16} className="text-emerald-500" /> Critérios de Avaliação
                         </h3>
                         <div className="space-y-3">
-                            <CriteriaRow label="Banheiro" desc="-2,5 por saída" val="Sem teto" />
-                            <CriteriaRow label="Dormir" desc="-2,5 por ocorrência" val="Sem teto" />
-                            <CriteriaRow label="Material" desc="Sem material (Sim/Não)" val="-1,5" />
+                            <CriteriaRow label="Prontidão" desc="-2,0 por ocorrência" val="até -6,0" />
+                            <CriteriaRow label="Conversa" desc="-3,0 por ocorrência" val="até -9,0" />
+                            <CriteriaRow label="Banheiro" desc="-3,0 por saída" val="Sem teto" />
+                            <CriteriaRow label="Dormir" desc="-3,0 por ocorrência" val="Sem teto" />
+                            <CriteriaRow label="Material" desc="Sem material (Sim/Não)" val="-2,5" />
                             <CriteriaRow label="Tarefas" desc="Não fez (Sim/Não)" val="-2,5" />
-                            <CriteriaRow label="Atividade" desc="-2,0 por nível perdido (0-3)" val="até -6,0" />
+                            <CriteriaRow label="Atividade" desc="-2,5 por nível perdido (0-3)" val="até -7,5" />
                             <CriteriaRow label="Celular" desc="Uso não autorizado" val="-5,0" />
                         </div>
                     </div>
@@ -681,12 +826,13 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                                 if (!r.present) {
                                                     deductions.push(r.justifiedAbsence ? "Falta Justificada (Nota 5.0)" : "Falta (Nota 0.0)");
                                                 } else {
-                                                    if (r.counters.talk > 0) deductions.push(`${r.counters.talk}x Conversa (-${(r.counters.talk * 2.5).toFixed(1)})`);
-                                                    if (r.counters.bathroom > 0) deductions.push(`${r.counters.bathroom}x Banheiro (-${(r.counters.bathroom * 2.5).toFixed(1)})`);
-                                                    if (r.counters.sleep > 0) deductions.push(`${r.counters.sleep}x Sono (-${(r.counters.sleep * 2.5).toFixed(1)})`);
-                                                    if (r.counters.material === 0) deductions.push(`Sem Material (-1.5)`);
+                                                    if ((r.counters.prontidao || 0) > 0) deductions.push(`${r.counters.prontidao}x Prontidão (-${(r.counters.prontidao * 2.0).toFixed(1)})`);
+                                                    if (r.counters.talk > 0) deductions.push(`${r.counters.talk}x Conversa (-${(r.counters.talk * 3.0).toFixed(1)})`);
+                                                    if (r.counters.bathroom > 0) deductions.push(`${r.counters.bathroom}x Banheiro (-${(r.counters.bathroom * 3.0).toFixed(1)})`);
+                                                    if (r.counters.sleep > 0) deductions.push(`${r.counters.sleep}x Sono (-${(r.counters.sleep * 3.0).toFixed(1)})`);
+                                                    if (r.counters.material === 0) deductions.push(`Sem Material (-2.5)`);
                                                     if (r.counters.homework === 0) deductions.push(`Sem Tarefa (-2.5)`);
-                                                    if (r.counters.activity < 3) deductions.push(`Ativ. Incompleta (-${((3 - r.counters.activity) * 2.0).toFixed(1)})`);
+                                                    if (r.counters.activity < 3) deductions.push(`Ativ. Incompleta (-${((3 - r.counters.activity) * 2.5).toFixed(1)})`);
                                                     if (r.phoneConfiscated) deductions.push(`Celular (-5.0)`);
                                                     if (r.counters.participation > 0) deductions.push(`Participação (+${(r.counters.participation * 0.5).toFixed(1)})`);
                                                 }
