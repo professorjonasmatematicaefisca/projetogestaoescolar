@@ -586,7 +586,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 generalNotes: contentStr,
                 homework: classHomework,
                 photos: classPhotos,
-                moduleIds: selectedContentIds
+                moduleIds: selectedContentIds.filter(id => !id.startsWith('generic-'))
             };
             setSession(updatedSession);
             const result = await SupabaseService.saveSession(updatedSession, userEmail);
@@ -890,7 +890,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 ...session,
                 block: compositeBlock,
                 blocksCount: selectedBlocks.length,
-                moduleIds: selectedContentIds, // Sync with the latest selection logic
+                moduleIds: selectedContentIds.filter(id => !id.startsWith('generic-')), // Filter generic IDs to avoid UUID errors in DB
                 topic: derivedTopic,
                 generalNotes: classGeneralNotes,
                 homework: classHomework,
