@@ -500,7 +500,41 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 if (chapterComparison !== 0) return chapterComparison;
                 return String(a.module).localeCompare(String(b.module), undefined, { numeric: true });
             });
-            setContentModules(sorted);
+
+            const genericModules: PlanningModule[] = [
+                {
+                    id: 'generic-revisao',
+                    disciplineId: discObj?.id || 'generic',
+                    front: 'Geral',
+                    chapter: '-',
+                    module: '-',
+                    title: 'Revisão - Prova',
+                    topic: 'Revisão',
+                    bimestre: 1
+                },
+                {
+                    id: 'generic-resolucao',
+                    disciplineId: discObj?.id || 'generic',
+                    front: 'Geral',
+                    chapter: '-',
+                    module: '-',
+                    title: 'Resolução de exercícios',
+                    topic: 'Exercícios',
+                    bimestre: 1
+                },
+                {
+                    id: 'generic-correcao',
+                    disciplineId: discObj?.id || 'generic',
+                    front: 'Geral',
+                    chapter: '-',
+                    module: '-',
+                    title: 'Correção de Prova',
+                    topic: 'Correção',
+                    bimestre: 1
+                }
+            ];
+
+            setContentModules([...sorted, ...genericModules]);
         } catch (err) {
             console.error('Error loading planning modules:', err);
         }
@@ -523,7 +557,13 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         const parts: string[] = [];
         selectedContentIds.forEach(id => {
             const mod = contentModules.find(m => m.id === id);
-            if (mod) parts.push(`Cap. ${mod.chapter} — Mod. ${mod.module} — ${mod.title}`);
+            if (mod) {
+                if (id.startsWith('generic-')) {
+                    parts.push(mod.title);
+                } else {
+                    parts.push(`Cap. ${mod.chapter} — Mod. ${mod.module} — ${mod.title}`);
+                }
+            }
         });
         if (classTopic.trim()) parts.push(classTopic.trim());
         return parts.join(' | ');
@@ -555,7 +595,10 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 if (selectedContentIds.length > 0) {
                     const classObj = allClasses.find(c => normalize(c.name) === normalize(selectedClassId));
                     if (classObj) {
-                        await SupabaseService.markModulesAsUsed(selectedContentIds, classObj.id);
+                        const realModuleIds = selectedContentIds.filter(id => !id.startsWith('generic-'));
+                        if (realModuleIds.length > 0) {
+                            await SupabaseService.markModulesAsUsed(realModuleIds, classObj.id);
+                        }
                         // Reload modules so they disappear from the list immediately
                         await loadContentModules();
                     }
@@ -840,7 +883,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
             // Generate the topic string automatically from selected modules
             const derivedTopic = selectedContentIds.map(id => {
                 const mod = contentModules.find(m => m.id === id);
-                return mod ? `Cap. ${mod.chapter} - Mod. ${mod.module} - ${mod.title}` : '';
+                return mod ? (id.startsWith('generic-') ? mod.title : `Cap. ${mod.chapter} - Mod. ${mod.module} - ${mod.title}`) : '';
             }).filter(Boolean).join('; ');
 
             const updatedSession: ClassSession = {
@@ -1401,7 +1444,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                                                 }`}
                                                         >
                                                             {selectedContentIds.includes(mod.id) ? <Check size={12} /> : <Tag size={12} />}
-                                                            Cap. {mod.chapter} — Mod. {mod.module} — {mod.title}
+                                                            {mod.id.startsWith('generic-') ? mod.title : `Cap. ${mod.chapter} — Mod. ${mod.module} — ${mod.title}`}
                                                         </button>
                                                     ))}
                                                 </div>
@@ -1419,7 +1462,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                                             return mod ? (
                                                                 <span key={id} className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-lg px-2 py-1 text-[10px] font-bold">
                                                                     <Check size={10} />
-                                                                    Cap. {mod.chapter} — Mod. {mod.module} — {mod.title}
+                                                                    {id.startsWith('generic-') ? mod.title : `Cap. ${mod.chapter} — Mod. ${mod.module} — ${mod.title}`}
                                                                     <button onClick={() => toggleContentModule(id)} className="ml-1 hover:text-red-400"><X size={10} /></button>
                                                                 </span>
                                                             ) : null;
@@ -1434,7 +1477,7 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                                         const mod = contentModules.find(m => m.id === id);
                                                         return mod ? (
                                                             <div key={id} className="mb-1">
-                                                                {index + 1}. Cap. {mod.chapter} — Razão e proporção — Mod. {mod.module} — {mod.title}
+                                                                {index + 1}. {id.startsWith('generic-') ? mod.title : `Cap. ${mod.chapter} — ${allDisciplines.find(d => d.name === selectedSubject)?.displayName || selectedSubject} — Mod. ${mod.module} — ${mod.title}`}
                                                             </div>
                                                         ) : null;
                                                     })
