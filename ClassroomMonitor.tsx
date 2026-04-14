@@ -94,12 +94,19 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
     // --- Modal State for History (Load Previous) ---
     const [historyModalOpen, setHistoryModalOpen] = useState(false);
     const [historySessions, setHistorySessions] = useState<ClassSession[]>([]);
+    const [expandedHistoryGroups, setExpandedHistoryGroups] = useState<Set<string>>(new Set());
+
+    // --- Blocked Time Slots ---
+    const [blockedSlots, setBlockedSlots] = useState<string[]>([]);
 
     // --- Unsaved Changes State ---
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
     // Ref to skip the useEffect fetch when session was loaded directly
     const skipNextFetchRef = useRef(false);
+
+    // Draft persistence key
+    const DRAFT_KEY = 'educontrol_classroom_draft';
 
     // Close time dropdown on click outside
     useEffect(() => {
@@ -249,6 +256,28 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 // Clear current session while fetching to avoid showing old data
                 setSession(null);
 
+                // Buscar todos os registros do dia para esta turma (para bloquear horários)
+                const allSessionsForDay = await SupabaseService.getSessions();
+                const todaySessions = allSessionsForDay.filter(s =>
+                    s.className === selectedClassId &&
+                    s.teacherId === selectedTeacherId &&
+                    s.date.split('T')[0] === selectedDate
+                );
+
+                // Coletar os blocos já usados neste dia
+                const usedBlocks: string[] = [];
+                todaySessions.forEach(s => {
+                    // O bloco pode ser composto (ex: "07h00 - 08h30 (2 aulas)")
+                    // Vamos tentar descobrir os blocos individuais usados
+                    availableBlocks.forEach(b => {
+                        const blockStart = b.split(' - ')[0];
+                        if (s.block && s.block.includes(blockStart)) {
+                            usedBlocks.push(b);
+                        }
+                    });
+                });
+                setBlockedSlots(usedBlocks);
+
                 const existingSession = await SupabaseService.findSession({
                     date: selectedDate,
                     className: selectedClassId,
@@ -283,14 +312,37 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                     } else if (existingSession.block && availableBlocks.includes(existingSession.block)) {
                         setSelectedBlocks([existingSession.block]);
                     }
+                    // Limpar rascunho pois sessão já existe
+                    localStorage.removeItem(DRAFT_KEY);
                     onShowToast("Registro existente carregado para edição.");
                 } else {
+                    // Tentar restaurar rascunho salvo
+                    const savedDraft = localStorage.getItem(DRAFT_KEY);
+                    if (savedDraft) {
+                        try {
+                            const draft = JSON.parse(savedDraft);
+                            // Só restaurar se for para a mesma turma/disciplina/data
+                            if (draft.className === selectedClassId &&
+                                draft.subject === selectedSubject &&
+                                draft.date === selectedDate &&
+                                draft.teacherId === selectedTeacherId) {
+                                setSession(draft.session);
+                                setClassGeneralNotes(draft.generalNotes || '');
+                                setClassHomework(draft.homework || '');
+                                setSelectedContentIds(draft.contentIds || []);
+                                onShowToast("📋 Rascunho restaurado! Seus dados foram recuperados.");
+                                return;
+                            }
+                        } catch (e) {
+                            localStorage.removeItem(DRAFT_KEY);
+                        }
+                    }
                     initializeSession(filtered);
                 }
             };
             fetchExistingSession();
         }
-    }, [selectedClassId, selectedTeacherId, selectedSubject, selectedDate]); // Removed allStudents from deps to avoid excessive resets, filtered is derived here anyway
+    }, [selectedClassId, selectedTeacherId, selectedSubject, selectedDate]);
 
     // Sync Class Register State when session changes
     useEffect(() => {
@@ -364,8 +416,26 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         const newRecords = session.records.map(r =>
             r.studentId === studentId ? updater({ ...r }) : r
         );
-        setSession({ ...session, records: newRecords });
+        const updatedSession = { ...session, records: newRecords };
+        setSession(updatedSession);
         setHasUnsavedChanges(true); // Mark as dirty
+
+        // Salvar rascunho automaticamente
+        try {
+            const draft = {
+                className: selectedClassId,
+                subject: selectedSubject,
+                date: selectedDate,
+                teacherId: selectedTeacherId,
+                session: updatedSession,
+                generalNotes: classGeneralNotes,
+                homework: classHomework,
+                contentIds: selectedContentIds
+            };
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        } catch (e) {
+            // Ignorar erro de quota
+        }
     };
 
     const handleCounter = (studentId: string, type: keyof Counters, delta: number) => {
@@ -902,6 +972,8 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                 setSession(updatedSession);
                 onShowToast("Aula salva no Supabase com sucesso!");
                 setHasUnsavedChanges(false);
+                // Limpar rascunho após salvar com sucesso
+                localStorage.removeItem(DRAFT_KEY);
 
                 // Clear screen to start fresh as requested
                 setTimeout(() => {
@@ -986,18 +1058,34 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                             </button>
                             {isTimeDropdownOpen && (
                                 <div className="absolute top-full left-0 mt-1 w-64 bg-[#1e293b] border border-gray-700 rounded-lg shadow-xl z-50 p-2 max-h-64 overflow-y-auto">
-                                    {availableBlocks.map(block => (
+                                    {availableBlocks.map(block => {
+                                        const isBlocked = blockedSlots.includes(block) && !selectedBlocks.includes(block);
+                                        return (
                                         <div
                                             key={block}
-                                            onClick={() => toggleBlock(block)}
-                                            className={`flex items-center gap-2 p-2 rounded cursor-pointer text-sm ${selectedBlocks.includes(block) ? 'bg-emerald-500/20 text-emerald-400' : 'text-gray-300 hover:bg-gray-700'}`}
+                                            onClick={() => !isBlocked && toggleBlock(block)}
+                                            className={`flex items-center gap-2 p-2 rounded text-sm ${
+                                                isBlocked
+                                                    ? 'opacity-40 cursor-not-allowed bg-gray-800/50'
+                                                    : selectedBlocks.includes(block)
+                                                        ? 'bg-emerald-500/20 text-emerald-400 cursor-pointer'
+                                                        : 'text-gray-300 hover:bg-gray-700 cursor-pointer'
+                                            }`}
                                         >
-                                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${selectedBlocks.includes(block) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-500'}`}>
-                                                {selectedBlocks.includes(block) && <Check size={10} className="text-[#0f172a]" />}
+                                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                                                isBlocked
+                                                    ? 'border-red-500/50 bg-red-500/20'
+                                                    : selectedBlocks.includes(block)
+                                                        ? 'bg-emerald-500 border-emerald-500'
+                                                        : 'border-gray-500'
+                                            }`}>
+                                                {isBlocked ? <X size={10} className="text-red-400" /> : selectedBlocks.includes(block) && <Check size={10} className="text-[#0f172a]" />}
                                             </div>
-                                            {block}
+                                            <span className="flex-1">{block}</span>
+                                            {isBlocked && <span className="text-[9px] text-red-400 font-bold">OCUPADO</span>}
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
@@ -1613,66 +1701,88 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                     const classNames = Object.keys(grouped).sort();
 
                                     return (
-                                        <div className="space-y-4">
-                                            {classNames.map(className => (
+                                        <div className="space-y-3">
+                                            {classNames.map(className => {
+                                                const isExpanded = expandedHistoryGroups.has(className);
+                                                return (
                                                 <div key={className}>
-                                                    <div className="flex items-center gap-2 px-3 py-2 bg-[#0f172a] rounded-lg border border-gray-700 mb-2">
-                                                        <Users size={14} className="text-emerald-500" />
-                                                        <span className="font-bold text-emerald-400 text-sm uppercase tracking-wide">{className}</span>
-                                                        <span className="text-gray-500 text-xs ml-auto">{grouped[className].length} aula(s)</span>
-                                                    </div>
-                                                    <div className="space-y-2 pl-2">
-                                                        {grouped[className].map(sess => (
-                                                            <div
-                                                                key={sess.id}
-                                                                className="bg-[#0f172a] border border-gray-800 p-4 rounded-lg hover:border-emerald-500/50 transition-colors group flex items-center justify-between"
-                                                            >
+                                                    {/* Cabeçalho da turma com seta para expandir/recolher */}
+                                                    <button
+                                                        onClick={() => {
+                                                            setExpandedHistoryGroups(prev => {
+                                                                const next = new Set(prev);
+                                                                if (next.has(className)) next.delete(className);
+                                                                else next.add(className);
+                                                                return next;
+                                                            });
+                                                        }}
+                                                        className="w-full flex items-center gap-2 px-3 py-2.5 bg-[#0f172a] rounded-lg border border-gray-700 mb-1 hover:border-emerald-500/40 transition-colors"
+                                                    >
+                                                        <Users size={14} className="text-emerald-500 flex-shrink-0" />
+                                                        <span className="font-bold text-emerald-400 text-sm uppercase tracking-wide flex-1 text-left">{className}</span>
+                                                        <span className="text-gray-500 text-xs mr-2">{grouped[className].length} aula(s)</span>
+                                                        <ChevronDown
+                                                            size={16}
+                                                            className={`text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                                                        />
+                                                    </button>
+
+                                                    {/* Sessões da turma — só visíveis quando expandida */}
+                                                    {isExpanded && (
+                                                        <div className="space-y-2 pl-2 mb-2">
+                                                            {grouped[className].map(sess => (
                                                                 <div
-                                                                    className="flex flex-col gap-1 flex-1 cursor-pointer"
-                                                                    onClick={() => handleLoadSession(sess)}
+                                                                    key={sess.id}
+                                                                    className="bg-[#0f172a] border border-gray-800 p-4 rounded-lg hover:border-emerald-500/50 transition-colors group flex items-center justify-between"
                                                                 >
+                                                                    <div
+                                                                        className="flex flex-col gap-1 flex-1 cursor-pointer"
+                                                                        onClick={() => handleLoadSession(sess)}
+                                                                    >
+                                                                        <div className="flex items-center gap-2">
+                                                                            <Calendar size={14} className="text-emerald-500" />
+                                                                            <span className="font-bold text-white text-sm">
+                                                                                {format(new Date(sess.date), "dd 'de' MMMM, yyyy", { locale: ptBR })}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="flex gap-4 text-xs text-gray-400 ml-6">
+                                                                            <span>{sess.subject}</span>
+                                                                            <span>•</span>
+                                                                            <span>{sess.block}</span>
+                                                                        </div>
+                                                                        {sess.generalNotes && (
+                                                                            <p className="text-[10px] text-gray-500 ml-6 mt-1 truncate max-w-md">
+                                                                                "{sess.generalNotes}"
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
                                                                     <div className="flex items-center gap-2">
-                                                                        <Calendar size={14} className="text-emerald-500" />
-                                                                        <span className="font-bold text-white text-sm">
-                                                                            {format(new Date(sess.date), "dd 'de' MMMM, yyyy", { locale: ptBR })}
-                                                                        </span>
+                                                                        {userRole === UserRole.COORDINATOR ? (
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); handleDeleteSession(sess); }}
+                                                                                className="p-2 rounded-lg text-gray-600 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                                                                title="Excluir registro"
+                                                                            >
+                                                                                <Trash2 size={16} />
+                                                                            </button>
+                                                                        ) : (
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); handleRequestDeleteSession(sess); }}
+                                                                                className="p-2 rounded-lg text-gray-600 hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
+                                                                                title="Solicitar exclusão ao coordenador"
+                                                                            >
+                                                                                <Trash2 size={16} />
+                                                                            </button>
+                                                                        )}
+                                                                        <ArrowRight size={18} className="text-gray-600 group-hover:text-emerald-500 transition-colors" />
                                                                     </div>
-                                                                    <div className="flex gap-4 text-xs text-gray-400 ml-6">
-                                                                        <span>{sess.subject}</span>
-                                                                        <span>•</span>
-                                                                        <span>{sess.block}</span>
-                                                                    </div>
-                                                                    {sess.generalNotes && (
-                                                                        <p className="text-[10px] text-gray-500 ml-6 mt-1 truncate max-w-md">
-                                                                            "{sess.generalNotes}"
-                                                                        </p>
-                                                                    )}
                                                                 </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    {userRole === UserRole.COORDINATOR ? (
-                                                                        <button
-                                                                            onClick={(e) => { e.stopPropagation(); handleDeleteSession(sess); }}
-                                                                            className="p-2 rounded-lg text-gray-600 hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                                                                            title="Excluir registro"
-                                                                        >
-                                                                            <Trash2 size={16} />
-                                                                        </button>
-                                                                    ) : (
-                                                                        <button
-                                                                            onClick={(e) => { e.stopPropagation(); handleRequestDeleteSession(sess); }}
-                                                                            className="p-2 rounded-lg text-gray-600 hover:text-amber-500 hover:bg-amber-500/10 transition-colors"
-                                                                            title="Solicitar exclusão ao coordenador"
-                                                                        >
-                                                                            <Trash2 size={16} />
-                                                                        </button>
-                                                                    )}
-                                                                    <ArrowRight size={18} className="text-gray-600 group-hover:text-emerald-500 transition-colors" />
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     );
                                 })()}

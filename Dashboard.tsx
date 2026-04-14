@@ -8,6 +8,13 @@ import { SupabaseService } from './services/supabaseService';
 import { StorageService } from './services/storageService';
 import { ClassSession, ClassRoom } from './types';
 import { UserAvatar } from './components/UserAvatar';
+import { format, subDays, subMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+
+type FilterRange = 'SEMANAL' | 'MENSAL' | 'BIMESTRAL';
+
+// Datas dos Bimestres 2026
+const BIMESTRE_ATUAL_START = '2026-01-28';
+const BIMESTRE_ATUAL_END = '2026-04-17';
 
 interface DashboardProps {
     onNavigateToStudent?: (studentId: string) => void;
@@ -18,9 +25,10 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent, onNavigate, userRole }) => {
     const [sessions, setSessions] = React.useState<ClassSession[]>([]);
     const [classes, setClasses] = React.useState<ClassRoom[]>([]);
-    const [students, setStudents] = React.useState<any[]>([]); // Need students for risk analysis
+    const [students, setStudents] = React.useState<any[]>([]);
     const [pendingRequests, setPendingRequests] = React.useState(0);
     const [loading, setLoading] = React.useState(true);
+    const [filterRange, setFilterRange] = React.useState<FilterRange>('SEMANAL');
 
     React.useEffect(() => {
         const loadData = async () => {
@@ -49,7 +57,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent, onNav
 
     if (loading) return <div className="text-white p-6">Carregando painel...</div>;
 
-    // --- DATA CALCULATION ---
+    // --- FILTRO DE PERÍODO ---
+    const getFilteredSessions = (): ClassSession[] => {
+        const today = new Date();
+        let start: Date;
+        let end: Date = today;
+
+        if (filterRange === 'SEMANAL') {
+            start = startOfWeek(today, { weekStartsOn: 1 });
+            end = endOfWeek(today, { weekStartsOn: 1 });
+        } else if (filterRange === 'MENSAL') {
+            start = startOfMonth(today);
+            end = endOfMonth(today);
+        } else { // BIMESTRAL
+            start = new Date(BIMESTRE_ATUAL_START);
+            end = new Date(BIMESTRE_ATUAL_END);
+        }
+
+        const startStr = start.toISOString().split('T')[0];
+        const endStr = end.toISOString().split('T')[0];
+
+        return sessions.filter(s => {
+            const d = s.date.split('T')[0];
+            return d >= startStr && d <= endStr;
+        });
+    };
+
+    const filteredSessions = getFilteredSessions();
+
+    // --- DATA CALCULATION (usa sessões filtradas) ---
 
     // 1. School-wide Summary
     let totalGradeSum = 0;
@@ -57,7 +93,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent, onNav
     let totalPresent = 0;
     let totalRecords = 0;
 
-    sessions.forEach(sess => {
+    filteredSessions.forEach(sess => {
         sess.records.forEach(r => {
             totalGradeSum += StorageService.calculateGrade(r);
             totalGradeCount++;
@@ -69,9 +105,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent, onNav
     const schoolAvgGrade = totalGradeCount > 0 ? (totalGradeSum / totalGradeCount).toFixed(1) : '0.0';
     const schoolAttendanceRate = totalRecords > 0 ? ((totalPresent / totalRecords) * 100).toFixed(1) : '0.0';
 
-    // 2. Class-specific Stats for Insights
+    // 2. Class-specific Stats for Insights (usa sessões filtradas)
     const classStats = classes.map(cls => {
-        const clsSessions = sessions.filter(s => s.className === cls.name);
+        const clsSessions = filteredSessions.filter(s => s.className === cls.name);
         let cGradeSum = 0;
         let cCount = 0;
         clsSessions.forEach(s => {
@@ -84,10 +120,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent, onNav
         return { name: cls.name, avg };
     });
 
-    // 3. Mock Chart Data (Replacing specific class chart with global daily trend if needed, 
-    // but for now let's keep it simple or make it aggregate of last 5 days)
-    // We'll stick to a visual mock for the line chart to keep the UI clean as per request "Desempenho Analítico"
-    // 4. AIS Risk Analysis (Top 10 Students in Focus)
+    // 3. Gráfico de Presença vs Dispersão (últimos 5 dias com dados)
+    const last5DaysSessions = [...filteredSessions]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5)
+        .reverse();
+
+    const chartData = last5DaysSessions.length > 0
+        ? last5DaysSessions.map(sess => {
+            const totalR = sess.records.length || 1;
+            const presentCount = sess.records.filter(r => r.present).length;
+            const dispersao = sess.records.reduce((acc, r) => acc + r.counters.talk + r.counters.sleep, 0);
+            return {
+                name: format(new Date(sess.date), 'dd/MM'),
+                presenca: Math.round((presentCount / totalR) * 100),
+                dispersao: Math.min(100, Math.round((dispersao / totalR) * 10))
+            };
+        })
+        : [
+            { name: 'SEG', presenca: 95, dispersao: 10 },
+            { name: 'TER', presenca: 92, dispersao: 15 },
+            { name: 'QUA', presenca: 98, dispersao: 5 },
+            { name: 'QUI', presenca: 88, dispersao: 25 },
+            { name: 'SEX', presenca: 94, dispersao: 12 },
+        ];
+
+    // 4. Análise de Risco (usa TODAS as sessões para contexto histórico)
     const riskStudents = students.map(student => {
         let riskScore = 0;
         let gradeSum = 0;
@@ -128,16 +186,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent, onNav
             negativePoints
         };
     })
-        .sort((a, b) => b.riskScore - a.riskScore) // Sort by highest risk
-        .slice(0, 10); // Top 10
+        .sort((a, b) => b.riskScore - a.riskScore)
+        .slice(0, 10);
 
-    const chartData = [
-        { name: 'SEG', presenca: 95, dispersao: 10 },
-        { name: 'TER', presenca: 92, dispersao: 15 },
-        { name: 'QUA', presenca: 98, dispersao: 5 },
-        { name: 'QUI', presenca: 88, dispersao: 25 },
-        { name: 'SEX', presenca: 94, dispersao: 12 },
-    ];
+    // chartData já calculado acima com base nas sessões filtradas
 
     // --- INSIGHT LOGIC ---
     const renderInsights = () => {
@@ -227,9 +279,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent, onNav
                     <p className="text-gray-400 text-sm mt-1">Resumo Geral do Colégio</p>
                 </div>
                 <div className="flex bg-[#1e293b] p-1 rounded-lg border border-gray-700">
-                    <button className="px-4 py-1.5 text-xs font-bold bg-emerald-600 text-white rounded-md shadow-lg">SEMANAL</button>
-                    <button className="px-4 py-1.5 text-xs font-bold text-gray-400 hover:text-white transition-colors">MENSAL</button>
-                    <button className="px-4 py-1.5 text-xs font-bold text-gray-400 hover:text-white transition-colors">BIMESTRAL</button>
+                    {(['SEMANAL', 'MENSAL', 'BIMESTRAL'] as FilterRange[]).map(f => (
+                        <button
+                            key={f}
+                            onClick={() => setFilterRange(f)}
+                            className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
+                                filterRange === f
+                                    ? 'bg-emerald-600 text-white shadow-lg'
+                                    : 'text-gray-400 hover:text-white'
+                            }`}
+                        >
+                            {f}
+                        </button>
+                    ))}
                 </div>
             </div>
 

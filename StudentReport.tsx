@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { StorageService } from './services/storageService';
 import { SupabaseService } from './services/supabaseService';
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, BarChart, Bar
 } from 'recharts';
-import { Mail, Calendar, GraduationCap, Eye, MoreHorizontal, TrendingUp, AlertCircle, CheckCircle2, Users, BarChart2, Download, Send, Filter, Layers } from 'lucide-react';
+import { Mail, Calendar, GraduationCap, Eye, MoreHorizontal, TrendingUp, AlertCircle, CheckCircle2, Users, BarChart2, Download, Send, Filter, Layers, ClipboardList } from 'lucide-react';
 import { format, subDays, isWithinInterval, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { UserRole, Student, ClassSession, ClassRoom } from './types';
@@ -16,7 +15,7 @@ interface ReportProps {
     initialStudentId?: string;
 }
 
-type ReportType = 'STUDENT' | 'CLASS' | 'COMPARE';
+type ReportType = 'STUDENT' | 'CLASS' | 'COMPARE' | 'ABSENCES';
 
 export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserRole, initialStudentId }) => {
     const [reportType, setReportType] = useState<ReportType>('STUDENT');
@@ -91,19 +90,19 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 setEndDate(format(new Date(), 'yyyy-MM-dd'));
             }
         } else {
-            const year = academicYear;
+            // Datas reais dos bimestres 2026
             if (selectedBimestre === '1') {
-                setStartDate(`${year}-01-01`);
-                setEndDate(`${year}-04-30`);
+                setStartDate('2026-01-28');
+                setEndDate('2026-04-17');
             } else if (selectedBimestre === '2') {
-                setStartDate(`${year}-05-01`);
-                setEndDate(`${year}-06-30`);
+                setStartDate('2026-04-18');
+                setEndDate('2026-06-30');
             } else if (selectedBimestre === '3') {
-                setStartDate(`${year}-07-01`);
-                setEndDate(`${year}-09-30`);
+                setStartDate('2026-07-01');
+                setEndDate('2026-09-30');
             } else if (selectedBimestre === '4') {
-                setStartDate(`${year}-10-01`);
-                setEndDate(`${year}-12-31`);
+                setStartDate('2026-10-01');
+                setEndDate('2026-12-31');
             }
         }
     }, [academicYear, selectedBimestre]);
@@ -562,6 +561,12 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                     >
                         <BarChart2 size={14} /> Comparativo
                     </button>
+                    <button
+                        onClick={() => setReportType('ABSENCES')}
+                        className={`px-4 py-2 rounded-md text-xs font-bold transition-all flex items-center gap-2 ${reportType === 'ABSENCES' ? 'bg-red-500 text-white' : 'text-gray-600 hover:text-gray-800'}`}
+                    >
+                        <ClipboardList size={14} /> Frequência
+                    </button>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -699,9 +704,175 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                         </select>
                     </div>
                 )}
+
+                {reportType === 'ABSENCES' && (
+                    <div className="flex flex-col">
+                        <label className="text-[9px] font-bold text-gray-500 uppercase">Turma</label>
+                        <select
+                            value={selectedClassName}
+                            onChange={(e) => setSelectedClassName(e.target.value)}
+                            className="bg-white text-gray-800 border border-gray-300 rounded p-1.5 text-xs outline-none focus:border-red-500 min-w-[150px]"
+                        >
+                            <option value="">Selecione uma turma...</option>
+                            {classes.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        </select>
+                    </div>
+                )}
             </div>
         </div>
     );
+
+    // --- GRADE DE FREQUÊNCIA (FALTAS) ---
+    const renderAbsencesReport = () => {
+        if (!selectedClassName) {
+            return (
+                <div className="text-center p-12 border-2 border-dashed border-red-200 rounded-xl bg-red-50">
+                    <ClipboardList size={48} className="mx-auto text-red-300 mb-4" />
+                    <p className="text-red-400 font-bold">Selecione uma turma para visualizar a grade de frequência.</p>
+                </div>
+            );
+        }
+
+        // Filtrar sessões da turma no período
+        const classSessions = sessions
+            .filter(s => s.className === selectedClassName && isSessionInDateRange(s.date))
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        const studentsInClass = students
+            .filter(s => s.className === selectedClassName)
+            .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+        if (classSessions.length === 0) {
+            return (
+                <div className="text-center p-12 border-2 border-dashed border-red-200 rounded-xl bg-red-50">
+                    <p className="text-red-400 font-bold">Nenhuma aula registrada para esta turma no período selecionado.</p>
+                </div>
+            );
+        }
+
+        return (
+            <div className="space-y-6">
+                {/* Legenda */}
+                <div className="flex flex-wrap gap-4 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold">
+                    <span className="flex items-center gap-1.5"><span className="w-6 h-6 bg-emerald-100 border border-emerald-300 rounded flex items-center justify-center text-emerald-700 font-black">P</span> Presente</span>
+                    <span className="flex items-center gap-1.5"><span className="w-6 h-6 bg-red-100 border border-red-300 rounded flex items-center justify-center text-red-700 font-black">F</span> Falta</span>
+                    <span className="flex items-center gap-1.5"><span className="w-6 h-6 bg-amber-100 border border-amber-300 rounded flex items-center justify-center text-amber-700 font-black">FJ</span> Falta Justificada</span>
+                    <span className="flex items-center gap-1.5"><span className="w-6 h-6 bg-gray-100 border border-gray-300 rounded flex items-center justify-center text-gray-400 font-black">-</span> Não registrado</span>
+                </div>
+
+                {/* Grade horizontal com scroll */}
+                <div className="overflow-x-auto rounded-xl border border-gray-200 shadow">
+                    <table className="min-w-full border-collapse text-xs">
+                        <thead>
+                            <tr className="bg-gray-800 text-white">
+                                <th className="sticky left-0 z-10 bg-gray-800 text-left px-4 py-3 font-bold min-w-[200px] border-r border-gray-700">Aluno</th>
+                                {classSessions.map(sess => (
+                                    <th key={sess.id} className="px-2 py-2 text-center font-bold min-w-[60px] border-r border-gray-700">
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-[10px] text-gray-300">{format(new Date(sess.date), 'EEE', { locale: ptBR }).toUpperCase()}</span>
+                                            <span>{format(new Date(sess.date), 'dd/MM')}</span>
+                                        </div>
+                                    </th>
+                                ))}
+                                <th className="px-3 py-3 text-center font-bold min-w-[55px] bg-gray-900 text-red-300">FALTAS</th>
+                                <th className="px-3 py-3 text-center font-bold min-w-[65px] bg-gray-900 text-emerald-300">FREQ. %</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {studentsInClass.map((student, idx) => {
+                                let faltasCount = 0;
+                                let totalAulas = 0;
+
+                                const cells = classSessions.map(sess => {
+                                    const record = sess.records.find(r => r.studentId === student.id);
+                                    if (!record) return { type: 'none' };
+                                    totalAulas++;
+                                    if (record.present) return { type: 'present' };
+                                    if (record.justifiedAbsence) return { type: 'justified' };
+                                    faltasCount++;
+                                    return { type: 'absent' };
+                                });
+
+                                const frequency = totalAulas > 0
+                                    ? (((totalAulas - faltasCount) / totalAulas) * 100).toFixed(0)
+                                    : '100';
+                                const freqNum = parseInt(frequency);
+
+                                return (
+                                    <tr
+                                        key={student.id}
+                                        className={`border-b border-gray-100 ${
+                                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                        } hover:bg-emerald-50 transition-colors`}
+                                    >
+                                        <td className={`sticky left-0 z-10 px-4 py-2 font-bold text-gray-800 border-r border-gray-200 ${
+                                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                        }`}>
+                                            {student.name}
+                                        </td>
+                                        {cells.map((cell, cIdx) => (
+                                            <td key={cIdx} className="px-1 py-2 text-center border-r border-gray-100">
+                                                {cell.type === 'present' && (
+                                                    <span className="w-6 h-6 inline-flex items-center justify-center bg-emerald-100 border border-emerald-300 rounded text-emerald-700 font-black text-[10px]">P</span>
+                                                )}
+                                                {cell.type === 'absent' && (
+                                                    <span className="w-6 h-6 inline-flex items-center justify-center bg-red-100 border border-red-300 rounded text-red-700 font-black text-[10px]">F</span>
+                                                )}
+                                                {cell.type === 'justified' && (
+                                                    <span className="w-6 h-6 inline-flex items-center justify-center bg-amber-100 border border-amber-300 rounded text-amber-700 font-black text-[10px]">FJ</span>
+                                                )}
+                                                {cell.type === 'none' && (
+                                                    <span className="w-6 h-6 inline-flex items-center justify-center bg-gray-100 border border-gray-200 rounded text-gray-400 text-[10px]">-</span>
+                                                )}
+                                            </td>
+                                        ))}
+                                        <td className="px-3 py-2 text-center font-black text-red-600 bg-red-50">{faltasCount}</td>
+                                        <td className={`px-3 py-2 text-center font-black ${
+                                            freqNum >= 75 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'
+                                        }`}>{frequency}%</td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Resumo */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {(() => {
+                        let totalFaltas = 0;
+                        let totalComFalta = 0;
+                        studentsInClass.forEach(student => {
+                            classSessions.forEach(sess => {
+                                const rec = sess.records.find(r => r.studentId === student.id);
+                                if (rec && !rec.present && !rec.justifiedAbsence) {
+                                    totalFaltas++;
+                                    totalComFalta++;
+                                }
+                            });
+                        });
+                        const aboveAlert = studentsInClass.filter(student => {
+                            let f = 0;
+                            classSessions.forEach(sess => {
+                                const rec = sess.records.find(r => r.studentId === student.id);
+                                if (rec && !rec.present && !rec.justifiedAbsence) f++;
+                            });
+                            return (classSessions.length > 0 && (f / classSessions.length) > 0.25);
+                        }).length;
+
+                        return (
+                            <>
+                                <SummaryCard label="Total de Aulas" value={classSessions.length} color="blue" />
+                                <SummaryCard label="Total de Faltas" value={totalFaltas} color="red" />
+                                <SummaryCard label="Alunos c/ +25% Faltas" value={aboveAlert} color="orange" />
+                                <SummaryCard label="Total de Alunos" value={studentsInClass.length} color="green" />
+                            </>
+                        );
+                    })()}
+                </div>
+            </div>
+        );
+    };
 
     const renderStudentReport = () => {
         const { chartData, avgGrade, totalClasses, student } = getStudentData(selectedStudentId);
@@ -1098,6 +1269,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                 <h1 className="text-2xl font-bold uppercase text-emerald-900 tracking-tight">
                                     {reportType === 'STUDENT' ? 'Relatório Individual do Aluno' :
                                         reportType === 'CLASS' ? 'Relatório de Desempenho da Turma' :
+                                        reportType === 'ABSENCES' ? 'Grade de Frequência / Chamada' :
                                             'Comparativo Geral'}
                                 </h1>
                                 <p className="text-xs text-gray-800 font-bold mt-1">
@@ -1113,6 +1285,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                     {reportType === 'STUDENT' && renderStudentReport()}
                     {reportType === 'CLASS' && renderClassReport()}
                     {reportType === 'COMPARE' && renderComparativeReport()}
+                    {reportType === 'ABSENCES' && renderAbsencesReport()}
                 </div>
             )}
         </div>
@@ -1146,3 +1319,18 @@ const CriteriaRow = ({ label, desc, val }: { label: string, desc: string, val: s
         <span className={`font-bold px-1.5 py-0.5 rounded ${val.includes('+') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>{val}</span>
     </div>
 );
+
+const SummaryCard = ({ label, value, color }: { label: string, value: number, color: 'blue' | 'red' | 'orange' | 'green' }) => {
+    const colors = {
+        blue: 'bg-blue-50 border-blue-200 text-blue-700',
+        red: 'bg-red-50 border-red-200 text-red-700',
+        orange: 'bg-orange-50 border-orange-200 text-orange-700',
+        green: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+    };
+    return (
+        <div className={`p-4 rounded-xl border ${colors[color]} flex flex-col items-center justify-center`}>
+            <span className="text-3xl font-black">{value}</span>
+            <span className="text-[10px] font-bold uppercase mt-1 text-center">{label}</span>
+        </div>
+    );
+};
