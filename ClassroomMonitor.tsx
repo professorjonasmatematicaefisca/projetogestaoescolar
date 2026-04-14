@@ -6,11 +6,14 @@ import { SupabaseService } from './services/supabaseService';
 import {
     MessageSquare, Moon, Smartphone, Book,
     Zap, Save, RefreshCw, Check, X, Tag,
-    MoreVertical, Search, Bell, AlertCircle, Clock, ChevronDown, Calendar, FileText, Hand, Plus, Camera, Trash2, BookOpen, History, ArrowRight, Upload, Users
+    MoreVertical, Search, Bell, AlertCircle, Clock, ChevronDown, Calendar, FileText, Hand, Plus, Camera, Trash2, BookOpen, History, ArrowRight, Upload, Users, LogOut
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { UserAvatar } from './components/UserAvatar';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { Occurrence, OccurrenceType, OccurrenceStatus } from './types';
 
 interface ClassroomMonitorProps {
     onShowToast: (msg: string) => void;
@@ -101,6 +104,20 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
 
     // --- Unsaved Changes State ---
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+    // --- Classroom Occurrence State ---
+    const [occurrenceModalOpen, setOccurrenceModalOpen] = useState(false);
+    const [occurrenceStudentId, setOccurrenceStudentId] = useState('');
+    const [occurrenceReason, setOccurrenceReason] = useState('');
+    const [occurrenceNotes, setOccurrenceNotes] = useState('');
+    const [isSavingOccurrence, setIsSavingOccurrence] = useState(false);
+
+    const OCCURRENCE_REASONS = [
+        'Dormir',
+        'Celular',
+        'Falta de respeito',
+        'Sair da sala sem autorização'
+    ];
 
     // Ref to skip the useEffect fetch when session was loaded directly
     const skipNextFetchRef = useRef(false);
@@ -394,6 +411,131 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         const start = selectedBlocks[0].split(' - ')[0];
         const end = selectedBlocks[selectedBlocks.length - 1].split(' - ')[1];
         return `${start} - ${end} (${selectedBlocks.length} aulas)`;
+    };
+
+    const generateOccurrencePDF = (student: Student, reason: string, notes: string) => {
+        const doc = new jsPDF();
+        const teacher = teachers.find(t => t.id === selectedTeacherId);
+
+        // Header
+        doc.setFontSize(22);
+        doc.setTextColor(30, 41, 59); // Slate-800
+        doc.setFont('helvetica', 'bold');
+        doc.text('FICHA DE OCORRÊNCIA DISCIPLINAR', 105, 25, { align: 'center' });
+
+        doc.setDrawColor(226, 232, 240); // Slate-200
+        doc.line(14, 32, 196, 32);
+
+        // Identification Section
+        doc.setFontSize(10);
+        doc.setTextColor(100, 116, 139); // Slate-500
+        doc.text('DADOS DE IDENTIFICAÇÃO', 14, 42);
+
+        doc.setFillColor(248, 250, 252); // Slate-50
+        doc.rect(14, 45, 182, 45, 'F');
+        doc.setDrawColor(203, 213, 225); // Slate-300
+        doc.rect(14, 45, 182, 45, 'S');
+
+        doc.setFontSize(11);
+        doc.setTextColor(15, 23, 42); // Slate-900
+        doc.setFont('helvetica', 'bold');
+        doc.text('Aluno:', 20, 55);
+        doc.text('Turma:', 20, 65);
+        doc.text('Professor:', 20, 75);
+        doc.text('Data:', 140, 55);
+        doc.text('Disciplina:', 20, 85);
+
+        doc.setFont('helvetica', 'normal');
+        doc.text(student.name, 45, 55);
+        doc.text(student.className, 45, 65);
+        doc.text(teacher?.name || 'Não informado', 45, 75);
+        doc.text(format(new Date(), 'dd/MM/yyyy'), 155, 55);
+        doc.text(selectedSubject || 'Não informada', 45, 85);
+
+        // Occurrence Section
+        doc.setFontSize(10);
+        doc.setTextColor(100, 116, 139); // Slate-500
+        doc.setFont('helvetica', 'bold');
+        doc.text('DETALHES DA OCORRÊNCIA', 14, 105);
+
+        doc.setFillColor(254, 242, 242); // Red-50 (Alert style)
+        doc.rect(14, 108, 182, 15, 'F');
+        doc.setDrawColor(252, 165, 165); // Red-300
+        doc.rect(14, 108, 182, 15, 'S');
+
+        doc.setTextColor(185, 28, 28); // Red-700
+        doc.setFontSize(12);
+        doc.text(`MOTIVO: ${reason.toUpperCase()}`, 105, 118, { align: 'center' });
+
+        // Notes
+        doc.setFontSize(10);
+        doc.setTextColor(100, 116, 139); // Slate-500
+        doc.setFont('helvetica', 'bold');
+        doc.text('RELATO DO PROFESSOR:', 14, 138);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(51, 65, 85); // Slate-700
+        const splitNotes = doc.splitTextToSize(notes || 'Nenhuma observação adicional registrada.', 170);
+        doc.text(splitNotes, 20, 148);
+
+        // Signatures Section (at the bottom)
+        const footerY = 250;
+        doc.setDrawColor(148, 163, 184); // Slate-400
+        
+        // Professor line
+        doc.line(20, footerY, 95, footerY);
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text('Assinatura do Professor', 57.5, footerY + 5, { align: 'center' });
+
+        // Coordinator line
+        doc.line(115, footerY, 190, footerY);
+        doc.text('Assinatura do Orientador Pedagógico', 152.5, footerY + 5, { align: 'center' });
+
+        // Save
+        const fileName = `Ocorrencia_${student.name.replace(/\s+/g, '_')}_${format(new Date(), 'dd-MM-yyyy')}.pdf`;
+        doc.save(fileName);
+    };
+
+    const handleSaveOccurrence = async () => {
+        if (!occurrenceStudentId || !occurrenceReason) {
+            onShowToast("Selecione um aluno e um motivo.");
+            return;
+        }
+
+        setIsSavingOccurrence(true);
+        try {
+            const student = allStudents.find(s => s.id === occurrenceStudentId);
+            if (!student) throw new Error("Aluno não encontrado");
+
+            const newOccurrence: Occurrence = {
+                id: `occ-${Date.now()}`,
+                type: OccurrenceType.DISCIPLINE,
+                description: `SALA DE AULA: ${occurrenceReason}. ${occurrenceNotes}`,
+                studentIds: [occurrenceStudentId],
+                date: new Date().toISOString(),
+                status: OccurrenceStatus.OPEN,
+                reportedBy: teachers.find(t => t.id === selectedTeacherId)?.name || 'Professor'
+            };
+
+            const success = await SupabaseService.saveOccurrence(newOccurrence);
+            
+            if (success) {
+                onShowToast("Ocorrência registrada e PDF gerado!");
+                generateOccurrencePDF(student, occurrenceReason, occurrenceNotes);
+                setOccurrenceModalOpen(false);
+                setOccurrenceStudentId('');
+                setOccurrenceReason('');
+                setOccurrenceNotes('');
+            } else {
+                onShowToast("Erro ao salvar ocorrência no banco.");
+            }
+        } catch (error) {
+            console.error(error);
+            onShowToast("Erro inesperado ao processar ocorrência.");
+        } finally {
+            setIsSavingOccurrence(false);
+        }
     };
 
     const initializeSession = (studentList: Student[]) => {
@@ -1065,6 +1207,22 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                     return <option key={s} value={s}>{disc?.displayName || s}</option>;
                                 })}
                             </select>
+                             <button
+                            onClick={() => setOccurrenceModalOpen(true)}
+                            disabled={!selectedClassId}
+                            className="h-11 px-6 bg-red-600/10 text-red-500 border border-red-500/20 rounded-xl font-bold text-sm flex items-center gap-3 hover:bg-red-500 hover:text-white transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <AlertTriangle size={18} />
+                            OCORRÊNCIA
+                        </button>
+
+                        <button
+                            onClick={() => setHistoryModalOpen(true)}
+                            className="h-11 px-6 bg-[#1e293b] text-gray-400 border border-gray-700 rounded-xl font-bold text-sm flex items-center gap-3 hover:bg-gray-800 hover:text-white transition-all shadow-lg active:scale-95"
+                        >
+                            <History size={18} />
+                            AULAS ANTERIORES
+                        </button>
                         </div>
                         <div className="relative" ref={timeDropdownRef}>
                             <button
@@ -1818,6 +1976,113 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                     </div>
                 )
             }
+            {/* Classroom Occurrence Modal */}
+            {occurrenceModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="bg-[#1e293b] w-full max-w-xl rounded-2xl border border-gray-700 shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-[#0f172a]">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-red-500/10 rounded-lg">
+                                    <AlertTriangle size={20} className="text-red-500" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-white uppercase tracking-wider text-sm">Registro de Ocorrência</h3>
+                                    <p className="text-[10px] text-gray-500 font-medium">SALA DE AULA • {selectedClassId}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setOccurrenceModalOpen(false)} className="text-gray-500 hover:text-white transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh] custom-scrollbar">
+                            {/* Student Selection */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest">Aluno(a) Envolvido(a)</label>
+                                <select
+                                    value={occurrenceStudentId}
+                                    onChange={(e) => setOccurrenceStudentId(e.target.value)}
+                                    className="w-full h-11 bg-[#0f172a] border border-gray-700 rounded-xl px-4 text-white text-sm outline-none focus:border-red-500 transition-all appearance-none cursor-pointer"
+                                >
+                                    <option value="">Selecione o aluno...</option>
+                                    {allStudents
+                                        .filter(s => s.className === selectedClassId)
+                                        .sort((a, b) => a.name.localeCompare(b.name))
+                                        .map(s => (
+                                            <option key={s.id} value={s.id}>{s.name}</option>
+                                        ))
+                                    }
+                                </select>
+                            </div>
+
+                            {/* Reasons Selection */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest">Motivo da Ocorrência</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {OCCURRENCE_REASONS.map(reason => (
+                                        <button
+                                            key={reason}
+                                            onClick={() => setOccurrenceReason(reason)}
+                                            className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-2 group ${occurrenceReason === reason
+                                                ? 'bg-red-500/20 border-red-500 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.15)]'
+                                                : 'bg-[#0f172a]/50 border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300'
+                                                }`}
+                                        >
+                                            <div className={`p-1.5 rounded-lg transition-colors ${occurrenceReason === reason ? 'bg-red-500/20' : 'bg-gray-800'}`}>
+                                                {reason === 'Celular' && <Smartphone size={14} />}
+                                                {reason === 'Dormir' && <Moon size={14} />}
+                                                {reason === 'Falta de respeito' && <AlertCircle size={14} />}
+                                                {reason === 'Sair da sala sem autorização' && <LogOut size={14} />}
+                                            </div>
+                                            <span className="text-center leading-tight">{reason}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Detailed Notes */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-3 tracking-widest">Relato Detalhado (Opcional)</label>
+                                <textarea
+                                    value={occurrenceNotes}
+                                    onChange={(e) => setOccurrenceNotes(e.target.value)}
+                                    placeholder="Descreva brevemente o comportamento do aluno..."
+                                    className="w-full h-24 bg-[#0f172a] border border-gray-700 rounded-xl p-4 text-white text-sm outline-none focus:border-red-500 transition-all resize-none placeholder-gray-700"
+                                ></textarea>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 bg-[#0f172a] border-t border-gray-700 flex justify-end gap-3">
+                            <button
+                                onClick={() => setOccurrenceModalOpen(false)}
+                                className="px-5 py-2 rounded-lg text-sm font-bold text-gray-500 hover:text-white transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSaveOccurrence}
+                                disabled={isSavingOccurrence || !occurrenceStudentId || !occurrenceReason}
+                                className="px-6 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold text-sm shadow-xl transition-all flex items-center gap-2 active:scale-95"
+                            >
+                                {isSavingOccurrence ? (
+                                    <>
+                                        <RefreshCw size={16} className="animate-spin" />
+                                        SALVANDO...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={16} />
+                                        REGISTRAR E GERAR PDF
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 };
