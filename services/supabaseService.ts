@@ -1019,7 +1019,16 @@ export const SupabaseService = {
             console.error("Error fetching occurrences:", error);
             return [];
         }
-        return data as Occurrence[];
+        return data.map((occ: any) => ({
+            id: occ.id,
+            type: occ.type,
+            description: occ.description,
+            studentIds: occ.student_ids || [],
+            date: occ.date,
+            status: occ.status,
+            photos: occ.photos,
+            reportedBy: occ.reported_by
+        })) as Occurrence[];
     },
 
     async saveOccurrence(occurrence: Occurrence): Promise<boolean> {
@@ -1032,9 +1041,21 @@ export const SupabaseService = {
             return true;
         }
 
+        // Convert camelCase to snake_case for Supabase
+        const payload = {
+            id: occurrence.id,
+            type: occurrence.type,
+            description: occurrence.description,
+            student_ids: occurrence.studentIds,
+            date: occurrence.date,
+            status: occurrence.status,
+            photos: occurrence.photos,
+            reported_by: occurrence.reportedBy
+        };
+
         const { error } = await supabase
             .from('occurrences')
-            .upsert(occurrence);
+            .upsert(payload);
 
         if (error) {
             console.error("Error saving occurrence:", error);
