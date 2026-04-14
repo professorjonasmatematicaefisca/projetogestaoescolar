@@ -6,7 +6,7 @@ import { SupabaseService } from './services/supabaseService';
 import {
     MessageSquare, Moon, Smartphone, Book,
     Zap, Save, RefreshCw, Check, X, Tag,
-    MoreVertical, Search, Bell, AlertCircle, Clock, ChevronDown, Calendar, FileText, Hand, Plus, Camera, Trash2, BookOpen, History, ArrowRight, Upload, Users, LogOut
+    MoreVertical, Search, Bell, AlertCircle, AlertTriangle, Clock, ChevronDown, Calendar, FileText, Hand, Plus, Camera, Trash2, BookOpen, History, ArrowRight, Upload, Users, LogOut
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
