@@ -1207,22 +1207,6 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                     return <option key={s} value={s}>{disc?.displayName || s}</option>;
                                 })}
                             </select>
-                             <button
-                            onClick={() => setOccurrenceModalOpen(true)}
-                            disabled={!selectedClassId}
-                            className="h-11 px-6 bg-red-600/10 text-red-500 border border-red-500/20 rounded-xl font-bold text-sm flex items-center gap-3 hover:bg-red-500 hover:text-white transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <AlertTriangle size={18} />
-                            OCORRÊNCIA
-                        </button>
-
-                        <button
-                            onClick={() => setHistoryModalOpen(true)}
-                            className="h-11 px-6 bg-[#1e293b] text-gray-400 border border-gray-700 rounded-xl font-bold text-sm flex items-center gap-3 hover:bg-gray-800 hover:text-white transition-all shadow-lg active:scale-95"
-                        >
-                            <History size={18} />
-                            AULAS ANTERIORES
-                        </button>
                         </div>
                         <div className="relative" ref={timeDropdownRef}>
                             <button
@@ -1560,6 +1544,14 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                     >
                         <Save size={18} />
                         {session && session.id && !session.id.startsWith('sess-') ? "Salvar Alteração" : "Salvar Aula"}
+                    </button>
+                    <button
+                        onClick={() => setOccurrenceModalOpen(true)}
+                        disabled={!selectedClassId}
+                        className="flex-1 sm:flex-none min-w-[140px] px-4 py-2.5 bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-600/30 rounded-lg font-bold transition-all flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <AlertTriangle size={18} />
+                        Ocorrência
                     </button>
                 </div>
             </div >
