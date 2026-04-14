@@ -1079,22 +1079,40 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                             </button>
 
                             {isTimeDropdownOpen && (
-                                            }`}
-                                        >
-                                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                                                isBlocked
-                                                    ? 'border-red-500/50 bg-red-500/20'
-                                                    : selectedBlocks.includes(block)
-                                                        ? 'bg-emerald-500 border-emerald-500'
-                                                        : 'border-gray-500'
-                                            }`}>
-                                                {isBlocked ? <X size={10} className="text-red-400" /> : selectedBlocks.includes(block) && <Check size={10} className="text-[#0f172a]" />}
-                                            </div>
-                                            <span className="flex-1">{block}</span>
-                                            {isBlocked && <span className="text-[9px] text-red-400 font-bold">OCUPADO</span>}
-                                        </div>
-                                        );
-                                    })}
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-[#1e293b] border border-gray-700 rounded-xl shadow-2xl z-[100] py-2 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                        {availableBlocks.map(block => {
+                                            const isBlocked = blockedSlots.includes(block);
+                                            return (
+                                                <div
+                                                    key={block}
+                                                    onClick={() => !isBlocked && toggleBlock(block)}
+                                                    className={`
+                                                        flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors
+                                                        ${selectedBlocks.includes(block) ? 'bg-emerald-500/10 text-emerald-400' : 'text-gray-300 hover:bg-gray-800'}
+                                                        ${isBlocked ? 'opacity-40 cursor-not-allowed bg-gray-900/50' : ''}
+                                                    `}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${selectedBlocks.includes(block) ? 'bg-emerald-500 border-emerald-500' : 'border-gray-600'}`}>
+                                                            {selectedBlocks.includes(block) && <Check size={10} className="text-[#0f172a]" />}
+                                                        </div>
+                                                        <span className="text-sm font-medium">{block}</span>
+                                                    </div>
+                                                    {isBlocked && (
+                                                        <span className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                                                            <AlertCircle size={10} /> OCUPADO
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="border-t border-gray-700 p-2 bg-gray-900/40">
+                                        <p className="text-[10px] text-gray-500 text-center italic">
+                                            Selecione um ou mais horários para aula dupla/tripla.
+                                        </p>
+                                    </div>
                                 </div>
                             )}
                         </div>
