@@ -344,6 +344,25 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
         }
     }, [selectedClassId, selectedTeacherId, selectedSubject, selectedDate]);
 
+    // Effect: AUTO-SAVE DRAFT whenever session, notes or content changes
+    useEffect(() => {
+        if (session && !session.id.startsWith('sess-')) return; // Don't save draft if it's an existing DB session
+
+        if (selectedClassId && selectedTeacherId && selectedSubject && selectedDate && session) {
+            const draft = {
+                className: selectedClassId,
+                subject: selectedSubject,
+                date: selectedDate,
+                teacherId: selectedTeacherId,
+                session: session,
+                generalNotes: classGeneralNotes,
+                homework: classHomework,
+                contentIds: selectedContentIds
+            };
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        }
+    }, [session, classGeneralNotes, classHomework, selectedContentIds]);
+
     // Sync Class Register State when session changes
     useEffect(() => {
         if (session) {
@@ -1047,29 +1066,19 @@ export const ClassroomMonitor: React.FC<ClassroomMonitorProps> = ({ onShowToast,
                                 })}
                             </select>
                         </div>
-                        <div className="flex flex-col relative" ref={timeDropdownRef}>
-                            <label className="text-[10px] text-gray-500 font-bold uppercase mb-1">Horário(s)</label>
+                        <div className="relative" ref={timeDropdownRef}>
                             <button
                                 onClick={() => setIsTimeDropdownOpen(!isTimeDropdownOpen)}
-                                className="bg-[#1e293b] text-white text-sm border border-gray-700 rounded-lg p-2 outline-none focus:border-emerald-500 min-w-[180px] flex justify-between items-center text-left"
+                                className="w-full h-11 bg-[#1e293b] border border-gray-700 rounded-xl px-4 flex items-center justify-between text-white hover:border-gray-600 transition-all shadow-lg"
                             >
-                                <span className="truncate">{getCompositeBlockLabel()}</span>
-                                <ChevronDown size={14} className="text-gray-400" />
+                                <div className="flex items-center gap-3">
+                                    <Clock size={18} className="text-emerald-500" />
+                                    <span className="text-sm font-medium">{getCompositeBlockLabel()}</span>
+                                </div>
+                                <ChevronDown size={18} className={`text-gray-500 transition-transform duration-200 ${isTimeDropdownOpen ? 'rotate-180' : ''}`} />
                             </button>
+
                             {isTimeDropdownOpen && (
-                                <div className="absolute top-full left-0 mt-1 w-64 bg-[#1e293b] border border-gray-700 rounded-lg shadow-xl z-50 p-2 max-h-64 overflow-y-auto">
-                                    {availableBlocks.map(block => {
-                                        const isBlocked = blockedSlots.includes(block) && !selectedBlocks.includes(block);
-                                        return (
-                                        <div
-                                            key={block}
-                                            onClick={() => !isBlocked && toggleBlock(block)}
-                                            className={`flex items-center gap-2 p-2 rounded text-sm ${
-                                                isBlocked
-                                                    ? 'opacity-40 cursor-not-allowed bg-gray-800/50'
-                                                    : selectedBlocks.includes(block)
-                                                        ? 'bg-emerald-500/20 text-emerald-400 cursor-pointer'
-                                                        : 'text-gray-300 hover:bg-gray-700 cursor-pointer'
                                             }`}
                                         >
                                             <div className={`w-4 h-4 rounded border flex items-center justify-center ${

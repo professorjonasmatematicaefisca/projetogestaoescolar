@@ -74,8 +74,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateToStudent, onNav
             end = new Date(BIMESTRE_ATUAL_END);
         }
 
-        const startStr = start.toISOString().split('T')[0];
-        const endStr = end.toISOString().split('T')[0];
+        const startStr = format(start, 'yyyy-MM-dd');
+        const endStr = format(end, 'yyyy-MM-dd');
 
         return sessions.filter(s => {
             const d = s.date.split('T')[0];

@@ -381,21 +381,70 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
 
             const imgData = canvas.toDataURL('image/png');
             const pdf = new jsPDF({
-                orientation: 'landscape',
+                orientation: reportType === 'ABSENCES' ? 'portrait' : 'landscape',
                 unit: 'mm',
                 format: 'a4'
             });
 
-            const imgWidth = 297; // A4 Width in mm (landscape)
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
-            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
             pdf.save(`Relatorio_${reportType}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
 
             onShowToast("PDF baixado com sucesso!");
         } catch (error) {
             console.error("PDF Generation Error:", error);
             onShowToast("Erro ao gerar PDF.");
+        }
+    };
+
+    const handleDownloadAttendancePDF = async () => {
+        onShowToast("Preparando relatório de frequência mensal (PDF)...");
+        try {
+            const html2canvas = (await import('html2canvas')).default;
+            const jsPDF = (await import('jspdf')).default;
+
+            const container = document.getElementById('attendance-report-container');
+            if (!container) {
+                onShowToast("Erro: Container do relatório não encontrado.");
+                return;
+            }
+
+            // Buscar todos os blocos (meses + resumo)
+            const monthBlocks = Array.from(container.querySelectorAll('.break-after-page, .break-before-page'));
+            
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            for (let i = 0; i < monthBlocks.length; i++) {
+                const block = monthBlocks[i] as HTMLElement;
+                
+                // Forçar background branco e padding para o capture
+                const canvas = await html2canvas(block, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff'
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                if (i > 0) pdf.addPage();
+                
+                // Centralizar verticalmente se for menor que a página, ou começar do topo
+                pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, Math.min(imgHeight, 280));
+            }
+
+            pdf.save(`Frequencia_${selectedClassName}_${format(new Date(), 'MM-yyyy')}.pdf`);
+            onShowToast("Relatório de Frequência baixado com sucesso!");
+        } catch (error) {
+            console.error("Attendance PDF Error:", error);
+            onShowToast("Erro ao gerar PDF de frequência.");
         }
     };
 
@@ -722,7 +771,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
         </div>
     );
 
-    // --- GRADE DE FREQUÊNCIA (FALTAS) ---
+    // --- GRADE DE FREQUÊNCIA MENSAL (PARA PDF E TELA) ---
     const renderAbsencesReport = () => {
         if (!selectedClassName) {
             return (
@@ -733,7 +782,6 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             );
         }
 
-        // Filtrar sessões da turma no período
         const classSessions = sessions
             .filter(s => s.className === selectedClassName && isSessionInDateRange(s.date))
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -750,125 +798,176 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             );
         }
 
+        // Agrupar por mês
+        const sessionsByMonth: { [key: string]: ClassSession[] } = {};
+        classSessions.forEach(sess => {
+            const month = format(new Date(sess.date), 'MMMM', { locale: ptBR });
+            if (!sessionsByMonth[month]) sessionsByMonth[month] = [];
+            sessionsByMonth[month].push(sess);
+        });
+
+        // Totais Acumulados para o Resumo Final
+        const studentSummaries = studentsInClass.map(student => {
+            let totalAulas = 0;
+            let totalPresencas = 0;
+            let totalFaltas = 0;
+
+            classSessions.forEach(sess => {
+                const record = sess.records.find(r => r.studentId === student.id);
+                if (record) {
+                    const bCount = sess.blocksCount || 1;
+                    totalAulas += bCount;
+
+                    // 1ª Chamada
+                    if (record.present) totalPresencas++;
+                    else totalFaltas++;
+
+                    // 2ª Chamada
+                    if (bCount > 1) {
+                        if (record.present2 !== false) totalPresencas++;
+                        else totalFaltas++;
+                    }
+                }
+            });
+
+            return {
+                id: student.id,
+                name: student.name,
+                totalAulas,
+                totalPresencas,
+                totalFaltas,
+                frequency: totalAulas > 0 ? ((totalPresencas / totalAulas) * 100).toFixed(0) : '100'
+            };
+        });
+
         return (
-            <div className="space-y-6">
-                {/* Legenda */}
-                <div className="flex flex-wrap gap-4 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold">
-                    <span className="flex items-center gap-1.5"><span className="w-6 h-6 bg-emerald-100 border border-emerald-300 rounded flex items-center justify-center text-emerald-700 font-black">P</span> Presente</span>
-                    <span className="flex items-center gap-1.5"><span className="w-6 h-6 bg-red-100 border border-red-300 rounded flex items-center justify-center text-red-700 font-black">F</span> Falta</span>
-                    <span className="flex items-center gap-1.5"><span className="w-6 h-6 bg-amber-100 border border-amber-300 rounded flex items-center justify-center text-amber-700 font-black">FJ</span> Falta Justificada</span>
-                    <span className="flex items-center gap-1.5"><span className="w-6 h-6 bg-gray-100 border border-gray-300 rounded flex items-center justify-center text-gray-400 font-black">-</span> Não registrado</span>
+            <div id="attendance-report-container" className="space-y-12">
+                {/* Botão de Download Exclusivo para Frequência (Apenas Tela) */}
+                <div className="flex justify-end no-print">
+                    <button
+                        onClick={handleDownloadAttendancePDF}
+                        className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg active:scale-95"
+                    >
+                        <Download size={20} />
+                        Baixar Frequência Mensal (PDF)
+                    </button>
                 </div>
 
-                {/* Grade horizontal com scroll */}
-                <div className="overflow-x-auto rounded-xl border border-gray-200 shadow">
-                    <table className="min-w-full border-collapse text-xs">
-                        <thead>
-                            <tr className="bg-gray-800 text-white">
-                                <th className="sticky left-0 z-10 bg-gray-800 text-left px-4 py-3 font-bold min-w-[200px] border-r border-gray-700">Aluno</th>
-                                {classSessions.map(sess => (
-                                    <th key={sess.id} className="px-2 py-2 text-center font-bold min-w-[60px] border-r border-gray-700">
-                                        <div className="flex flex-col items-center">
-                                            <span className="text-[10px] text-gray-300">{format(new Date(sess.date), 'EEE', { locale: ptBR }).toUpperCase()}</span>
-                                            <span>{format(new Date(sess.date), 'dd/MM')}</span>
-                                        </div>
-                                    </th>
-                                ))}
-                                <th className="px-3 py-3 text-center font-bold min-w-[55px] bg-gray-900 text-red-300">FALTAS</th>
-                                <th className="px-3 py-3 text-center font-bold min-w-[65px] bg-gray-900 text-emerald-300">FREQ. %</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {studentsInClass.map((student, idx) => {
-                                let faltasCount = 0;
-                                let totalAulas = 0;
+                {/* Legenda (Apenas Tela) */}
+                <div className="flex flex-wrap gap-4 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold no-print">
+                    <span className="flex items-center gap-1.5 font-black uppercase text-gray-500">Legenda:</span>
+                    <span className="flex items-center gap-1.5"><span className="w-5 h-5 bg-emerald-100 border border-emerald-300 rounded flex items-center justify-center text-emerald-700">P</span> Presente</span>
+                    <span className="flex items-center gap-1.5"><span className="w-5 h-5 bg-red-100 border border-red-300 rounded flex items-center justify-center text-red-700">F</span> Falta</span>
+                    <span className="flex items-center gap-1.5"><span className="w-5 h-5 bg-amber-100 border border-amber-300 rounded flex items-center justify-center text-amber-700">FJ</span> Justificada</span>
+                    <span className="flex items-center gap-1.5 ml-auto text-gray-400 font-normal italic">* FJ conta como ausência na frequência</span>
+                </div>
 
-                                const cells = classSessions.map(sess => {
-                                    const record = sess.records.find(r => r.studentId === student.id);
-                                    if (!record) return { type: 'none' };
-                                    totalAulas++;
-                                    if (record.present) return { type: 'present' };
-                                    if (record.justifiedAbsence) return { type: 'justified' };
-                                    faltasCount++;
-                                    return { type: 'absent' };
-                                });
-
-                                const frequency = totalAulas > 0
-                                    ? (((totalAulas - faltasCount) / totalAulas) * 100).toFixed(0)
-                                    : '100';
-                                const freqNum = parseInt(frequency);
-
-                                return (
-                                    <tr
-                                        key={student.id}
-                                        className={`border-b border-gray-100 ${
-                                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                        } hover:bg-emerald-50 transition-colors`}
-                                    >
-                                        <td className={`sticky left-0 z-10 px-4 py-2 font-bold text-gray-800 border-r border-gray-200 ${
-                                            idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                        }`}>
-                                            {student.name}
-                                        </td>
-                                        {cells.map((cell, cIdx) => (
-                                            <td key={cIdx} className="px-1 py-2 text-center border-r border-gray-100">
-                                                {cell.type === 'present' && (
-                                                    <span className="w-6 h-6 inline-flex items-center justify-center bg-emerald-100 border border-emerald-300 rounded text-emerald-700 font-black text-[10px]">P</span>
-                                                )}
-                                                {cell.type === 'absent' && (
-                                                    <span className="w-6 h-6 inline-flex items-center justify-center bg-red-100 border border-red-300 rounded text-red-700 font-black text-[10px]">F</span>
-                                                )}
-                                                {cell.type === 'justified' && (
-                                                    <span className="w-6 h-6 inline-flex items-center justify-center bg-amber-100 border border-amber-300 rounded text-amber-700 font-black text-[10px]">FJ</span>
-                                                )}
-                                                {cell.type === 'none' && (
-                                                    <span className="w-6 h-6 inline-flex items-center justify-center bg-gray-100 border border-gray-200 rounded text-gray-400 text-[10px]">-</span>
-                                                )}
-                                            </td>
+                {Object.entries(sessionsByMonth).map(([month, monthSessions]) => (
+                    <div key={month} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden break-after-page mb-8">
+                        <div className="bg-gray-800 text-white px-6 py-3 flex justify-between items-center">
+                            <h3 className="font-bold uppercase tracking-wider">{month} / {academicYear}</h3>
+                            <span className="text-[10px] bg-gray-700 px-2 py-1 rounded">{selectedClassName}</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full border-collapse text-[10px]">
+                                <thead>
+                                    <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                                        <th className="sticky left-0 z-10 bg-gray-50 text-left px-4 py-2 font-bold min-w-[180px] border-r border-gray-200">Aluno</th>
+                                        {monthSessions.map(sess => (
+                                            <th key={sess.id} className="px-1 py-1 text-center font-bold min-w-[45px] border-r border-gray-200">
+                                                <div className="flex flex-col items-center">
+                                                    <span className="text-[8px] opacity-60">{format(new Date(sess.date), 'EEE', { locale: ptBR }).toUpperCase()}</span>
+                                                    <span>{format(new Date(sess.date), 'dd')}</span>
+                                                    {sess.blocksCount > 1 && <span className="text-[7px] text-blue-500">(2h)</span>}
+                                                </div>
+                                            </th>
                                         ))}
-                                        <td className="px-3 py-2 text-center font-black text-red-600 bg-red-50">{faltasCount}</td>
-                                        <td className={`px-3 py-2 text-center font-black ${
-                                            freqNum >= 75 ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'
-                                        }`}>{frequency}%</td>
                                     </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                                </thead>
+                                <tbody>
+                                    {studentsInClass.map((student, sIdx) => (
+                                        <tr key={student.id} className={`border-b border-gray-50 ${sIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                                            <td className={`sticky left-0 z-10 px-4 py-1.5 font-medium text-gray-800 border-r border-gray-200 ${sIdx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
+                                                {student.name}
+                                            </td>
+                                            {monthSessions.map(sess => {
+                                                const record = sess.records.find(r => r.studentId === student.id);
+                                                if (!record) return <td key={sess.id} className="text-center text-gray-300 border-r border-gray-100">-</td>;
+                                                
+                                                const bCount = sess.blocksCount || 1;
+                                                
+                                                return (
+                                                    <td key={sess.id} className="px-0.5 py-1 text-center border-r border-gray-100">
+                                                        <div className="flex justify-center gap-0.5">
+                                                            {/* 1ª Aula */}
+                                                            {record.present ? (
+                                                                <span className="w-4 h-4 inline-flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[9px]">P</span>
+                                                            ) : (
+                                                                <span className="w-4 h-4 inline-flex items-center justify-center bg-red-50 text-red-600 border border-red-200 rounded text-[9px]">{record.justifiedAbsence ? 'FJ' : 'F'}</span>
+                                                            )}
+                                                            
+                                                            {/* 2ª Aula (Opcional) */}
+                                                            {bCount > 1 && (
+                                                                <>
+                                                                    <span className="text-gray-300">|</span>
+                                                                    {record.present2 !== false ? (
+                                                                        <span className="w-4 h-4 inline-flex items-center justify-center bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[9px]">P</span>
+                                                                    ) : (
+                                                                        <span className="w-4 h-4 inline-flex items-center justify-center bg-red-50 text-red-600 border border-red-200 rounded text-[9px]">{record.justifiedAbsence ? 'FJ' : 'F'}</span>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ))}
 
-                {/* Resumo */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {(() => {
-                        let totalFaltas = 0;
-                        let totalComFalta = 0;
-                        studentsInClass.forEach(student => {
-                            classSessions.forEach(sess => {
-                                const rec = sess.records.find(r => r.studentId === student.id);
-                                if (rec && !rec.present && !rec.justifiedAbsence) {
-                                    totalFaltas++;
-                                    totalComFalta++;
-                                }
-                            });
-                        });
-                        const aboveAlert = studentsInClass.filter(student => {
-                            let f = 0;
-                            classSessions.forEach(sess => {
-                                const rec = sess.records.find(r => r.studentId === student.id);
-                                if (rec && !rec.present && !rec.justifiedAbsence) f++;
-                            });
-                            return (classSessions.length > 0 && (f / classSessions.length) > 0.25);
-                        }).length;
-
-                        return (
-                            <>
-                                <SummaryCard label="Total de Aulas" value={classSessions.length} color="blue" />
-                                <SummaryCard label="Total de Faltas" value={totalFaltas} color="red" />
-                                <SummaryCard label="Alunos c/ +25% Faltas" value={aboveAlert} color="orange" />
-                                <SummaryCard label="Total de Alunos" value={studentsInClass.length} color="green" />
-                            </>
-                        );
-                    })()}
+                {/* RESUMO FINAL ACUMULADO */}
+                <div className="bg-white rounded-xl border-2 border-emerald-500 shadow-md overflow-hidden mt-12 break-before-page">
+                    <div className="bg-emerald-600 text-white px-6 py-4 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <BarChart2 size={24} />
+                            <h3 className="font-bold uppercase tracking-widest text-lg">Resumo Geral de Frequência</h3>
+                        </div>
+                        <span className="text-xs font-bold bg-emerald-700 px-3 py-1 rounded-full">{selectedClassName}</span>
+                    </div>
+                    <div className="p-1">
+                        <table className="min-w-full border-collapse">
+                            <thead>
+                                <tr className="bg-emerald-50 text-emerald-800 text-xs font-black uppercase">
+                                    <th className="text-left px-6 py-4 border-b-2 border-emerald-100">Nome do Aluno</th>
+                                    <th className="text-center px-4 py-4 border-b-2 border-emerald-100">Total Aulas</th>
+                                    <th className="text-center px-4 py-4 border-b-2 border-emerald-100">Presenças (Qtd)</th>
+                                    <th className="text-center px-4 py-4 border-b-2 border-emerald-100">Faltas (Qtd)</th>
+                                    <th className="text-center px-6 py-4 border-b-2 border-emerald-100 bg-emerald-100/50">Freq. %</th>
+                                </tr>
+                            </thead>
+                            <tbody className="text-sm">
+                                {studentSummaries.map((s, idx) => (
+                                    <tr key={s.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-emerald-50/20'} hover:bg-emerald-100/30 transition-colors`}>
+                                        <td className="px-6 py-3 font-bold text-gray-800 border-b border-emerald-50">{idx + 1}. {s.name}</td>
+                                        <td className="px-4 py-3 text-center text-gray-600 border-b border-emerald-50 font-medium">{s.totalAulas}</td>
+                                        <td className="px-4 py-3 text-center text-emerald-600 border-b border-emerald-50 font-bold">{s.totalPresencas}</td>
+                                        <td className="px-4 py-3 text-center text-red-500 border-b border-emerald-50 font-bold">{s.totalFaltas}</td>
+                                        <td className={`px-6 py-3 text-center font-black border-b border-emerald-50 text-lg ${parseInt(s.frequency) >= 75 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                            {s.frequency}%
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="bg-gray-50 px-6 py-4 text-[10px] text-gray-500 italic flex justify-between items-center">
+                        <span>Gerado em: {format(new Date(), "dd/MM/yyyy HH:mm:ss")}</span>
+                        <span>* Faltas justificadas (FJ) são contadas como ausência no cálculo de frequência.</span>
+                    </div>
                 </div>
             </div>
         );
