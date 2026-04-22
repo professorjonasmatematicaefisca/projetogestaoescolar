@@ -360,38 +360,51 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 return;
             }
 
-            // Ensure we are at the top to capture everything correctly
+            // Forçar scroll para o topo para captura correta
             window.scrollTo(0, 0);
 
             const canvas = await html2canvas(element as HTMLElement, {
-                scale: 2, // Higher scale for better quality
-                useCORS: true, // For images
+                scale: 2,
+                useCORS: true,
                 logging: false,
-                backgroundColor: '#ffffff', // Match background color
+                backgroundColor: '#ffffff',
                 allowTaint: true,
-                foreignObjectRendering: false,
-                onclone: (clonedDoc) => {
-                    const clonedElement = clonedDoc.querySelector('.animate-in') as HTMLElement;
-                    if (clonedElement) {
-                        clonedElement.style.padding = '20px';
-                        clonedElement.style.background = '#ffffff';
-                    }
-                }
             });
 
-            const imgData = canvas.toDataURL('image/png');
+            const imgData = canvas.toDataURL('image/png', 1.0);
+            
+            // Configuração A4 Retrato
             const pdf = new jsPDF({
-                orientation: reportType === 'ABSENCES' ? 'portrait' : 'landscape',
+                orientation: 'portrait',
                 unit: 'mm',
                 format: 'a4'
             });
 
             const pdfWidth = pdf.internal.pageSize.getWidth();
-            const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+            const ratio = pdfWidth / imgWidth;
+            const canvasPageHeight = pdfHeight / ratio;
+            
+            let heightLeft = imgHeight;
+            let position = 0;
+            let page = 1;
 
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
-            pdf.save(`Relatorio_${reportType}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
+            // Adiciona a primeira página
+            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight * ratio, undefined, 'FAST');
+            heightLeft -= canvasPageHeight;
 
+            // Adiciona páginas subsequentes se necessário (evita cortes)
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position * ratio, pdfWidth, imgHeight * ratio, undefined, 'FAST');
+                heightLeft -= canvasPageHeight;
+                page++;
+            }
+
+            pdf.save(`Relatorio_${reportType}_${selectedStudentId || 'Geral'}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
             onShowToast("PDF baixado com sucesso!");
         } catch (error) {
             console.error("PDF Generation Error:", error);
@@ -449,7 +462,6 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
     };
 
     const handleBulkPDF = async () => {
-        // Get list of students to export
         const studentsToExport = studentFilterClass
             ? students.filter(s => s.className === studentFilterClass)
             : students;
@@ -459,121 +471,182 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             return;
         }
 
-        onShowToast(`Gerando PDF para ${studentsToExport.length} alunos... Aguarde.`);
+        onShowToast(`Gerando PDF premium para ${studentsToExport.length} alunos... Aguarde.`);
 
         try {
             const html2canvas = (await import('html2canvas')).default;
             const jsPDF = (await import('jspdf')).default;
+            const { renderToStaticMarkup } = await import('react-dom/server');
 
-            const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-            const imgWidth = 297;
-            let firstPage = true;
-
-            for (const student of studentsToExport) {
-                // Create a temporary div to render each student report
-                const container = document.createElement('div');
-                container.style.position = 'absolute';
-                container.style.left = '-9999px';
-                container.style.top = '0';
-                container.style.width = '1122px'; // ~A4 landscape at 96dpi
-                container.style.background = '#ffffff';
-                container.style.padding = '24px';
-                container.style.fontFamily = 'Inter, sans-serif';
-                document.body.appendChild(container);
-
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            
+            for (let i = 0; i < studentsToExport.length; i++) {
+                const student = studentsToExport[i];
                 const { chartData, avgGrade, totalClasses } = getStudentData(student.id);
 
+                // Criar um container temporário para renderizar o relatório do aluno
+                // Usaremos um elemento fixo para garantir que o layout 'Retrato' seja forçado
+                const printContainer = document.createElement('div');
+                printContainer.style.position = 'absolute';
+                printContainer.style.left = '-9999px';
+                printContainer.style.top = '0';
+                printContainer.style.width = '210mm'; // Largura A4 Real
+                printContainer.style.background = '#ffffff';
+                document.body.appendChild(printContainer);
+
+                // Injetar o design premium original
+                // Como não podemos usar hooks dentro de renderToStaticMarkup facilmente para componentes complexos,
+                // vamos clonar a estrutura visual do renderStudentReport manualmente mas com estilo inline fixo
+                
                 const deductionRows = chartData.slice().reverse().map(d => {
                     const r = d.record!;
                     const ded: string[] = [];
                     if (!r.present) {
-                        ded.push(r.justifiedAbsence ? 'Falta Justificada (5.0)' : 'Falta (0.0)');
+                        ded.push(r.justifiedAbsence ? 'Falta Justificada' : 'Falta');
                     } else {
-                        if (r.counters.prontidao > 0) ded.push(`${r.counters.prontidao}x Prontidão (-${(r.counters.prontidao * 2.0).toFixed(1)})`);
-                        if (r.counters.talk > 0) ded.push(`${r.counters.talk}x Conversa (-${(r.counters.talk * 3.0).toFixed(1)})`);
-                        if (r.counters.bathroom > 0) ded.push(`${r.counters.bathroom}x Banheiro (-${(r.counters.bathroom * 3.0).toFixed(1)})`);
-                        if (r.counters.sleep > 0) ded.push(`${r.counters.sleep}x Sono (-${(r.counters.sleep * 3.0).toFixed(1)})`);
-                        if (r.counters.material === 0) ded.push('Sem Material (-2.5)');
-                        if (r.counters.homework === 0) ded.push('Sem Tarefa (-2.5)');
-                        if (r.counters.activity < 3) ded.push(`Ativ. Incompleta (-${((3 - r.counters.activity) * 2.5).toFixed(1)})`);
-                        if (r.phoneConfiscated) ded.push('Celular (-5.0)');
-                        if (r.counters.participation > 0) ded.push(`Participação (+${(r.counters.participation * 0.5).toFixed(1)})`);
+                        if (r.counters.prontidao > 0) ded.push(`Prontidão`);
+                        if (r.counters.talk > 0) ded.push(`Conversa`);
+                        if (r.counters.bathroom > 0) ded.push(`Banheiro`);
+                        if (r.counters.sleep > 0) ded.push(`Sono`);
+                        if (r.counters.material === 0) ded.push('Sem Mat.');
+                        if (r.counters.homework === 0) ded.push('Sem Tarefa');
+                        if (r.counters.activity < 3) ded.push(`Ativ. Incomp.`);
+                        if (r.phoneConfiscated) ded.push('Celular');
+                        if (r.counters.participation > 0) ded.push(`Partic.`);
                     }
-                    return `<tr style="border-bottom:1px solid #e5e7eb">
-                        <td style="padding:6px 8px;color:#374151;font-size:11px">${format(new Date(d.fullDate), "dd/MM/yyyy")}</td>
-                        <td style="padding:6px 8px;color:#6b7280;font-size:11px">${d.teacherName || '—'}</td>
-                        <td style="padding:6px 8px;font-size:11px">${r.present ? '<span style="color:#10b981">✓ SIM</span>' : '<span style="color:#ef4444">✗ NÃO</span>'}</td>
-                        <td style="padding:6px 8px;font-size:11px;color:#ef4444">${ded.length > 0 ? ded.join(' | ') : '<span style="color:#9ca3af">Sem deduções</span>'}</td>
-                        <td style="padding:6px 8px;text-align:right;font-weight:bold;font-size:13px;color:${Number(d.aluno) >= 7 ? '#10b981' : '#ef4444'}">${d.aluno?.toFixed(1)}</td>
-                    </tr>`;
+                    return `
+                        <tr style="border-bottom:1px solid #f1f5f9">
+                            <td style="padding:10px 8px; font-size:11px; color:#1e293b">${format(new Date(d.fullDate), "dd/MM/yyyy")}</td>
+                            <td style="padding:10px 8px; font-size:11px; color:#64748b">${d.teacherName || '—'}</td>
+                            <td style="padding:10px 8px; font-size:11px; color:${r.present ? '#10b981' : '#ef4444'}; font-weight:bold">${r.present ? 'SIM' : 'NÃO'}</td>
+                            <td style="padding:10px 8px; font-size:10px; color:#64748b">${ded.join(' | ') || 'Sem ocorrências'}</td>
+                            <td style="padding:10px 8px; font-size:13px; color:${Number(d.aluno) >= 7 ? '#10b981' : '#ef4444'}; font-weight:900; text-align:right">${d.aluno?.toFixed(1)}</td>
+                        </tr>
+                    `;
                 }).join('');
 
-                container.innerHTML = `
-                <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #065f46;padding-bottom:8px;margin-bottom:16px">
-                    <div>
-                        <h1 style="font-size:20px;font-weight:bold;color:#065f46;margin:0">Relatório Individual do Aluno</h1>
-                        <p style="font-size:11px;color:#374151;margin:4px 0 0">Ano Letivo ${academicYear} &nbsp;|&nbsp; Período: ${startDate} a ${endDate}</p>
+                const criteriaHtml = [
+                    { label: "Prontidão", desc: "-2,0 p/ ocorr.", val: "-6,0" },
+                    { label: "Conversa", desc: "-3,0 p/ ocorr.", val: "-9,0" },
+                    { label: "Banheiro", desc: "-3,0 p/ saída", val: "Fixo" },
+                    { label: "Dormir", desc: "-3,0 p/ ocorr.", val: "Fixo" },
+                    { label: "Material", desc: "Uso Obrigatório", val: "-2,5" },
+                    { label: "Tarefas", desc: "Entrega Diária", val: "-2,5" },
+                    { label: "Atividade", desc: "Produtividade", val: "-7,5" },
+                    { label: "Celular", desc: "Uso Proibido", val: "-5,0" }
+                ].map(c => `
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid #f1f5f9; padding-bottom:6px; margin-bottom:6px">
+                        <div>
+                            <div style="font-size:11px; font-weight:bold; color:#334155">${c.label}</div>
+                            <div style="font-size:9px; color:#94a3b8">${c.desc}</div>
+                        </div>
+                        <div style="font-size:11px; font-weight:bold; color:#ef4444; background:#fef2f2; padding:2px 6px; border-radius:4px">${c.val}</div>
                     </div>
-                    <span style="font-size:11px;color:#6b7280">EduControl PRO</span>
-                </div>
-                <div style="display:grid;grid-template-columns:200px 1fr;gap:16px">
-                    <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;text-align:center">
-                        <img src="${student.photoUrl}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;margin:0 auto 8px;border:2px solid #10b981" />
-                        <h2 style="font-size:15px;font-weight:bold;color:#111827;margin:0 0 4px">${student.name}</h2>
-                        <p style="font-size:12px;color:#6b7280;margin:0 0 12px">${student.className}</p>
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-                            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px">
-                                <p style="font-size:9px;color:#9ca3af;font-weight:bold;margin:0 0 2px">MÉDIA GERAL</p>
-                                <p style="font-size:22px;font-weight:bold;color:${Number(avgGrade) >= 7 ? '#10b981' : '#f97316'};margin:0">${avgGrade}</p>
+                `).join('');
+
+                printContainer.innerHTML = `
+                    <div style="padding:40px; font-family: sans-serif; background:#ffffff">
+                        <!-- Cabeçalho -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #065f46; padding-bottom:15px; margin-bottom:25px">
+                            <div style="display:flex; align-items:center; gap:20px">
+                                ${schoolLogoUrl ? `<img src="${schoolLogoUrl}" style="height:60px; object-contain" />` : '<div style="width:60px; height:60px; background:#f0fdf4; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#10b981; font-weight:bold">EDU</div>'}
+                                <div>
+                                    <h1 style="margin:0; font-size:24px; color:#064e3b; text-transform:uppercase; letter-spacing:-0.5px">Relatório Individual</h1>
+                                    <div style="font-size:12px; font-weight:bold; color:#334155; margin-top:4px">Ano Letivo ${academicYear} | Período: ${format(new Date(startDate), "dd/MM")} a ${format(new Date(endDate), "dd/MM")}</div>
+                                </div>
                             </div>
-                            <div style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px">
-                                <p style="font-size:9px;color:#9ca3af;font-weight:bold;margin:0 0 2px">TOTAL AULAS</p>
-                                <p style="font-size:22px;font-weight:bold;color:#111827;margin:0">${totalClasses}</p>
+                            <div style="text-align:right; color:#64748b; font-size:10px; font-weight:bold">EduControl PRO</div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns: 200px 1fr; gap:30px">
+                            <!-- Perfil Lateral -->
+                            <div>
+                                <div style="background:#f8fafc; border:1px solid #f1f5f9; border-radius:16px; padding:20px; text-align:center; margin-bottom:20px">
+                                    <img src="${student.photoUrl}" style="width:100px; height:100px; border-radius:50%; object-fit:cover; border:3px solid #10b981; margin:0 auto 15px" />
+                                    <h2 style="margin:0 0 5px; font-size:18px; color:#1e293b">${student.name}</h2>
+                                    <div style="font-size:13px; color:#64748b; margin-bottom:20px">${student.className}</div>
+                                    
+                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+                                        <div style="background:#ffffff; padding:10px; border-radius:12px; border:1px solid #f1f5f9">
+                                            <div style="font-size:9px; font-weight:bold; color:#94a3b8; text-transform:uppercase">Média</div>
+                                            <div style="font-size:20px; font-weight:900; color:${Number(avgGrade) >= 7 ? '#10b981' : '#f97316'}">${avgGrade}</div>
+                                        </div>
+                                        <div style="background:#ffffff; padding:10px; border-radius:12px; border:1px solid #f1f5f9">
+                                            <div style="font-size:9px; font-weight:bold; color:#94a3b8; text-transform:uppercase">Aulas</div>
+                                            <div style="font-size:20px; font-weight:900; color:#1e293b">${totalClasses}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Critérios -->
+                                <div style="background:#ffffff; border:1px solid #f1f5f9; border-radius:16px; padding:20px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05)">
+                                    <h3 style="font-size:13px; font-weight:bold; color:#1e293b; margin:0 0 15px; display:flex; align-items:center; gap:8px">Critérios de Avaliação</h3>
+                                    ${criteriaHtml}
+                                </div>
+                            </div>
+
+                            <!-- Conteúdo Principal -->
+                            <div>
+                                <h3 style="font-size:16px; font-weight:bold; color:#1e293b; margin:0 0 15px">Histórico Detalhado</h3>
+                                <table style="width:100%; border-collapse:collapse">
+                                    <thead>
+                                        <tr style="background:#f8fafc; border-bottom:2px solid #f1f5f9">
+                                            <th style="padding:12px 8px; text-align:left; font-size:10px; color:#64748b; text-transform:uppercase">Data</th>
+                                            <th style="padding:12px 8px; text-align:left; font-size:10px; color:#64748b; text-transform:uppercase">Docente</th>
+                                            <th style="padding:12px 8px; text-align:left; font-size:10px; color:#64748b; text-transform:uppercase">Pres.</th>
+                                            <th style="padding:12px 8px; text-align:left; font-size:10px; color:#64748b; text-transform:uppercase">Ocorrências</th>
+                                            <th style="padding:12px 8px; text-align:right; font-size:10px; color:#64748b; text-transform:uppercase">Nota</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${deductionRows || '<tr><td colspan="5" style="padding:30px; text-align:center; color:#94a3b8">Sem registros no período.</td></tr>'}
+                                    </tbody>
+                                </table>
+                                
+                                <div style="margin-top:40px; border-top:1px solid #f1f5f9; padding-top:20px; display:flex; justify-content:space-between">
+                                    <div style="width:200px; text-align:center">
+                                        <div style="border-top:1px solid #cbd5e1; margin-bottom:5px"></div>
+                                        <div style="font-size:9px; color:#64748b; font-weight:bold">Assinatura do Responsável</div>
+                                    </div>
+                                    <div style="width:200px; text-align:center">
+                                        <div style="border-top:1px solid #cbd5e1; margin-bottom:5px"></div>
+                                        <div style="font-size:9px; color:#64748b; font-weight:bold">Assinatura da Coordenação</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div style="margin-top:12px;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px;text-align:left">
-                            <p style="font-size:9px;color:#9ca3af;font-weight:bold;margin:0 0 6px">CRITÉRIOS</p>
-                            <p style="font-size:9px;color:#374151;margin:2px 0">✍️ Prontidão: -2,0/ocor.</p>
-                            <p style="font-size:9px;color:#374151;margin:2px 0">💬 Conversa: -3,0/ocor.</p>
-                            <p style="font-size:9px;color:#374151;margin:2px 0">🚽 Banheiro: -3,0/saída</p>
-                            <p style="font-size:9px;color:#374151;margin:2px 0">😴 Dormir: -3,0/ocor.</p>
-                            <p style="font-size:9px;color:#374151;margin:2px 0">📚 Material: -2,5</p>
-                            <p style="font-size:9px;color:#374151;margin:2px 0">📝 Tarefa: -2,5</p>
-                            <p style="font-size:9px;color:#374151;margin:2px 0">⚡ Atividade: -2,5/nível</p>
-                            <p style="font-size:9px;color:#374151;margin:2px 0">📱 Celular: -5,0</p>
-                        </div>
                     </div>
-                    <div style="overflow:auto">
-                        <h3 style="font-size:14px;font-weight:bold;color:#111827;margin:0 0 10px">Histórico Detalhado</h3>
-                        <table style="width:100%;border-collapse:collapse;font-family:Inter,sans-serif">
-                            <thead style="background:#f3f4f6">
-                                <tr>
-                                    <th style="padding:6px 8px;font-size:10px;color:#6b7280;text-align:left;font-weight:bold">DATA</th>
-                                    <th style="padding:6px 8px;font-size:10px;color:#6b7280;text-align:left;font-weight:bold">PROFESSOR</th>
-                                    <th style="padding:6px 8px;font-size:10px;color:#6b7280;text-align:left;font-weight:bold">PRESENÇA</th>
-                                    <th style="padding:6px 8px;font-size:10px;color:#6b7280;text-align:left;font-weight:bold">OCORRÊNCIAS</th>
-                                    <th style="padding:6px 8px;font-size:10px;color:#6b7280;text-align:right;font-weight:bold">NOTA</th>
-                                </tr>
-                            </thead>
-                            <tbody>${deductionRows || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#9ca3af">Nenhum registro no período.</td></tr>'}</tbody>
-                        </table>
-                    </div>
-                </div>`;
+                `;
 
-                await new Promise(res => setTimeout(res, 50));
-                const canvas = await html2canvas(container, { scale: 1.5, useCORS: true, backgroundColor: '#ffffff', logging: false });
-                document.body.removeChild(container);
+                await new Promise(res => setTimeout(res, 100)); // Esperar renderização/imagens
+                const canvas = await html2canvas(printContainer, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
+                document.body.removeChild(printContainer);
 
-                const imgData = canvas.toDataURL('image/png');
-                if (!firstPage) pdf.addPage();
-                const pageWidth = 297;
-                const pageHeight = (canvas.height * pageWidth) / canvas.width;
-                pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, Math.min(pageHeight, 210));
-                firstPage = false;
+                const imgData = canvas.toDataURL('image/png', 1.0);
+                if (i > 0) pdf.addPage();
+                
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                const ratio = pdfWidth / canvas.width;
+                const imgHeight = canvas.height * ratio;
+
+                // Adicionar imagem do aluno (se for maior que uma página, precisaremos de um loop igual ao download individual)
+                // Mas geralmente 1 aluno cabe em 1 ou 2 páginas. Vamos simplificar adicionando a primeira parte e verificando.
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight, undefined, 'FAST');
+                
+                // Se o conteúdo for maior que a página, adiciona páginas extras para esse aluno específico
+                let heightLeft = imgHeight - pdfHeight;
+                let position = -pdfHeight;
+                while (heightLeft > 0) {
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight, undefined, 'FAST');
+                    heightLeft -= pdfHeight;
+                    position -= pdfHeight;
+                }
             }
 
-            pdf.save(`Relatorio_Turma_${studentFilterClass || 'Todos'}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
-            onShowToast(`PDF gerado com ${studentsToExport.length} relatórios!`);
+            pdf.save(`Bulk_Relatorio_${selectedClassName}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
+            onShowToast(`PDF gerado com ${studentsToExport.length} relatórios premium!`);
         } catch (error) {
             console.error('Bulk PDF Error:', error);
             onShowToast('Erro ao gerar PDF em massa.');
@@ -975,93 +1048,93 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
 
     const renderStudentReport = () => {
         const { chartData, avgGrade, totalClasses, student } = getStudentData(selectedStudentId);
-        if (!student) return <div className="text-gray-400 p-8 text-center bg-[#0f172a] rounded-xl border border-gray-800 border-dashed">Selecione um aluno para visualizar o relatório.</div>;
+        if (!student) return <div className="text-gray-400 p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 mt-10">Selecione um aluno para visualizar o relatório.</div>;
 
         return (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column: Profile & Summary */}
-                <div className="space-y-6">
-                    <div className="bg-white rounded-xl border border-gray-200 p-6 flex flex-col items-center text-center shadow-lg relative break-inside-avoid">
-                        <div className="w-24 h-24 rounded-full p-1 border-2 border-emerald-500 mb-3">
-                            <img src={student.photoUrl} className="w-full h-full rounded-full object-cover" />
+                <div className="space-y-8">
+                    <div className="bg-slate-50 rounded-2xl border border-slate-200 p-8 flex flex-col items-center text-center shadow-sm relative break-inside-avoid">
+                        <div className="w-28 h-28 rounded-full p-1.5 border-4 border-emerald-500 mb-4 shadow-inner">
+                            <img src={student.photoUrl} className="w-full h-full rounded-full object-cover shadow-sm" />
                         </div>
-                        <h2 className="text-xl font-bold text-gray-800">{student.name}</h2>
-                        <p className="text-gray-500 text-sm mb-4">{student.className}</p>
+                        <h2 className="text-2xl font-black text-slate-800 tracking-tight">{student.name}</h2>
+                        <p className="text-emerald-700 font-bold text-sm mb-6 uppercase tracking-widest">{student.className}</p>
 
-                        <div className="grid grid-cols-2 gap-3 w-full mb-4">
-                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                <p className="text-[10px] text-gray-500 font-bold uppercase">Média Geral</p>
-                                <p className={`text-2xl font-bold ${Number(avgGrade) >= 7 ? 'text-emerald-500' : 'text-orange-500'}`}>{avgGrade}</p>
+                        <div className="grid grid-cols-2 gap-4 w-full mb-6">
+                            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">Média Geral</p>
+                                <p className={`text-3xl font-black ${Number(avgGrade) >= 7 ? 'text-emerald-600' : 'text-orange-600'}`}>{avgGrade}</p>
                             </div>
-                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                <p className="text-[10px] text-gray-500 font-bold uppercase">Total Aulas</p>
-                                <p className="text-2xl font-bold text-gray-800">{totalClasses}</p>
+                            <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">Total Aulas</p>
+                                <p className="text-3xl font-black text-slate-800">{totalClasses}</p>
                             </div>
                         </div>
-                        <div className="text-[10px] text-gray-500">Período: {format(new Date(startDate), 'dd/MM')} a {format(new Date(endDate), 'dd/MM')}</div>
+                        <div className="text-[10px] text-slate-400 font-bold uppercase">Período: {format(new Date(startDate), 'dd/MM')} a {format(new Date(endDate), 'dd/MM')}</div>
                     </div>
 
                     {/* Criteria Table Legend */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-lg break-inside-avoid">
-                        <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
-                            <AlertCircle size={16} className="text-emerald-500" /> Critérios de Avaliação
+                    <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm break-inside-avoid">
+                        <h3 className="text-sm font-black text-slate-800 mb-6 flex items-center gap-2 border-b border-slate-100 pb-3 uppercase tracking-wider">
+                            <AlertCircle size={18} className="text-emerald-500" /> Critérios Avaliativos
                         </h3>
-                        <div className="space-y-3">
-                            <CriteriaRow label="Prontidão" desc="-2,0 por ocorrência" val="até -6,0" />
-                            <CriteriaRow label="Conversa" desc="-3,0 por ocorrência" val="até -9,0" />
-                            <CriteriaRow label="Banheiro" desc="-3,0 por saída" val="Sem teto" />
-                            <CriteriaRow label="Dormir" desc="-3,0 por ocorrência" val="Sem teto" />
-                            <CriteriaRow label="Material" desc="Sem material (Sim/Não)" val="-2,5" />
-                            <CriteriaRow label="Tarefas" desc="Não fez (Sim/Não)" val="-2,5" />
-                            <CriteriaRow label="Atividade" desc="-2,5 por nível perdido (0-3)" val="até -7,5" />
+                        <div className="space-y-4">
+                            <CriteriaRow label="Prontidão" desc="Engajamento inicial" val="-2,0" />
+                            <CriteriaRow label="Conversa" desc="Interrupções letivas" val="-3,0" />
+                            <CriteriaRow label="Banheiro" desc="Saída de sala" val="-3,0" />
+                            <CriteriaRow label="Dormir" desc="Apatia em aula" val="-3,0" />
+                            <CriteriaRow label="Material" desc="Esquecimento" val="-2,5" />
+                            <CriteriaRow label="Tarefas" desc="Pendências" val="-2,5" />
+                            <CriteriaRow label="Atividade" desc="Produtividade" val="-2,5" />
                             <CriteriaRow label="Celular" desc="Uso não autorizado" val="-5,0" />
                         </div>
                     </div>
                 </div>
 
                 {/* Right Column: Chart & History */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-2 space-y-8">
                     {/* Evolution Chart */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg break-inside-avoid">
-                        <div className="flex justify-between items-center mb-6">
+                    <div className="bg-white rounded-2xl border border-slate-200 p-8 shadow-sm break-inside-avoid">
+                        <div className="flex justify-between items-center mb-8">
                             <div>
-                                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                                    <TrendingUp className="text-emerald-500" size={20} />
+                                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3 tracking-tight">
+                                    <TrendingUp className="text-emerald-500" size={24} />
                                     Evolução de Desempenho
                                 </h3>
-                                <p className="text-xs text-gray-500">Comparativo: Aluno vs. Média da Turma</p>
+                                <p className="text-sm text-slate-400 font-medium mt-1">Comparativo: Aluno vs. Média da Turma no período</p>
                             </div>
                         </div>
 
-                        <div className="h-72 w-full">
+                        <div className="h-80 w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                    <XAxis dataKey="date" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} dy={10} />
-                                    <YAxis domain={[0, 10]} stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} dx={-10} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                    <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} dy={10} fontStyle="bold" />
+                                    <YAxis domain={[0, 10]} stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} dx={-10} fontStyle="bold" />
                                     <Tooltip
-                                        contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e5e7eb', color: '#1f2937' }}
-                                        itemStyle={{ color: '#1f2937' }}
+                                        contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #f1f5f9', color: '#1e293b', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                        itemStyle={{ color: '#1e293b', fontWeight: 'bold' }}
                                         formatter={(value: number) => [value.toFixed(1), 'Nota']}
-                                        labelStyle={{ color: '#6b7280', marginBottom: '0.5rem' }}
+                                        labelStyle={{ color: '#64748b', marginBottom: '0.5rem', fontWeight: 'bold' }}
                                     />
-                                    <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                                    <Legend wrapperStyle={{ paddingTop: '30px', fontSize: '12px', fontWeight: 'bold', color: '#64748b' }} />
                                     <Line
-                                        name="Aluno"
+                                        name="Desempenho do Aluno"
                                         type="monotone"
                                         dataKey="aluno"
                                         stroke="#10b981"
-                                        strokeWidth={3}
-                                        dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }}
-                                        activeDot={{ r: 6 }}
+                                        strokeWidth={4}
+                                        dot={{ r: 5, fill: '#10b981', strokeWidth: 0 }}
+                                        activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2 }}
                                     />
                                     <Line
                                         name="Média da Turma"
                                         type="monotone"
                                         dataKey="mediaTurma"
-                                        stroke="#94a3b8"
+                                        stroke="#cbd5e1"
                                         strokeWidth={2}
-                                        strokeDasharray="5 5"
+                                        strokeDasharray="6 6"
                                         dot={false}
                                     />
                                 </LineChart>
@@ -1070,28 +1143,28 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                     </div>
 
                     {/* Detailed History Table */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg break-inside-avoid">
-                        <h3 className="text-lg font-bold text-gray-800 mb-4">Histórico Detalhado</h3>
-                        <div className="overflow-x-auto -mx-6 px-6">
-                            <div className="inline-block min-w-full align-middle">
-                                <div className="overflow-hidden border border-gray-200 rounded-lg">
-                                    <table className="min-w-full text-left">
-                                        <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase border-b border-gray-200">
-                                            <tr>
-                                                <th className="px-4 py-3 sticky left-0 bg-gray-50 z-10 border-r border-gray-200">Data</th>
-                                                <th className="px-4 py-3">Professor</th>
-                                                <th className="px-4 py-3">Presença</th>
-                                                <th className="px-4 py-3">Ocorrências (Deduções)</th>
-                                                <th className="px-4 py-3 text-right rounded-tr-lg">Nota Final</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-200 text-sm">
-                                            {chartData.length === 0 && (
-                                                <tr><td colSpan={4} className="p-4 text-center text-gray-500">Nenhum registro encontrado neste período.</td></tr>
-                                            )}
-                                            {chartData.slice().reverse().map((d, idx) => { // Show newest first
-                                                const r = d.record!;
-                                                const deductions = [];
+                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm break-inside-avoid">
+                        <div className="bg-slate-50 px-8 py-5 border-b border-slate-200">
+                            <h3 className="text-lg font-black text-slate-800 tracking-tight">Histórico de Sessões</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-widest border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-8 py-4">Data da Aula</th>
+                                        <th className="px-6 py-4">Docente</th>
+                                        <th className="px-6 py-4">Presença</th>
+                                        <th className="px-6 py-4">Deduções / Bônus</th>
+                                        <th className="px-8 py-4 text-right">Nota Preliminar</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-sm">
+                                    {chartData.length === 0 && (
+                                        <tr><td colSpan={5} className="p-12 text-center text-slate-400 font-medium italic">Nenhum registro encontrado neste período.</td></tr>
+                                    )}
+                                    {chartData.slice().reverse().map((d, idx) => {
+                                        const r = d.record!;
+                                        const deductions = [];
 
                                                 if (!r.present) {
                                                     deductions.push(r.justifiedAbsence ? "Falta Justificada (Nota 5.0)" : "Falta (Nota 0.0)");
@@ -1353,38 +1426,53 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                     </div>
                 </div>
             ) : (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-[210mm] mx-auto overflow-visible bg-white p-6 shadow-2xl print:shadow-none print:p-0">
-                    {/* Header Info for Report */}
-                    <div className="flex justify-between items-end border-b-2 border-emerald-800 pb-2 mb-6 gap-4">
-                        <div className="flex items-center gap-4">
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-[210mm] mx-auto overflow-visible bg-white p-10 shadow-2xl print:shadow-none print:p-0" style={{ minHeight: '297mm' }}>
+                    {/* Cabeçalho Institucional Premium */}
+                    <div className="flex justify-between items-center border-b-[3px] border-emerald-800 pb-4 mb-8 gap-4">
+                        <div className="flex items-center gap-6">
                             {schoolLogoUrl ? (
-                                <img src={schoolLogoUrl} alt="Logo" className="max-h-16 object-contain" />
+                                <img src={schoolLogoUrl} alt="Logo" className="h-16 object-contain" />
                             ) : (
-                                <div className="p-2 border border-emerald-200 bg-emerald-50 rounded-lg">
-                                    <GraduationCap className="text-emerald-500" size={32} />
+                                <div className="p-3 border-2 border-emerald-200 bg-emerald-50 rounded-xl">
+                                    <GraduationCap className="text-emerald-500" size={40} />
                                 </div>
                             )}
                             <div>
-                                <h1 className="text-2xl font-bold uppercase text-emerald-900 tracking-tight">
+                                <h1 className="text-3xl font-black uppercase text-emerald-900 tracking-tighter leading-none">
                                     {reportType === 'STUDENT' ? 'Relatório Individual do Aluno' :
-                                        reportType === 'CLASS' ? 'Relatório de Desempenho da Turma' :
-                                        reportType === 'ABSENCES' ? 'Grade de Frequência / Chamada' :
+                                        reportType === 'CLASS' ? 'Desempenho da Turma' :
+                                        reportType === 'ABSENCES' ? 'Grade de Frequência' :
                                             'Comparativo Geral'}
                                 </h1>
-                                <p className="text-xs text-gray-800 font-bold mt-1">
-                                    Ano Letivo {academicYear}
+                                <p className="text-xs text-slate-600 font-bold mt-2 flex items-center gap-2">
+                                    <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-800">Ano Letivo {academicYear}</span>
+                                    {reportType === 'STUDENT' && <span className="bg-emerald-100 px-2 py-0.5 rounded text-emerald-800 tracking-wider">REGISTRO OFICIAL</span>}
                                 </p>
                             </div>
                         </div>
-                        <div className="text-right hidden sm:block">
-                            <p className="font-bold text-gray-800 text-xs mt-2">EduControl PRO</p>
+                        <div className="text-right">
+                            <p className="font-black text-emerald-950 text-sm tracking-widest">EduControl PRO</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Sistemas de Gestão Educacional</p>
                         </div>
                     </div>
 
-                    {reportType === 'STUDENT' && renderStudentReport()}
-                    {reportType === 'CLASS' && renderClassReport()}
-                    {reportType === 'COMPARE' && renderComparativeReport()}
-                    {reportType === 'ABSENCES' && renderAbsencesReport()}
+                    <div className="print-content">
+                        {reportType === 'STUDENT' && renderStudentReport()}
+                        {reportType === 'CLASS' && renderClassReport()}
+                        {reportType === 'COMPARE' && renderComparativeReport()}
+                        {reportType === 'ABSENCES' && renderAbsencesReport()}
+                    </div>
+
+                    {/* Rodapé de Página de Impressão */}
+                    <div className="mt-20 pt-8 border-t border-slate-100 flex justify-between items-end text-[10px] text-slate-400 font-medium">
+                        <div>
+                            Gerado em {format(new Date(), "dd/MM/yyyy 'às' HH:mm")}
+                        </div>
+                        <div className="flex gap-4">
+                            <span>Documento gerado digitalmente</span>
+                            <span className="font-bold text-slate-600">Página 1</span>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
