@@ -384,11 +384,21 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             const html2canvas = (await import('html2canvas')).default;
             const jsPDF = (await import('jspdf')).default;
 
-            const element = document.querySelector('.animate-in'); // Target the main report container
+            const element = document.getElementById('report-pdf-content');
             if (!element) {
                 onShowToast("Erro: Elemento do relatório não encontrado.");
                 return;
             }
+
+            // Temporarily remove shadow and animation for cleaner capture
+            const originalStyle = element.getAttribute('style') || '';
+            const originalClassName = element.className;
+            
+            // Remove animation and shadow classes
+            element.classList.remove('shadow-2xl', 'animate-in', 'fade-in', 'slide-in-from-bottom-4');
+            element.style.boxShadow = 'none';
+            element.style.transform = 'none';
+            element.style.transition = 'none';
 
             // Forçar scroll para o topo para captura correta
             window.scrollTo(0, 0);
@@ -399,11 +409,16 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                 logging: false,
                 backgroundColor: '#ffffff',
                 allowTaint: true,
+                windowWidth: element.scrollWidth,
+                windowHeight: element.scrollHeight
             });
+
+            // Restore original styles
+            element.className = originalClassName;
+            element.setAttribute('style', originalStyle);
 
             const imgData = canvas.toDataURL('image/png', 1.0);
             
-            // Configuração A4 Retrato
             const pdf = new jsPDF({
                 orientation: 'portrait',
                 unit: 'mm',
@@ -415,23 +430,21 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             const imgWidth = canvas.width;
             const imgHeight = canvas.height;
             const ratio = pdfWidth / imgWidth;
-            const canvasPageHeight = pdfHeight / ratio;
+            const imgHeightInPdf = imgHeight * ratio;
             
-            let heightLeft = imgHeight;
+            let heightLeft = imgHeightInPdf;
             let position = 0;
-            let page = 1;
 
-            // Adiciona a primeira página
-            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight * ratio, undefined, 'FAST');
-            heightLeft -= canvasPageHeight;
+            // Add first page
+            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf, undefined, 'FAST');
+            heightLeft -= pdfHeight;
 
-            // Adiciona páginas subsequentes se necessário (evita cortes)
+            // Add subsequent pages
             while (heightLeft > 0) {
-                position = heightLeft - imgHeight;
+                position = heightLeft - imgHeightInPdf;
                 pdf.addPage();
-                pdf.addImage(imgData, 'PNG', 0, position * ratio, pdfWidth, imgHeight * ratio, undefined, 'FAST');
-                heightLeft -= canvasPageHeight;
-                page++;
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf, undefined, 'FAST');
+                heightLeft -= pdfHeight;
             }
 
             pdf.save(`Relatorio_${reportType}_${selectedStudentId || 'Geral'}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
@@ -1457,7 +1470,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                     </div>
                 </div>
             ) : (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-[210mm] mx-auto overflow-visible bg-white p-10 shadow-2xl print:shadow-none print:p-0" style={{ minHeight: '297mm' }}>
+                <div id="report-pdf-content" className="animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-[210mm] mx-auto overflow-visible bg-white p-10 shadow-2xl print:shadow-none print:p-0" style={{ minHeight: '297mm' }}>
                     {/* Cabeçalho Institucional Premium */}
                     <div className="flex justify-between items-center border-b-[3px] border-emerald-800 pb-4 mb-8 gap-4">
                         <div className="flex items-center gap-6">
