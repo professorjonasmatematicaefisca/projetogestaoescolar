@@ -17,6 +17,8 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "jsx": "react-jsx",
     "paths": {
       "@/*": [
@@ -25,5 +27,11 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "*.mjs",
+    "script2.ts"
+  ]
 }

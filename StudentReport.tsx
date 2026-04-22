@@ -17,6 +17,36 @@ interface ReportProps {
 
 type ReportType = 'STUDENT' | 'CLASS' | 'COMPARE' | 'ABSENCES';
 
+const SortableHeader = ({ label, sortKey, currentSort, onSort, rounded }: { label: string, sortKey: string, currentSort: any, onSort: any, rounded?: boolean }) => {
+    const isActive = currentSort.key === sortKey;
+    return (
+        <th
+            className={`px-2 py-3 cursor-pointer hover:bg-gray-100 transition-colors ${rounded ? 'rounded-tr-lg' : ''}`}
+            onClick={() => onSort({ key: sortKey, direction: isActive && currentSort.direction === 'desc' ? 'asc' : 'desc' })}
+        >
+            <div className="flex items-center gap-1">
+                {label}
+                <div className="flex flex-col">
+                    <span className={`text-[6px] ${isActive && currentSort.direction === 'asc' ? 'text-emerald-500' : 'text-gray-400'}`}>▲</span>
+                    <span className={`text-[6px] ${isActive && currentSort.direction === 'desc' ? 'text-emerald-500' : 'text-gray-400'}`}>▼</span>
+                </div>
+            </div>
+        </th>
+    );
+};
+
+const CriteriaRow = ({ label, desc, val }: { label: string, desc: string, val: string }) => (
+    <div className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors px-1 rounded-md">
+        <div>
+            <div className="text-xs font-black text-slate-700 uppercase tracking-tight">{label}</div>
+            <div className="text-[10px] text-slate-400 font-medium">{desc}</div>
+        </div>
+        <div className={`text-[11px] font-black px-2 py-1 rounded-md ${val.includes('+') ? 'text-emerald-600 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>
+            {val}
+        </div>
+    </div>
+);
+
 export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserRole, initialStudentId }) => {
     const [reportType, setReportType] = useState<ReportType>('STUDENT');
 
@@ -1051,17 +1081,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
         if (!student) return <div className="text-gray-400 p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 mt-10">Selecione um aluno para visualizar o relatório.</div>;
 
         // Componente auxiliar para as linhas de critérios
-        const CriteriaRow = ({ label, desc, val }: { label: string, desc: string, val: string }) => (
-            <div className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors px-1 rounded-md">
-                <div>
-                    <div className="text-xs font-black text-slate-700 uppercase tracking-tight">{label}</div>
-                    <div className="text-[10px] text-slate-400 font-medium">{desc}</div>
-                </div>
-                <div className="text-[11px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                    {val}
-                </div>
-            </div>
-        );
+
 
         return (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1128,7 +1148,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#ffffff', borderRadius: '12px', border: '1px solid #f1f5f9', color: '#1e293b', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                         itemStyle={{ color: '#1e293b', fontWeight: 'bold' }}
-                                        formatter={(value: number) => [value.toFixed(1), 'Nota']}
+                                        formatter={(value: any) => [typeof value === 'number' ? value.toFixed(1) : value, 'Nota']}
                                         labelStyle={{ color: '#64748b', marginBottom: '0.5rem', fontWeight: 'bold' }}
                                     />
                                     <Legend wrapperStyle={{ paddingTop: '30px', fontSize: '12px', fontWeight: 'bold', color: '#64748b' }} />
@@ -1235,10 +1255,8 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                     </table>
                                 </div>
                             </div>
-                        </div>
                     </div>
                 </div>
-            </div>
         );
     };
 
@@ -1492,45 +1510,4 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
     );
 };
 
-const SortableHeader = ({ label, sortKey, currentSort, onSort, rounded }: { label: string, sortKey: string, currentSort: any, onSort: any, rounded?: boolean }) => {
-    const isActive = currentSort.key === sortKey;
-    return (
-        <th
-            className={`px-2 py-3 cursor-pointer hover:bg-gray-700 transition-colors ${rounded ? 'rounded-tr-lg' : ''}`}
-            onClick={() => onSort({ key: sortKey, direction: isActive && currentSort.direction === 'desc' ? 'asc' : 'desc' })}
-        >
-            <div className="flex items-center gap-1">
-                {label}
-                <div className="flex flex-col">
-                    <span className={`text-[6px] ${isActive && currentSort.direction === 'asc' ? 'text-emerald-400' : 'text-gray-600'}`}>▲</span>
-                    <span className={`text-[6px] ${isActive && currentSort.direction === 'desc' ? 'text-emerald-400' : 'text-gray-600'}`}>▼</span>
-                </div>
-            </div>
-        </th>
-    );
-};
 
-const CriteriaRow = ({ label, desc, val }: { label: string, desc: string, val: string }) => (
-    <div className="flex justify-between items-start text-xs border-b border-gray-800 pb-2 last:border-0 last:pb-0">
-        <div>
-            <span className="font-bold text-gray-200 block">{label}</span>
-            <span className="text-gray-500">{desc}</span>
-        </div>
-        <span className={`font-bold px-1.5 py-0.5 rounded ${val.includes('+') ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>{val}</span>
-    </div>
-);
-
-const SummaryCard = ({ label, value, color }: { label: string, value: number, color: 'blue' | 'red' | 'orange' | 'green' }) => {
-    const colors = {
-        blue: 'bg-blue-50 border-blue-200 text-blue-700',
-        red: 'bg-red-50 border-red-200 text-red-700',
-        orange: 'bg-orange-50 border-orange-200 text-orange-700',
-        green: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-    };
-    return (
-        <div className={`p-4 rounded-xl border ${colors[color]} flex flex-col items-center justify-center`}>
-            <span className="text-3xl font-black">{value}</span>
-            <span className="text-[10px] font-bold uppercase mt-1 text-center">{label}</span>
-        </div>
-    );
-};
