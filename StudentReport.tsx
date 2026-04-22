@@ -529,57 +529,167 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             return;
         }
 
-        onShowToast(`Iniciando exportação em massa de ${studentsToExport.length} alunos...`);
+        onShowToast(`Gerando ${studentsToExport.length} relatórios (Layout Original com Gráfico)...`);
         setIsExporting(true);
 
         try {
             const html2canvas = (await import('html2canvas')).default;
             const jsPDF = (await import('jspdf')).default;
 
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
-            });
-
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-
+            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            
+            // Salvar estado original
             const originalStudentId = selectedStudentId;
             const originalReportType = reportType;
-
             setReportType('STUDENT');
 
             for (let i = 0; i < studentsToExport.length; i++) {
                 const student = studentsToExport[i];
                 setSelectedStudentId(student.id);
                 
-                onShowToast(`Processando: ${student.name} (${i + 1}/${studentsToExport.length})`);
-                
+                // Esperar renderização para capturar o gráfico do UI real
                 await new Promise(res => setTimeout(res, 800));
+                
+                const { chartData, avgGrade, totalClasses } = getStudentData(student.id);
+                
+                // Capturar o gráfico atual da tela (já que está renderizado no report-pdf-content)
+                const chartElement = document.querySelector('.recharts-wrapper');
+                let chartImgData = '';
+                if (chartElement) {
+                    const chartCanvas = await html2canvas(chartElement as HTMLElement, { scale: 2, backgroundColor: '#ffffff' });
+                    chartImgData = chartCanvas.toDataURL('image/png');
+                }
 
-                const element = document.getElementById('report-pdf-content');
-                if (!element) continue;
+                const deductionRows = chartData.slice().reverse().map(d => {
+                    const r = d.record!;
+                    const ded: string[] = [];
+                    if (!r.present) {
+                        ded.push(r.justifiedAbsence ? 'Falta Justificada' : 'Falta');
+                    } else {
+                        if ((r.counters.prontidao || 0) > 0) ded.push(`Prontidão`);
+                        if (r.counters.talk > 0) ded.push(`Conversa`);
+                        if (r.counters.bathroom > 0) ded.push(`Banheiro`);
+                        if (r.counters.sleep > 0) ded.push(`Sono`);
+                        if (r.counters.material === 0) ded.push('Sem Mat.');
+                        if (r.counters.homework === 0) ded.push('Sem Tarefa');
+                        if (r.counters.activity < 3) ded.push(`Ativ. Incomp.`);
+                        if (r.phoneConfiscated) ded.push('Celular');
+                        if (r.counters.participation > 0) ded.push(`Partic.`);
+                    }
+                    return `
+                        <tr style="border-bottom:1px solid #f1f5f9">
+                            <td style="padding:10px 8px; font-size:11px; color:#1e293b">${format(new Date(d.fullDate), "dd/MM/yyyy")}</td>
+                            <td style="padding:10px 8px; font-size:11px; color:#64748b">${d.teacherName || '—'}</td>
+                            <td style="padding:10px 8px; font-size:11px; color:${r.present ? '#10b981' : '#ef4444'}; font-weight:bold">${r.present ? 'SIM' : 'NÃO'}</td>
+                            <td style="padding:10px 8px; font-size:10px; color:#64748b">${ded.join(' | ') || 'Sem ocorrências'}</td>
+                            <td style="padding:10px 8px; font-size:13px; color:${Number(d.aluno) >= 7 ? '#10b981' : '#ef4444'}; font-weight:900; text-align:right">${d.aluno?.toFixed(1)}</td>
+                        </tr>
+                    `;
+                }).join('');
 
-                const originalStyle = element.getAttribute('style') || '';
-                const originalClassName = element.className;
-                element.classList.remove('shadow-2xl', 'animate-in', 'fade-in', 'slide-in-from-bottom-4');
-                element.style.boxShadow = 'none';
-                element.style.transform = 'none';
-                element.style.transition = 'none';
+                const criteriaHtml = [
+                    { label: "Prontidão", desc: "-2,0 p/ ocorr.", val: "-2,0" },
+                    { label: "Conversa", desc: "-3,0 p/ ocorr.", val: "-3,0" },
+                    { label: "Banheiro", desc: "-3,0 p/ saída", val: "-3,0" },
+                    { label: "Dormir", desc: "-3,0 p/ ocorr.", val: "-3,0" },
+                    { label: "Material", desc: "Uso Obrigatório", val: "-2,5" },
+                    { label: "Tarefas", desc: "Entrega Diária", val: "-2,5" },
+                    { label: "Atividade", desc: "Produtividade", val: "-2,5" },
+                    { label: "Celular", desc: "Uso Proibido", val: "-5,0" }
+                ].map(c => `
+                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid #f1f5f9; padding-bottom:6px; margin-bottom:6px">
+                        <div>
+                            <div style="font-size:11px; font-weight:bold; color:#334155">${c.label}</div>
+                            <div style="font-size:9px; color:#94a3b8">${c.desc}</div>
+                        </div>
+                        <div style="font-size:11px; font-weight:bold; color:#ef4444; background:#fef2f2; padding:2px 6px; border-radius:4px">${c.val}</div>
+                    </div>
+                `).join('');
 
-                const canvas = await html2canvas(element as HTMLElement, {
-                    scale: 2,
-                    useCORS: true,
-                    logging: false,
-                    backgroundColor: '#ffffff',
-                    allowTaint: true,
-                    windowWidth: element.scrollWidth,
-                    windowHeight: element.scrollHeight
-                });
+                const printContainer = document.createElement('div');
+                printContainer.style.width = '210mm';
+                printContainer.style.background = '#ffffff';
+                printContainer.style.position = 'absolute';
+                printContainer.style.left = '-9999px';
+                document.body.appendChild(printContainer);
 
-                element.className = originalClassName;
-                element.setAttribute('style', originalStyle);
+                printContainer.innerHTML = `
+                    <div style="padding:40px; font-family: sans-serif; background:#ffffff">
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #065f46; padding-bottom:15px; margin-bottom:25px">
+                            <div style="display:flex; align-items:center; gap:20px">
+                                ${schoolLogoUrl ? `<img src="${schoolLogoUrl}" style="height:60px; object-contain" />` : '<div style="width:60px; height:60px; background:#f0fdf4; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#10b981; font-weight:bold">EDU</div>'}
+                                <div>
+                                    <h1 style="margin:0; font-size:24px; color:#064e3b; text-transform:uppercase; letter-spacing:-0.5px">Relatório Individual</h1>
+                                    <div style="font-size:12px; font-weight:bold; color:#334155; margin-top:4px">Ano Letivo ${academicYear} | Período: ${format(new Date(startDate), "dd/MM")} a ${format(new Date(endDate), "dd/MM")}</div>
+                                </div>
+                            </div>
+                            <div style="text-align:right; color:#64748b; font-size:10px; font-weight:bold">EduControl PRO</div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns: 200px 1fr; gap:30px">
+                            <div>
+                                <div style="background:#f8fafc; border:1px solid #f1f5f9; border-radius:16px; padding:20px; text-align:center; margin-bottom:20px">
+                                    <img src="${student.photoUrl}" style="width:100px; height:100px; border-radius:50%; object-fit:cover; border:3px solid #10b981; margin:0 auto 15px" />
+                                    <h2 style="margin:0 0 5px; font-size:18px; color:#1e293b">${student.name}</h2>
+                                    <div style="font-size:13px; color:#64748b; margin-bottom:20px">${student.className}</div>
+                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+                                        <div style="background:#ffffff; padding:10px; border-radius:12px; border:1px solid #f1f5f9">
+                                            <div style="font-size:9px; font-weight:bold; color:#94a3b8; text-transform:uppercase">Média</div>
+                                            <div style="font-size:20px; font-weight:900; color:${Number(avgGrade) >= 7 ? '#10b981' : '#f97316'}">${avgGrade}</div>
+                                        </div>
+                                        <div style="background:#ffffff; padding:10px; border-radius:12px; border:1px solid #f1f5f9">
+                                            <div style="font-size:9px; font-weight:bold; color:#94a3b8; text-transform:uppercase">Aulas</div>
+                                            <div style="font-size:20px; font-weight:900; color:#1e293b">${totalClasses}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="background:#ffffff; border:1px solid #f1f5f9; border-radius:16px; padding:20px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05)">
+                                    <h3 style="font-size:13px; font-weight:bold; color:#1e293b; margin:0 0 15px">Critérios Avaliativos</h3>
+                                    ${criteriaHtml}
+                                </div>
+                            </div>
+
+                            <div>
+                                ${chartImgData ? `
+                                    <div style="margin-bottom:30px">
+                                        <h3 style="font-size:14px; font-weight:bold; color:#1e293b; margin:0 0 10px">Evolução de Desempenho</h3>
+                                        <img src="${chartImgData}" style="width:100%; height:auto; border-radius:12px; border:1px solid #f1f5f9" />
+                                    </div>
+                                ` : ''}
+
+                                <h3 style="font-size:16px; font-weight:bold; color:#1e293b; margin:0 0 15px">Histórico Detalhado</h3>
+                                <table style="width:100%; border-collapse:collapse">
+                                    <thead>
+                                        <tr style="background:#f8fafc; border-bottom:2px solid #f1f5f9">
+                                            <th style="padding:12px 8px; text-align:left; font-size:10px; color:#64748b; text-transform:uppercase">Data</th>
+                                            <th style="padding:12px 8px; text-align:left; font-size:10px; color:#64748b; text-transform:uppercase">Docente</th>
+                                            <th style="padding:12px 8px; text-align:left; font-size:10px; color:#64748b; text-transform:uppercase">Pres.</th>
+                                            <th style="padding:12px 8px; text-align:left; font-size:10px; color:#64748b; text-transform:uppercase">Ocorrências</th>
+                                            <th style="padding:12px 8px; text-align:right; font-size:10px; color:#64748b; text-transform:uppercase">Nota</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${deductionRows || '<tr><td colspan="5" style="padding:30px; text-align:center; color:#94a3b8">Sem registros no período.</td></tr>'}
+                                    </tbody>
+                                </table>
+                                
+                                <div style="margin-top:40px; border-top:1px solid #f1f5f9; padding-top:20px; display:flex; justify-content:space-between">
+                                    <div style="width:200px; text-align:center">
+                                        <div style="border-top:1px solid #cbd5e1; margin-bottom:5px"></div>
+                                        <div style="font-size:9px; color:#64748b; font-weight:bold">Assinatura do Responsável</div>
+                                    </div>
+                                    <div style="width:200px; text-align:center">
+                                        <div style="border-top:1px solid #cbd5e1; margin-bottom:5px"></div>
+                                        <div style="font-size:9px; color:#64748b; font-weight:bold">Assinatura da Coordenação</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                const canvas = await html2canvas(printContainer, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+                document.body.removeChild(printContainer);
 
                 const imgData = canvas.toDataURL('image/png', 1.0);
                 const imgWidth = canvas.width;
@@ -608,11 +718,11 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             setIsExporting(false);
 
             pdf.save(`Relatorios_Massa_${selectedClassName || 'Escola'}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
-            onShowToast(`Exportação concluída com sucesso!`);
+            onShowToast(`Exportação concluída!`);
         } catch (error) {
             console.error('Bulk PDF Error:', error);
             setIsExporting(false);
-            onShowToast('Erro ao gerar exportação em massa.');
+            onShowToast('Erro ao gerar exportação.');
         }
     };
 
@@ -1029,11 +1139,11 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
 
                         <div className="grid grid-cols-2 gap-4 w-full mb-6">
                             <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">Média Geral</p>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">Média do Aluno</p>
                                 <p className={`text-3xl font-black ${Number(avgGrade) >= 7 ? 'text-emerald-600' : 'text-orange-600'}`}>{avgGrade}</p>
                             </div>
                             <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">Total Aulas</p>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-tighter">Aulas no Período</p>
                                 <p className="text-3xl font-black text-slate-800">{totalClasses}</p>
                             </div>
                         </div>
