@@ -56,6 +56,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
     const [classes, setClasses] = useState<ClassRoom[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [academicYear, setAcademicYear] = useState<number>(2026);
+    const [isExporting, setIsExporting] = useState<boolean>(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -448,6 +449,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             }
 
             pdf.save(`Relatorio_${reportType}_${selectedStudentId || 'Geral'}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
+            setIsExporting(false);
             onShowToast("PDF baixado com sucesso!");
         } catch (error) {
             console.error("PDF Generation Error:", error);
@@ -488,12 +490,25 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
 
                 const imgData = canvas.toDataURL('image/png');
                 const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
                 const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
                 if (i > 0) pdf.addPage();
                 
-                // Centralizar verticalmente se for menor que a página, ou começar do topo
-                pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, Math.min(imgHeight, 280));
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                // Add first part of block
+                pdf.addImage(imgData, 'PNG', 0, 10, pdfWidth, imgHeight, undefined, 'FAST');
+                heightLeft -= (pdfHeight - 20); // Account for margins
+
+                // Add subsequent pages for the same block if it overflows
+                while (heightLeft > 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position + 10, pdfWidth, imgHeight, undefined, 'FAST');
+                    heightLeft -= (pdfHeight - 20);
+                }
             }
 
             pdf.save(`Frequencia_${selectedClassName}_${format(new Date(), 'MM-yyyy')}.pdf`);
@@ -514,185 +529,90 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
             return;
         }
 
-        onShowToast(`Gerando PDF premium para ${studentsToExport.length} alunos... Aguarde.`);
+        onShowToast(`Iniciando exportação em massa de ${studentsToExport.length} alunos...`);
+        setIsExporting(true);
 
         try {
             const html2canvas = (await import('html2canvas')).default;
             const jsPDF = (await import('jspdf')).default;
-            const { renderToStaticMarkup } = await import('react-dom/server');
 
-            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-            
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+
+            const originalStudentId = selectedStudentId;
+            const originalReportType = reportType;
+
+            setReportType('STUDENT');
+
             for (let i = 0; i < studentsToExport.length; i++) {
                 const student = studentsToExport[i];
-                const { chartData, avgGrade, totalClasses } = getStudentData(student.id);
-
-                // Criar um container temporário para renderizar o relatório do aluno
-                // Usaremos um elemento fixo para garantir que o layout 'Retrato' seja forçado
-                const printContainer = document.createElement('div');
-                printContainer.style.position = 'absolute';
-                printContainer.style.left = '-9999px';
-                printContainer.style.top = '0';
-                printContainer.style.width = '210mm'; // Largura A4 Real
-                printContainer.style.background = '#ffffff';
-                document.body.appendChild(printContainer);
-
-                // Injetar o design premium original
-                // Como não podemos usar hooks dentro de renderToStaticMarkup facilmente para componentes complexos,
-                // vamos clonar a estrutura visual do renderStudentReport manualmente mas com estilo inline fixo
+                setSelectedStudentId(student.id);
                 
-                const deductionRows = chartData.slice().reverse().map(d => {
-                    const r = d.record!;
-                    const ded: string[] = [];
-                    if (!r.present) {
-                        ded.push(r.justifiedAbsence ? 'Falta Justificada' : 'Falta');
-                    } else {
-                        if (r.counters.prontidao > 0) ded.push(`Prontidão`);
-                        if (r.counters.talk > 0) ded.push(`Conversa`);
-                        if (r.counters.bathroom > 0) ded.push(`Banheiro`);
-                        if (r.counters.sleep > 0) ded.push(`Sono`);
-                        if (r.counters.material === 0) ded.push('Sem Mat.');
-                        if (r.counters.homework === 0) ded.push('Sem Tarefa');
-                        if (r.counters.activity < 3) ded.push(`Ativ. Incomp.`);
-                        if (r.phoneConfiscated) ded.push('Celular');
-                        if (r.counters.participation > 0) ded.push(`Partic.`);
-                    }
-                    return `
-                        <tr style="border-bottom:1px solid #f1f5f9">
-                            <td style="padding:10px 8px; font-size:11px; color:#1e293b">${format(new Date(d.fullDate), "dd/MM/yyyy")}</td>
-                            <td style="padding:10px 8px; font-size:11px; color:#64748b">${d.teacherName || '—'}</td>
-                            <td style="padding:10px 8px; font-size:11px; color:${r.present ? '#10b981' : '#ef4444'}; font-weight:bold">${r.present ? 'SIM' : 'NÃO'}</td>
-                            <td style="padding:10px 8px; font-size:10px; color:#64748b">${ded.join(' | ') || 'Sem ocorrências'}</td>
-                            <td style="padding:10px 8px; font-size:13px; color:${Number(d.aluno) >= 7 ? '#10b981' : '#ef4444'}; font-weight:900; text-align:right">${d.aluno?.toFixed(1)}</td>
-                        </tr>
-                    `;
-                }).join('');
+                onShowToast(`Processando: ${student.name} (${i + 1}/${studentsToExport.length})`);
+                
+                await new Promise(res => setTimeout(res, 800));
 
-                const criteriaHtml = [
-                    { label: "Prontidão", desc: "-2,0 p/ ocorr.", val: "-6,0" },
-                    { label: "Conversa", desc: "-3,0 p/ ocorr.", val: "-9,0" },
-                    { label: "Banheiro", desc: "-3,0 p/ saída", val: "Fixo" },
-                    { label: "Dormir", desc: "-3,0 p/ ocorr.", val: "Fixo" },
-                    { label: "Material", desc: "Uso Obrigatório", val: "-2,5" },
-                    { label: "Tarefas", desc: "Entrega Diária", val: "-2,5" },
-                    { label: "Atividade", desc: "Produtividade", val: "-7,5" },
-                    { label: "Celular", desc: "Uso Proibido", val: "-5,0" }
-                ].map(c => `
-                    <div style="display:flex; justify-content:space-between; border-bottom:1px solid #f1f5f9; padding-bottom:6px; margin-bottom:6px">
-                        <div>
-                            <div style="font-size:11px; font-weight:bold; color:#334155">${c.label}</div>
-                            <div style="font-size:9px; color:#94a3b8">${c.desc}</div>
-                        </div>
-                        <div style="font-size:11px; font-weight:bold; color:#ef4444; background:#fef2f2; padding:2px 6px; border-radius:4px">${c.val}</div>
-                    </div>
-                `).join('');
+                const element = document.getElementById('report-pdf-content');
+                if (!element) continue;
 
-                printContainer.innerHTML = `
-                    <div style="padding:40px; font-family: sans-serif; background:#ffffff">
-                        <!-- Cabeçalho -->
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #065f46; padding-bottom:15px; margin-bottom:25px">
-                            <div style="display:flex; align-items:center; gap:20px">
-                                ${schoolLogoUrl ? `<img src="${schoolLogoUrl}" style="height:60px; object-contain" />` : '<div style="width:60px; height:60px; background:#f0fdf4; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#10b981; font-weight:bold">EDU</div>'}
-                                <div>
-                                    <h1 style="margin:0; font-size:24px; color:#064e3b; text-transform:uppercase; letter-spacing:-0.5px">Relatório Individual</h1>
-                                    <div style="font-size:12px; font-weight:bold; color:#334155; margin-top:4px">Ano Letivo ${academicYear} | Período: ${format(new Date(startDate), "dd/MM")} a ${format(new Date(endDate), "dd/MM")}</div>
-                                </div>
-                            </div>
-                            <div style="text-align:right; color:#64748b; font-size:10px; font-weight:bold">EduControl PRO</div>
-                        </div>
+                const originalStyle = element.getAttribute('style') || '';
+                const originalClassName = element.className;
+                element.classList.remove('shadow-2xl', 'animate-in', 'fade-in', 'slide-in-from-bottom-4');
+                element.style.boxShadow = 'none';
+                element.style.transform = 'none';
+                element.style.transition = 'none';
 
-                        <div style="display:grid; grid-template-columns: 200px 1fr; gap:30px">
-                            <!-- Perfil Lateral -->
-                            <div>
-                                <div style="background:#f8fafc; border:1px solid #f1f5f9; border-radius:16px; padding:20px; text-align:center; margin-bottom:20px">
-                                    <img src="${student.photoUrl}" style="width:100px; height:100px; border-radius:50%; object-fit:cover; border:3px solid #10b981; margin:0 auto 15px" />
-                                    <h2 style="margin:0 0 5px; font-size:18px; color:#1e293b">${student.name}</h2>
-                                    <div style="font-size:13px; color:#64748b; margin-bottom:20px">${student.className}</div>
-                                    
-                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
-                                        <div style="background:#ffffff; padding:10px; border-radius:12px; border:1px solid #f1f5f9">
-                                            <div style="font-size:9px; font-weight:bold; color:#94a3b8; text-transform:uppercase">Média</div>
-                                            <div style="font-size:20px; font-weight:900; color:${Number(avgGrade) >= 7 ? '#10b981' : '#f97316'}">${avgGrade}</div>
-                                        </div>
-                                        <div style="background:#ffffff; padding:10px; border-radius:12px; border:1px solid #f1f5f9">
-                                            <div style="font-size:9px; font-weight:bold; color:#94a3b8; text-transform:uppercase">Aulas</div>
-                                            <div style="font-size:20px; font-weight:900; color:#1e293b">${totalClasses}</div>
-                                        </div>
-                                    </div>
-                                </div>
+                const canvas = await html2canvas(element as HTMLElement, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff',
+                    allowTaint: true,
+                    windowWidth: element.scrollWidth,
+                    windowHeight: element.scrollHeight
+                });
 
-                                <!-- Critérios -->
-                                <div style="background:#ffffff; border:1px solid #f1f5f9; border-radius:16px; padding:20px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05)">
-                                    <h3 style="font-size:13px; font-weight:bold; color:#1e293b; margin:0 0 15px; display:flex; align-items:center; gap:8px">Critérios de Avaliação</h3>
-                                    ${criteriaHtml}
-                                </div>
-                            </div>
-
-                            <!-- Conteúdo Principal -->
-                            <div>
-                                <h3 style="font-size:16px; font-weight:bold; color:#1e293b; margin:0 0 15px">Histórico Detalhado</h3>
-                                <table style="width:100%; border-collapse:collapse">
-                                    <thead>
-                                        <tr style="background:#f8fafc; border-bottom:2px solid #f1f5f9">
-                                            <th style="padding:12px 8px; text-align:left; font-size:10px; color:#64748b; text-transform:uppercase">Data</th>
-                                            <th style="padding:12px 8px; text-align:left; font-size:10px; color:#64748b; text-transform:uppercase">Docente</th>
-                                            <th style="padding:12px 8px; text-align:left; font-size:10px; color:#64748b; text-transform:uppercase">Pres.</th>
-                                            <th style="padding:12px 8px; text-align:left; font-size:10px; color:#64748b; text-transform:uppercase">Ocorrências</th>
-                                            <th style="padding:12px 8px; text-align:right; font-size:10px; color:#64748b; text-transform:uppercase">Nota</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${deductionRows || '<tr><td colspan="5" style="padding:30px; text-align:center; color:#94a3b8">Sem registros no período.</td></tr>'}
-                                    </tbody>
-                                </table>
-                                
-                                <div style="margin-top:40px; border-top:1px solid #f1f5f9; padding-top:20px; display:flex; justify-content:space-between">
-                                    <div style="width:200px; text-align:center">
-                                        <div style="border-top:1px solid #cbd5e1; margin-bottom:5px"></div>
-                                        <div style="font-size:9px; color:#64748b; font-weight:bold">Assinatura do Responsável</div>
-                                    </div>
-                                    <div style="width:200px; text-align:center">
-                                        <div style="border-top:1px solid #cbd5e1; margin-bottom:5px"></div>
-                                        <div style="font-size:9px; color:#64748b; font-weight:bold">Assinatura da Coordenação</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                await new Promise(res => setTimeout(res, 100)); // Esperar renderização/imagens
-                const canvas = await html2canvas(printContainer, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
-                document.body.removeChild(printContainer);
+                element.className = originalClassName;
+                element.setAttribute('style', originalStyle);
 
                 const imgData = canvas.toDataURL('image/png', 1.0);
-                if (i > 0) pdf.addPage();
-                
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = pdf.internal.pageSize.getHeight();
-                const ratio = pdfWidth / canvas.width;
-                const imgHeight = canvas.height * ratio;
+                const imgWidth = canvas.width;
+                const imgHeight = canvas.height;
+                const ratio = pdfWidth / imgWidth;
+                const imgHeightInPdf = imgHeight * ratio;
 
-                // Adicionar imagem do aluno (se for maior que uma página, precisaremos de um loop igual ao download individual)
-                // Mas geralmente 1 aluno cabe em 1 ou 2 páginas. Vamos simplificar adicionando a primeira parte e verificando.
-                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight, undefined, 'FAST');
-                
-                // Se o conteúdo for maior que a página, adiciona páginas extras para esse aluno específico
-                let heightLeft = imgHeight - pdfHeight;
-                let position = -pdfHeight;
+                if (i > 0) pdf.addPage();
+
+                let heightLeft = imgHeightInPdf;
+                let position = 0;
+
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf, undefined, 'FAST');
+                heightLeft -= pdfHeight;
+
                 while (heightLeft > 0) {
+                    position = heightLeft - imgHeightInPdf;
                     pdf.addPage();
-                    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight, undefined, 'FAST');
+                    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeightInPdf, undefined, 'FAST');
                     heightLeft -= pdfHeight;
-                    position -= pdfHeight;
                 }
             }
 
-            pdf.save(`Bulk_Relatorio_${selectedClassName}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
-            onShowToast(`PDF gerado com ${studentsToExport.length} relatórios premium!`);
+            setSelectedStudentId(originalStudentId);
+            setReportType(originalReportType);
+            setIsExporting(false);
+
+            pdf.save(`Relatorios_Massa_${selectedClassName || 'Escola'}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
+            onShowToast(`Exportação concluída com sucesso!`);
         } catch (error) {
             console.error('Bulk PDF Error:', error);
-            onShowToast('Erro ao gerar PDF em massa.');
+            setIsExporting(false);
+            onShowToast('Erro ao gerar exportação em massa.');
         }
     };
 
@@ -1173,6 +1093,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                         strokeWidth={4}
                                         dot={{ r: 5, fill: '#10b981', strokeWidth: 0 }}
                                         activeDot={{ r: 8, stroke: '#fff', strokeWidth: 2 }}
+                                        isAnimationActive={!isExporting}
                                     />
                                     <Line
                                         name="Média da Turma"
@@ -1182,6 +1103,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                         strokeWidth={2}
                                         strokeDasharray="6 6"
                                         dot={false}
+                                        isAnimationActive={!isExporting}
                                     />
                                 </LineChart>
                             </ResponsiveContainer>
@@ -1383,7 +1305,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                             <XAxis dataKey="name" stroke="#6b7280" fontSize={10} tickLine={false} axisLine={false} />
                             <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', fontSize: '10px', color: '#1f2937' }} itemStyle={{ color: '#1f2937' }} formatter={(val: number) => val + unit} />
-                            <Bar dataKey={dataKey} fill={color} radius={[2, 2, 0, 0]} />
+                            <Bar dataKey={dataKey} fill={color} radius={[2, 2, 0, 0]} isAnimationActive={!isExporting} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
@@ -1406,7 +1328,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                     <XAxis dataKey="name" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
                                     <YAxis domain={[0, 10]} stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
                                     <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', color: '#1f2937' }} itemStyle={{ color: '#1f2937' }} />
-                                    <Bar dataKey="avgGrade" name="Nota Média" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
+                                    <Bar dataKey="avgGrade" name="Nota Média" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} isAnimationActive={!isExporting} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -1423,7 +1345,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                                     <XAxis dataKey="name" stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
                                     <YAxis domain={[0, 100]} stroke="#6b7280" fontSize={12} tickLine={false} axisLine={false} />
                                     <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', color: '#1f2937' }} itemStyle={{ color: '#1f2937' }} />
-                                    <Bar dataKey="attendance" name="Presença (%)" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
+                                    <Bar dataKey="attendance" name="Presença (%)" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} isAnimationActive={!isExporting} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
