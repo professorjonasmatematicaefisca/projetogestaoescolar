@@ -1050,6 +1050,19 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
         const { chartData, avgGrade, totalClasses, student } = getStudentData(selectedStudentId);
         if (!student) return <div className="text-gray-400 p-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 mt-10">Selecione um aluno para visualizar o relatório.</div>;
 
+        // Componente auxiliar para as linhas de critérios
+        const CriteriaRow = ({ label, desc, val }: { label: string, desc: string, val: string }) => (
+            <div className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors px-1 rounded-md">
+                <div>
+                    <div className="text-xs font-black text-slate-700 uppercase tracking-tight">{label}</div>
+                    <div className="text-[10px] text-slate-400 font-medium">{desc}</div>
+                </div>
+                <div className="text-[11px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
+                    {val}
+                </div>
+            </div>
+        );
+
         return (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column: Profile & Summary */}
@@ -1079,7 +1092,7 @@ export const StudentReport: React.FC<ReportProps> = ({ onShowToast, currentUserR
                         <h3 className="text-sm font-black text-slate-800 mb-6 flex items-center gap-2 border-b border-slate-100 pb-3 uppercase tracking-wider">
                             <AlertCircle size={18} className="text-emerald-500" /> Critérios Avaliativos
                         </h3>
-                        <div className="space-y-4">
+                        <div className="space-y-1">
                             <CriteriaRow label="Prontidão" desc="Engajamento inicial" val="-2,0" />
                             <CriteriaRow label="Conversa" desc="Interrupções letivas" val="-3,0" />
                             <CriteriaRow label="Banheiro" desc="Saída de sala" val="-3,0" />
