@@ -132,17 +132,20 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
 
         let payloadNote = soeConsiderations;
 
-        // Se NÃO FOR Coordenador, faz o Append-Only da nova observação
-        if (currentUserRole !== UserRole.COORDINATOR) {
-            if (!newObservation.trim()) {
-                setSaving(false);
-                return;
-            }
+        // Se houver uma nova observação, faz o Append para qualquer perfil
+        if (newObservation.trim()) {
             const dateStr = format(new Date(), "dd/MM/yyyy");
-            const roleStr = currentUserRole === UserRole.TEACHER ? "Prof." : "Usuário";
+            let roleStr = "Usuário";
+            if (currentUserRole === UserRole.COORDINATOR) roleStr = "Coord.";
+            else if (currentUserRole === UserRole.TEACHER) roleStr = "Prof.";
+            
             const signatureTitle = userName ? `${roleStr} ${userName.split(' ')[0]}` : signature;
             const prependedNote = `[${dateStr} - ${signatureTitle}]: ${newObservation.trim()}`;
             payloadNote = soeConsiderations ? `${soeConsiderations}\n\n${prependedNote}` : prependedNote;
+        } else if (currentUserRole !== UserRole.COORDINATOR) {
+            // Se não é coordenador e o campo de nova observação está vazio, não faz nada
+            setSaving(false);
+            return;
         }
 
         const success = await SupabaseService.saveStudentSOENote(selectedStudentId, selectedYear, payloadNote, signature);
@@ -638,65 +641,61 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                                     </span>
                                 )}
                             </div>
-                            {currentUserRole === UserRole.COORDINATOR && (
-                                <div className="flex items-center gap-2 print:hidden">
-                                    <span className="text-[10px] text-gray-500 uppercase mr-2">Acesso Livre (Coord.)</span>
-                                    <button
-                                        onClick={handleSaveConsiderations}
-                                        disabled={saving || !selectedStudentId}
-                                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold px-3 py-1 rounded transition-colors flex items-center gap-1"
-                                    >
-                                        {saving ? 'SALVANDO...' : 'SALVAR NOTA'}
-                                    </button>
-                                </div>
-                            )}
                         </div>
 
-                        {currentUserRole !== UserRole.COORDINATOR ? (
-                            <div className="p-4 bg-white flex flex-col">
-                                {/* ReadOnly View of Past History */}
-                                <div className="w-full text-sm text-gray-800 whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200 min-h-[80px] mb-3">
-                                    {soeConsiderations || <span className="text-gray-400 italic">Nenhuma consideração registrada ainda.</span>}
-                                </div>
-
-                                {/* New Entry Add Form */}
-                                <div className="print:hidden border border-emerald-200 rounded-lg overflow-hidden bg-emerald-50">
-                                    <div className="p-2 border-b border-emerald-200 bg-emerald-100/50 flex justify-between items-center">
-                                        <span className="text-xs font-bold text-emerald-800 flex items-center gap-1">Adicionar Nova Observação</span>
-                                        <button
-                                            onClick={handleSaveConsiderations}
-                                            disabled={saving || !selectedStudentId || !newObservation.trim()}
-                                            className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold px-3 py-1 rounded transition-colors flex items-center gap-1"
-                                        >
-                                            {saving ? 'SALVANDO...' : 'ADICIONAR OBS.'}
-                                        </button>
+                        <div className="p-4 bg-white flex flex-col">
+                            {/* ReadOnly View of Past History or Editable area for Coordinator */}
+                            {currentUserRole === UserRole.COORDINATOR ? (
+                                <>
+                                    <div className="print:hidden mb-1 flex justify-between items-end">
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Histórico (Acesso Livre - Coord.)</label>
                                     </div>
                                     <textarea
-                                        className="w-full h-20 p-3 text-sm text-gray-800 outline-none resize-none bg-transparent placeholder-emerald-800/40"
-                                        placeholder="Digite sua observação descritiva sobre o aluno..."
-                                        value={newObservation}
-                                        onChange={(e) => setNewObservation(e.target.value)}
+                                        className="w-full h-32 p-3 text-sm text-gray-800 outline-none resize-none bg-white border border-gray-300 rounded mb-3 print:hidden focus:border-emerald-500"
+                                        placeholder="Área de edição livre para coordenação (visão global)..."
+                                        value={soeConsiderations}
+                                        onChange={(e) => setSoeConsiderations(e.target.value)}
                                     />
-                                </div>
+                                    <div className="hidden print:block whitespace-pre-wrap text-sm text-gray-800 bg-gray-50 p-3 rounded border border-gray-200 min-h-[80px] mb-3">
+                                        {soeConsiderations || <span className="text-gray-400 italic">Nenhuma consideração registrada.</span>}
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="print:hidden mb-1">
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Histórico de Observações</label>
+                                    </div>
+                                    <div className="w-full text-sm text-gray-800 whitespace-pre-wrap bg-gray-50 p-3 rounded border border-gray-200 min-h-[80px] mb-3">
+                                        {soeConsiderations || <span className="text-gray-400 italic">Nenhuma consideração registrada ainda.</span>}
+                                    </div>
+                                </>
+                            )}
 
-                                {/* PDF Render Block */}
-                                <div className="hidden print:block whitespace-pre-wrap text-sm text-gray-800 mt-2">
-                                    {newObservation && `\n[Nova Observação não salva: ${newObservation}]`}
+                            {/* New Entry Add Form (Visible to everyone) */}
+                            <div className="print:hidden border border-emerald-200 rounded-lg overflow-hidden bg-emerald-50">
+                                <div className="p-2 border-b border-emerald-200 bg-emerald-100/50 flex justify-between items-center">
+                                    <span className="text-xs font-bold text-emerald-800 flex items-center gap-1">Adicionar Nova Observação</span>
+                                    <button
+                                        onClick={handleSaveConsiderations}
+                                        disabled={saving || !selectedStudentId || (!newObservation.trim() && currentUserRole !== UserRole.COORDINATOR)}
+                                        className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold px-3 py-1 rounded transition-colors flex items-center gap-1"
+                                    >
+                                        {saving ? 'SALVANDO...' : (currentUserRole === UserRole.COORDINATOR && !newObservation.trim() ? 'SALVAR EDIÇÃO' : 'ADICIONAR OBS.')}
+                                    </button>
                                 </div>
-                            </div>
-                        ) : (
-                            <>
                                 <textarea
-                                    className="w-full h-32 p-4 text-sm text-gray-800 outline-none resize-none bg-white placeholder-gray-300 print:hidden"
-                                    placeholder="Área de edição livre para coordenação (visão global)..."
-                                    value={soeConsiderations}
-                                    onChange={(e) => setSoeConsiderations(e.target.value)}
+                                    className="w-full h-20 p-3 text-sm text-gray-800 outline-none resize-none bg-transparent placeholder-emerald-800/40"
+                                    placeholder="Digite sua observação descritiva sobre o aluno..."
+                                    value={newObservation}
+                                    onChange={(e) => setNewObservation(e.target.value)}
                                 />
-                                <div className="hidden print:block whitespace-pre-wrap text-[11px] leading-tight text-gray-800 p-4 min-h-[120px]">
-                                    {soeConsiderations || "Nenhuma consideração."}
-                                </div>
-                            </>
-                        )}
+                            </div>
+
+                            {/* PDF Render Block for unsaved new observation */}
+                            <div className="hidden print:block whitespace-pre-wrap text-sm text-gray-800 mt-2">
+                                {newObservation && `\n[Nova Observação não salva: ${newObservation}]`}
+                            </div>
+                        </div>
                     </div>
 
                     {/* Signature Lines */}
