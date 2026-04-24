@@ -56,6 +56,11 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
     const [newObservation, setNewObservation] = useState<string>('');
     const [lastSignedBy, setLastSignedBy] = useState<string>('');
     const [saving, setSaving] = useState(false);
+
+    const currentSignature = userName || userEmail || "Sistema";
+    const isAuthor = lastSignedBy === currentSignature;
+    const canEditHistory = currentUserRole === UserRole.COORDINATOR || isAuthor;
+
     const [schoolLogoUrl, setSchoolLogoUrl] = useState<string | null>(localStorage.getItem('educontrol_school_logo'));
 
     // Generate available years based on session history + current year
@@ -142,8 +147,8 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
             const signatureTitle = userName ? `${roleStr} ${userName.split(' ')[0]}` : signature;
             const prependedNote = `[${dateStr} - ${signatureTitle}]: ${newObservation.trim()}`;
             payloadNote = soeConsiderations ? `${soeConsiderations}\n\n${prependedNote}` : prependedNote;
-        } else if (currentUserRole !== UserRole.COORDINATOR) {
-            // Se não é coordenador e o campo de nova observação está vazio, não faz nada
+        } else if (!canEditHistory) {
+            // Se não tem permissão de edição e o campo de nova observação está vazio, não faz nada
             setSaving(false);
             return;
         }
@@ -644,15 +649,20 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                         </div>
 
                         <div className="p-4 bg-white flex flex-col">
-                            {/* ReadOnly View of Past History or Editable area for Coordinator */}
-                            {currentUserRole === UserRole.COORDINATOR ? (
+                            {/* ReadOnly View of Past History or Editable area for Coordinator/Author */}
+                            {canEditHistory ? (
                                 <>
                                     <div className="print:hidden mb-1 flex justify-between items-end">
-                                        <label className="text-xs font-bold text-gray-500 uppercase">Histórico (Acesso Livre - Coord.)</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">
+                                            {currentUserRole === UserRole.COORDINATOR ? 'Histórico (Acesso Livre - Coord.)' : 'Histórico (Sua última observação - Editável)'}
+                                        </label>
+                                        {!newObservation.trim() && isAuthor && currentUserRole !== UserRole.COORDINATOR && (
+                                            <span className="text-[9px] text-emerald-600 font-bold uppercase animate-pulse">Você pode editar sua nota anterior abaixo</span>
+                                        )}
                                     </div>
                                     <textarea
-                                        className="w-full h-32 p-3 text-sm text-gray-800 outline-none resize-none bg-white border border-gray-300 rounded mb-3 print:hidden focus:border-emerald-500"
-                                        placeholder="Área de edição livre para coordenação (visão global)..."
+                                        className="w-full h-32 p-3 text-sm text-gray-800 outline-none resize-none bg-white border border-emerald-200 rounded mb-3 print:hidden focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20"
+                                        placeholder="Área de edição para sua observação..."
                                         value={soeConsiderations}
                                         onChange={(e) => setSoeConsiderations(e.target.value)}
                                     />
@@ -677,10 +687,10 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                                     <span className="text-xs font-bold text-emerald-800 flex items-center gap-1">Adicionar Nova Observação</span>
                                     <button
                                         onClick={handleSaveConsiderations}
-                                        disabled={saving || !selectedStudentId || (!newObservation.trim() && currentUserRole !== UserRole.COORDINATOR)}
+                                        disabled={saving || !selectedStudentId || (!newObservation.trim() && !canEditHistory)}
                                         className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold px-3 py-1 rounded transition-colors flex items-center gap-1"
                                     >
-                                        {saving ? 'SALVANDO...' : (currentUserRole === UserRole.COORDINATOR && !newObservation.trim() ? 'SALVAR EDIÇÃO' : 'ADICIONAR OBS.')}
+                                        {saving ? 'SALVANDO...' : (canEditHistory && !newObservation.trim() ? 'SALVAR EDIÇÃO' : 'ADICIONAR OBS.')}
                                     </button>
                                 </div>
                                 <textarea
