@@ -13,6 +13,8 @@ export const SEED_DISCIPLINES: Discipline[] = [
 
 export const SEED_CLASSES: ClassRoom[] = [
   { id: 'class-1-aem', name: '1º AEM', period: 'Matutino' },
+  { id: 'class-9-a-efii', name: '9º A EFII', period: 'Matutino' },
+  { id: 'class-9-b-efii', name: '9º B EFII', period: 'Vespertino' },
   { id: 'class-9-a', name: '9º Ano A', period: 'Matutino' },
   { id: 'class-9-b', name: '9º Ano B', period: 'Vespertino' }
 ];
@@ -26,7 +28,8 @@ export const SEED_TEACHERS: Teacher[] = [
     subject: 'Biologia',
     assignments: [
       { classId: '1º AEM', subject: 'Biologia' },
-      { classId: '9º Ano A', subject: 'Biologia' }
+      { classId: '9º Ano A', subject: 'Biologia' },
+      { classId: '9º B EFII', subject: 'Biologia' }
     ]
   },
   {
@@ -37,7 +40,8 @@ export const SEED_TEACHERS: Teacher[] = [
     subject: 'Matemática',
     assignments: [
       { classId: '1º AEM', subject: 'Matemática' },
-      { classId: '9º Ano B', subject: 'Matemática' }
+      { classId: '9º Ano B', subject: 'Matemática' },
+      { classId: '9º B EFII', subject: 'Matemática' }
     ]
   }
 ];
@@ -75,13 +79,24 @@ const studentNames = [
   "Vitoria Aline Bolina Manfrim"
 ];
 
-export const SEED_STUDENTS: Student[] = studentNames.map((name, index) => ({
-  id: `std-aem-${index + 1}`,
-  name: name,
-  photoUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff`,
-  parentEmail: `pais.${name.split(' ')[0].toLowerCase()}@exemplo.com`,
-  className: "1º AEM"
-}));
+export const SEED_STUDENTS: Student[] = [
+  {
+    id: 'std-felipe-gabriel',
+    name: 'Felipe Gabriel Nascimento dos Santos',
+    photoUrl: 'https://ui-avatars.com/api/?name=Felipe+Gabriel&background=0D9488&color=fff',
+    parentEmail: 'pais.felipe@exemplo.com',
+    className: '9º B EFII',
+    status: 'ACTIVE'
+  },
+  ...studentNames.map((name, index) => ({
+    id: `std-aem-${index + 1}`,
+    name: name,
+    photoUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff`,
+    parentEmail: `pais.${name.split(' ')[0].toLowerCase()}@exemplo.com`,
+    className: "1º AEM",
+    status: 'ACTIVE'
+  }))
+];
 
 export const SEED_OCCURRENCES: Occurrence[] = [
   {

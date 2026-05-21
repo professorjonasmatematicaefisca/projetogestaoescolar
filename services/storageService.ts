@@ -19,9 +19,10 @@ const init = () => {
   // Check if we need to migrate/update to the new requested class list
   const currentClasses = JSON.parse(localStorage.getItem(KEYS.CLASSES) || '[]');
   const hasAEM = currentClasses.some((c: ClassRoom) => c.name === '1º AEM');
+  const has9BEFII = currentClasses.some((c: ClassRoom) => c.name === '9º B EFII');
 
-  // If 1º AEM is missing, force update the seed data to ensure the user request is met
-  if (!hasAEM) {
+  // If 1º AEM or 9º B EFII is missing, force update the seed data to ensure the user request is met
+  if (!hasAEM || !has9BEFII) {
     localStorage.setItem(KEYS.CLASSES, JSON.stringify(SEED_CLASSES));
     localStorage.setItem(KEYS.STUDENTS, JSON.stringify(SEED_STUDENTS));
     // Reset sessions to prevent ID conflicts with old data

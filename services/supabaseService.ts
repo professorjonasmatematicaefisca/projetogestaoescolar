@@ -350,15 +350,21 @@ export const SupabaseService = {
     async getClasses(): Promise<ClassRoom[]> {
         if (!offlineService.isOnline()) {
             const cached = await offlineService.getCache<ClassRoom[]>('classes');
-            if (cached) return cached;
-            return [];
+            if (cached && cached.length > 0) return cached;
+            return StorageService.getClasses();
         }
 
         const { data, error } = await supabase.from('classes').select('*');
         if (error) {
             console.error("Error fetching classes:", error);
             const cached = await offlineService.getCache<ClassRoom[]>('classes');
-            return cached || [];
+            if (cached && cached.length > 0) return cached;
+            return StorageService.getClasses();
+        }
+
+        if (!data || data.length === 0) {
+            console.warn("Supabase classes table is empty, falling back to local storage");
+            return StorageService.getClasses();
         }
 
         const { data: assignments } = await supabase.from('class_disciplines').select('class_id, discipline_id');
@@ -399,8 +405,8 @@ export const SupabaseService = {
 
         if (!offlineService.isOnline()) {
             const cached = await offlineService.getCache<Student[]>(cacheKey);
-            if (cached) return cached;
-            return [];
+            if (cached && cached.length > 0) return cached;
+            return StorageService.getStudents();
         }
 
         let query = supabase.from('students').select('*');
@@ -412,7 +418,13 @@ export const SupabaseService = {
         if (error) {
             console.error("Error fetching students:", error);
             const cached = await offlineService.getCache<Student[]>(cacheKey);
-            return cached || [];
+            if (cached && cached.length > 0) return cached;
+            return StorageService.getStudents();
+        }
+
+        if (!data || data.length === 0) {
+            console.warn("Supabase students table is empty, falling back to local storage");
+            return StorageService.getStudents();
         }
 
         const students = data.map((s: any) => ({
