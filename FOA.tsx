@@ -39,6 +39,38 @@ interface ObservationLog {
     hasPhotos: boolean;
 }
 
+const DEFAULT_REPORTS: Record<string, string> = {
+    "Felipe Gabriel Nascimento dos Santos": `O aluno demonstra maior facilidade em conteúdos que envolvem cálculos diretos, aplicação de fórmulas e exercícios com comandos objetivos, como “calcule”, “resolva” ou “efetue”. Entretanto, apresenta dificuldades em conceitos matemáticos básicos e fundamentais, especialmente em simplificação de frações, manipulação algébrica e resolução de equações.
+
+Durante as explicações em sala de aula, observa-se que o aluno possui dificuldade em manter a atenção voltada para a exposição do conteúdo. Frequentemente, prioriza copiar os exercícios e resoluções em vez de acompanhar atentamente as explicações e orientações dadas pelo professor. Quando orientado a focar primeiro na explicação para compreender os procedimentos, estratégias e simplificações apresentadas, o aluno relata que acredita aprender melhor copiando.
+
+No entanto, após o término das explicações, é comum o aluno solicitar que o conteúdo seja repetido, alegando não ter compreendido o processo realizado anteriormente. Isso evidencia que a ausência de atenção durante o momento explicativo tem impactado diretamente sua compreensão e assimilação dos conteúdos trabalhados.
+
+Outro ponto observado é que, durante a realização dos exercícios em sala, enquanto o professor desenvolve a resolução juntamente com a turma, o aluno tende a tentar resolver sozinho sem acompanhar integralmente o raciocínio apresentado na lousa. Essa iniciativa demonstra interesse e tentativa de autonomia, o que é positivo; porém, devido às dificuldades conceituais já existentes, acaba prejudicando ainda mais a compreensão dos métodos corretos de resolução.
+
+Também foi observado que, ao ser questionado durante a aula sobre possíveis dúvidas, o aluno normalmente responde que compreendeu o conteúdo. Contudo, após o encerramento da aula, procura o professor para informar que não entendeu determinados procedimentos ou conceitos apresentados anteriormente.
+
+Sugestões e encaminhamentos pedagógicos
+
+Considero necessário que o aluno desenvolva maior atenção durante os momentos de explicação dos conteúdos, priorizando a compreensão do raciocínio matemático antes de realizar as cópias no caderno. Percebo que, muitas vezes, ao focar apenas em copiar, ele deixa de acompanhar estratégias, simplificações e orientações importantes apresentadas durante a resolução dos exercícios.
+
+Entendo também que é importante que o aluno passe a manifestar suas dúvidas no momento em que elas surgirem. Frequentemente, durante a aula, questiono se há dúvidas e o aluno informa que compreendeu o conteúdo, porém, após o término da aula, relata dificuldades em entender os procedimentos realizados. Essa comunicação imediata é fundamental para que eu possa auxiliá-lo de maneira mais eficiente durante a explicação.
+
+Acredito que o aluno necessita reforçar conteúdos básicos da matemática, principalmente simplificação de frações, operações algébricas e resolução de equações, pois essas habilidades são fundamentais para o desenvolvimento dos demais conteúdos da disciplina.
+
+Observo que o aluno possui iniciativa ao tentar resolver os exercícios sozinho, o que considero positivo. No entanto, é necessário que ele acompanhe inicialmente as resoluções feitas na lousa e procure compreender os métodos apresentados antes de tentar realizar as atividades de forma independente.
+
+Dessa forma, considero importante que o aluno:
+- mantenha maior foco e concentração durante as explicações;
+- participe mais ativamente das aulas;
+- esclareça suas dúvidas no momento em que elas aparecerem;
+- realize revisões frequentes dos conteúdos básicos;
+- pratique exercícios graduais para fortalecimento da base matemática;
+- desenvolva uma rotina de estudos e revisões fora da sala de aula.
+
+Acredito que, com essas mudanças de postura e acompanhamento contínuo, o aluno possui potencial para apresentar evolução significativa em seu desempenho e compreensão matemática.`
+};
+
 export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmail, userName }) => {
     const currentYear = new Date().getFullYear();
     const [classes, setClasses] = useState<ClassRoom[]>([]);
@@ -56,6 +88,7 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
     const [newObservation, setNewObservation] = useState<string>('');
     const [lastSignedBy, setLastSignedBy] = useState<string>('');
     const [saving, setSaving] = useState(false);
+    const [viewMode, setViewMode] = useState<'FOA' | 'DESCRITIVO'>('FOA');
 
     const currentSignature = userName || userEmail || "Sistema";
     const isAuthor = lastSignedBy === currentSignature;
@@ -119,6 +152,18 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
         if (selectedStudentId) {
             const loadNote = async () => {
                 const data = await SupabaseService.getStudentSOENote(selectedStudentId, selectedYear);
+                const currentStudent = students.find(s => s.id === selectedStudentId);
+                
+                if (!data.note && currentStudent) {
+                    const normalizedName = currentStudent.name.trim();
+                    const defaultReport = DEFAULT_REPORTS[normalizedName];
+                    if (defaultReport) {
+                        setSoeConsiderations(defaultReport);
+                        setLastSignedBy("Sugestão do Sistema");
+                        return;
+                    }
+                }
+                
                 setSoeConsiderations(data.note);
                 setLastSignedBy(data.signedBy);
             };
@@ -127,7 +172,7 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
             setSoeConsiderations('');
             setLastSignedBy('');
         }
-    }, [selectedStudentId, selectedYear]);
+    }, [selectedStudentId, selectedYear, students]);
 
     const handleSaveConsiderations = async () => {
         if (!selectedStudentId) return;
@@ -379,6 +424,112 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
         </th>
     );
 
+    const renderStudentPhoto = () => {
+        const initials = selectedStudent
+            ? selectedStudent.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
+            : 'S';
+
+        if (selectedStudent?.photoUrl && selectedStudent.photoUrl.trim() !== "") {
+            return (
+                <div className="w-20 h-24 border border-emerald-800 rounded-md overflow-hidden shadow-sm flex-shrink-0 bg-gray-50 flex items-center justify-center print:w-20 print:h-24">
+                    <img
+                        src={selectedStudent.photoUrl}
+                        alt={`Foto de ${selectedStudent.name}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                            const parent = (e.target as HTMLElement).parentElement;
+                            if (parent) {
+                                const fallback = document.createElement('div');
+                                fallback.className = "w-full h-full flex items-center justify-center bg-emerald-50 text-emerald-800 font-bold text-xl";
+                                fallback.innerText = initials;
+                                parent.appendChild(fallback);
+                            }
+                        }}
+                    />
+                </div>
+            );
+        }
+
+        return (
+            <div className="w-20 h-24 border border-emerald-800 rounded-md bg-emerald-50 shadow-sm flex flex-col items-center justify-center flex-shrink-0 text-emerald-850 relative overflow-hidden print:w-20 print:h-24">
+                <svg className="w-12 h-12 text-emerald-800/30 mb-1" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
+                <span className="text-[9px] font-bold tracking-wider text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full absolute bottom-1.5 uppercase">
+                    {initials}
+                </span>
+            </div>
+        );
+    };
+
+    const renderDescriptiveReport = () => {
+        if (!soeConsiderations) {
+            return (
+                <div className="py-12 text-center text-gray-400 italic bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+                    Nenhum relatório ou consideração registrada para este aluno no momento.
+                </div>
+            );
+        }
+
+        const paragraphs = soeConsiderations.split(/\n\s*\n/);
+
+        return (
+            <div className="space-y-5 text-gray-800 text-sm leading-relaxed my-6 px-1">
+                {paragraphs.map((p, idx) => {
+                    const cleanParagraph = p.trim();
+                    if (!cleanParagraph) return null;
+
+                    // Check if it is the section heading
+                    if (cleanParagraph.toLowerCase() === "sugestões e encaminhamentos pedagógicos") {
+                        return (
+                            <h3 
+                                key={idx} 
+                                className="text-base font-bold text-emerald-950 uppercase border-b-2 border-emerald-800/30 pb-1.5 mt-8 mb-4 flex items-center gap-2 print:break-after-avoid"
+                            >
+                                <FileText size={18} className="text-emerald-850" />
+                                Sugestões e Encaminhamentos Pedagógicos
+                            </h3>
+                        );
+                    }
+
+                    // Check if it's a bulleted list block
+                    if (cleanParagraph.includes('\n-') || cleanParagraph.startsWith('-')) {
+                        const lines = cleanParagraph.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                        const introduction = lines[0].startsWith('-') ? null : lines[0];
+                        const listItems = lines.filter(l => l.startsWith('-')).map(l => l.replace(/^-\s*/, ''));
+
+                        return (
+                            <div key={idx} className="my-4">
+                                {introduction && (
+                                    <p className="mb-3 font-medium text-gray-900">{introduction}</p>
+                                )}
+                                <ul className="list-disc pl-6 space-y-2.5 text-gray-700">
+                                    {listItems.map((item, itemIdx) => (
+                                        <li key={itemIdx} className="text-justify leading-relaxed">
+                                            {item}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        );
+                    }
+
+                    // Standard Paragraph
+                    return (
+                        <p 
+                            key={idx} 
+                            className="text-justify whitespace-pre-wrap leading-relaxed text-gray-800"
+                            style={{ textIndent: '1.5rem' }}
+                        >
+                            {cleanParagraph}
+                        </p>
+                    );
+                })}
+            </div>
+        );
+    };
+
     return (
         <div className="max-w-[1600px] mx-auto pb-20">
             {/* Controls (Hidden on Print) */}
@@ -448,6 +599,19 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                         </select>
                     </div>
 
+                    <div className="flex items-center gap-2 bg-[#1e293b] px-3 py-2 rounded-lg border border-gray-700">
+                        <FileText size={16} className="text-gray-400" />
+                        <span className="text-xs font-bold text-gray-500 uppercase mr-2">Modelo:</span>
+                        <select
+                            value={viewMode}
+                            onChange={(e) => setViewMode(e.target.value as 'FOA' | 'DESCRITIVO')}
+                            className="bg-[#0f172a] text-white text-sm border border-gray-700 rounded-md p-1 outline-none focus:border-emerald-500 min-w-[150px]"
+                        >
+                            <option value="FOA">FOA Padrão</option>
+                            <option value="DESCRITIVO">Relatório Descritivo</option>
+                        </select>
+                    </div>
+
                     <button
                         onClick={handlePrint}
                         className="bg-emerald-500 hover:bg-emerald-600 text-[#0f172a] font-bold px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
@@ -469,173 +633,191 @@ export const FOA: React.FC<FOAProps> = ({ onShowToast, currentUserRole, userEmai
                 <div className="bg-white text-black p-6 md:p-8 min-h-[1000px] shadow-2xl print:shadow-none print:p-0 print:m-0 print:w-full print:max-w-none max-w-[210mm] mx-auto overflow-visible">
 
                     {/* Header Info */}
-                    <div className="flex justify-between items-end border-b-2 border-emerald-800 pb-2 mb-4 gap-4">
-                        <div className="flex items-center gap-4">
+                    <div className="flex justify-between items-start border-b-2 border-emerald-800 pb-3 mb-4 gap-4">
+                        <div className="flex items-start gap-4">
                             {schoolLogoUrl && (
-                                <img src={schoolLogoUrl} alt="Logo" className="max-h-16 object-contain" />
+                                <img src={schoolLogoUrl} alt="Logo" className="max-h-16 object-contain mt-1" />
                             )}
                             <div>
-                                <h1 className="text-3xl font-bold uppercase text-emerald-900 tracking-tight">Ficha de Observação do Aluno</h1>
+                                <h1 className="text-2xl md:text-3xl font-bold uppercase text-emerald-900 tracking-tight">
+                                    {viewMode === 'DESCRITIVO' ? 'Relatório Descritivo Individual' : 'Ficha de Observação do Aluno'}
+                                </h1>
                                 <div className="flex flex-col md:flex-row md:gap-8 mt-2 text-sm text-gray-800">
                                     <p><strong className="text-emerald-800">ALUNO:</strong> {selectedStudent?.name.toUpperCase()}</p>
                                     <p><strong className="text-emerald-800">TURMA:</strong> {selectedStudent?.className}</p>
                                 </div>
                             </div>
                         </div>
-                        <div className="text-right">
-                            <p className="font-bold text-xl text-emerald-900">{selectedYear}</p>
-                            <p className="text-xs text-gray-600">EduControl PRO</p>
-                        </div>
-                    </div>
-
-                    {/* Legend */}
-                    <div className="mb-4 flex justify-end">
-                        <table className="text-[10px] border-collapse shadow-sm">
-                            <thead>
-                                <tr>
-                                    <td className="border border-gray-400 bg-gray-100 p-1 px-2 font-bold text-gray-700">Legenda:</td>
-                                    <td className="border border-gray-400 p-1 px-3 font-bold text-center" style={{ backgroundColor: '#00FF00', WebkitPrintColorAdjust: 'exact' }}>Ótimo (O)</td>
-                                    <td className="border border-gray-400 p-1 px-3 font-bold text-center" style={{ backgroundColor: '#92D050', WebkitPrintColorAdjust: 'exact' }}>Bom (B)</td>
-                                    <td className="border border-gray-400 p-1 px-3 font-bold text-center" style={{ backgroundColor: '#FFFF00', WebkitPrintColorAdjust: 'exact' }}>Satisfatório (S)</td>
-                                    <td className="border border-gray-400 p-1 px-3 font-bold text-center" style={{ backgroundColor: '#FF9900', WebkitPrintColorAdjust: 'exact' }}>Insatisfatório (I)</td>
-                                </tr>
-                            </thead>
-                        </table>
-                    </div>
-
-                    {/* Main Table */}
-                    <div className="overflow-hidden rounded-t-lg border border-gray-900">
-                        <table className="w-full text-xs border-collapse table-fixed">
-                            <colgroup><col style={{ width: '100px' }} /><col style={{ width: '100px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /></colgroup>
-                            <thead>
-                                {/* Group Headers */}
-                                <tr className="bg-emerald-50">
-                                    <th className="bg-white border border-gray-900 text-left pl-2 py-2 text-sm" rowSpan={2}>Disciplina</th>
-                                    <th className="bg-white border border-gray-900 text-left pl-2 py-2 text-sm" rowSpan={2}>Professor(a)</th>
-                                    <th colSpan={2} className="bg-white border border-gray-900 font-bold border-l-2 text-center py-1 bg-gray-50 uppercase tracking-tight text-[10px]">Aspectos Comportamentais</th>
-                                    <th colSpan={3} className="bg-white border border-gray-900 font-bold border-l-2 text-center py-1 bg-gray-50 uppercase tracking-tight text-[10px]">Tarefas/Materiais</th>
-                                    <th colSpan={4} className="bg-white border border-gray-900 font-bold border-l-2 text-center py-1 bg-gray-50 uppercase tracking-tight text-[10px]">Competências Socioemocionais</th>
-                                </tr>
-                                {/* Vertical Headers */}
-                                <tr className="bg-gray-50">
-                                    <VerticalHeader text="Comportamento" />
-                                    <VerticalHeader text="Falta de Atenção" subtext="(Foco)" />
-
-                                    <VerticalHeader text="Tarefas" subtext="(Portal)" />
-                                    <VerticalHeader text="Ativ. de Classe" />
-                                    <VerticalHeader text="Material" />
-
-                                    <VerticalHeader text="Engajamento" />
-                                    <VerticalHeader text="Falta Autogestão" />
-                                    <VerticalHeader text="Participação" />
-                                    <VerticalHeader text="Abertura ao Novo" />
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {foaRows.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={11} className="p-8 text-center text-gray-500 italic border border-gray-900">
-                                            Nenhuma aula registrada para este ano ({selectedYear}).
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    foaRows.map((row, index) => (
-                                        <tr key={index}>
-                                            <td className="border border-gray-900 p-2 pl-3 bg-white font-bold text-gray-800 text-[11px] truncate uppercase">
-                                                {row.subject.replace(/\s+\d+º.*$/, '').trim()}
-                                            </td>
-                                            <td className="border border-gray-900 p-2 pl-3 bg-white text-gray-700 text-[11px] truncate">
-                                                {row.teacherName}
-                                            </td>
-
-                                            {/* Concepts */}
-                                            <td className={getCellClass(row.comportamento)} style={{ backgroundColor: getConceptColor(row.comportamento), WebkitPrintColorAdjust: 'exact' }}>{row.comportamento}</td>
-                                            <td className={getCellClass(row.atencao)} style={{ backgroundColor: getConceptColor(row.atencao), WebkitPrintColorAdjust: 'exact' }}>{row.atencao}</td>
-
-                                            <td className={getCellClass(row.tarefas)} style={{ backgroundColor: getConceptColor(row.tarefas), WebkitPrintColorAdjust: 'exact' }}>{row.tarefas}</td>
-                                            <td className={getCellClass(row.atividades)} style={{ backgroundColor: getConceptColor(row.atividades), WebkitPrintColorAdjust: 'exact' }}>{row.atividades}</td>
-                                            <td className={getCellClass(row.material)} style={{ backgroundColor: getConceptColor(row.material), WebkitPrintColorAdjust: 'exact' }}>{row.material}</td>
-
-                                            <td className={getCellClass(row.engajamento)} style={{ backgroundColor: getConceptColor(row.engajamento), WebkitPrintColorAdjust: 'exact' }}>{row.engajamento}</td>
-                                            <td className={getCellClass(row.autogestao)} style={{ backgroundColor: getConceptColor(row.autogestao), WebkitPrintColorAdjust: 'exact' }}>{row.autogestao}</td>
-                                            <td className={getCellClass(row.participacao)} style={{ backgroundColor: getConceptColor(row.participacao), WebkitPrintColorAdjust: 'exact' }}>{row.participacao}</td>
-                                            <td className={getCellClass(row.abertura)} style={{ backgroundColor: getConceptColor(row.abertura), WebkitPrintColorAdjust: 'exact' }}>{row.abertura}</td>
-                                        </tr>
-                                    ))
+                        <div className="flex gap-4 items-start">
+                            {viewMode === 'DESCRITIVO' && renderStudentPhoto()}
+                            <div className="text-right flex flex-col justify-between h-full min-h-[70px]">
+                                <div>
+                                    <p className="font-bold text-xl text-emerald-900">{selectedYear}</p>
+                                    <p className="text-xs text-gray-650">EduControl PRO</p>
+                                </div>
+                                {viewMode === 'DESCRITIVO' && (
+                                    <p className="text-[10px] text-emerald-855 font-bold mt-auto bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 uppercase inline-block self-end">
+                                        {selectedBimestre === 'ANUAL' ? 'ANUAL' : `${selectedBimestre}º Bimestre`}
+                                    </p>
                                 )}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Criteria Details Legend */}
-                    <div className="mt-4 border border-gray-900 rounded-lg p-3 bg-gray-50 print:break-inside-avoid">
-                        <h3 className="text-xs font-bold text-emerald-900 uppercase border-b border-gray-300 pb-1 mb-2 flex items-center gap-1">
-                            <Info size={12} /> Critérios de Avaliação (Legenda)
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-[10px] text-gray-700">
-                            <div>
-                                <span className="font-bold text-gray-900">Comportamento:</span>
-                                <span className="ml-1">Média de ocorrências de 'Conversa' e 'Sono'.</span>
-                            </div>
-                            <div>
-                                <span className="font-bold text-gray-900">Falta de Atenção (Foco):</span>
-                                <span className="ml-1">Frequência de saídas (Banheiro) e dispersão.</span>
-                            </div>
-                            <div>
-                                <span className="font-bold text-gray-900">Tarefas (Portal):</span>
-                                <span className="ml-1">Entrega de atividades de casa/portal.</span>
-                            </div>
-                            <div>
-                                <span className="font-bold text-gray-900">Ativ. de Classe:</span>
-                                <span className="ml-1">Desempenho e produtividade em sala.</span>
-                            </div>
-                            <div>
-                                <span className="font-bold text-gray-900">Material:</span>
-                                <span className="ml-1">Registro de porte do material didático.</span>
-                            </div>
-                            <div>
-                                <span className="font-bold text-gray-900">Falta Autogestão:</span>
-                                <span className="ml-1">Registro de uso não autorizado de celular (Nota -5,0).</span>
-                            </div>
-                            <div>
-                                <span className="font-bold text-gray-900">Participação:</span>
-                                <span className="ml-1">Interação positiva em sala (+0,5 na nota).</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* Observations Section */}
-                    <div className="mt-6 border border-gray-900 rounded-lg overflow-hidden break-inside-avoid">
-                        <div className="bg-gray-100 p-2 border-b border-gray-900 flex items-center gap-2">
-                            <MessageSquare size={16} className="text-gray-600" />
-                            <h3 className="font-bold text-sm uppercase text-gray-800">Observações de Aula (Registro Diário)</h3>
-                        </div>
-                        <div className="min-h-[100px] bg-white p-4">
-                            {observations.length === 0 ? (
-                                <p className="text-xs text-gray-400 italic">Nenhuma observação registrada em aula até o momento.</p>
-                            ) : (
-                                <ul className="space-y-2">
-                                    {observations.map((obs, i) => (
-                                        <li key={i} className="text-xs text-gray-800 border-b border-gray-100 last:border-0 pb-1 flex flex-wrap gap-2 items-center">
-                                            <span className="font-bold text-emerald-800">{format(new Date(obs.date), "dd/MM", { locale: ptBR })}</span>
-                                            <span className="text-gray-400">|</span>
-                                            <span className="font-bold text-gray-700">{obs.subject} ({obs.teacher}):</span>
-                                            <span className="italic">{obs.note}</span>
-                                            {obs.hasPhotos && (
-                                                <span className="flex items-center gap-1 text-[9px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded border border-gray-300">
-                                                    <Camera size={10} />
-                                                    VER FOTO
-                                                </span>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-                    </div>
+                    {viewMode === 'FOA' ? (
+                        <>
+                            {/* Legend */}
+                            <div className="mb-4 flex justify-end">
+                                <table className="text-[10px] border-collapse shadow-sm">
+                                    <thead>
+                                        <tr>
+                                            <td className="border border-gray-400 bg-gray-100 p-1 px-2 font-bold text-gray-700">Legenda:</td>
+                                            <td className="border border-gray-400 p-1 px-3 font-bold text-center" style={{ backgroundColor: '#00FF00', WebkitPrintColorAdjust: 'exact' }}>Ótimo (O)</td>
+                                            <td className="border border-gray-400 p-1 px-3 font-bold text-center" style={{ backgroundColor: '#92D050', WebkitPrintColorAdjust: 'exact' }}>Bom (B)</td>
+                                            <td className="border border-gray-400 p-1 px-3 font-bold text-center" style={{ backgroundColor: '#FFFF00', WebkitPrintColorAdjust: 'exact' }}>Satisfatório (S)</td>
+                                            <td className="border border-gray-400 p-1 px-3 font-bold text-center" style={{ backgroundColor: '#FF9900', WebkitPrintColorAdjust: 'exact' }}>Insatisfatório (I)</td>
+                                        </tr>
+                                    </thead>
+                                </table>
+                            </div>
+
+                            {/* Main Table */}
+                            <div className="overflow-hidden rounded-t-lg border border-gray-900">
+                                <table className="w-full text-xs border-collapse table-fixed">
+                                    <colgroup><col style={{ width: '100px' }} /><col style={{ width: '100px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /><col style={{ width: '40px' }} /></colgroup>
+                                    <thead>
+                                        {/* Group Headers */}
+                                        <tr className="bg-emerald-50">
+                                            <th className="bg-white border border-gray-900 text-left pl-2 py-2 text-sm" rowSpan={2}>Disciplina</th>
+                                            <th className="bg-white border border-gray-900 text-left pl-2 py-2 text-sm" rowSpan={2}>Professor(a)</th>
+                                            <th colSpan={2} className="bg-white border border-gray-900 font-bold border-l-2 text-center py-1 bg-gray-50 uppercase tracking-tight text-[10px]">Aspectos Comportamentais</th>
+                                            <th colSpan={3} className="bg-white border border-gray-900 font-bold border-l-2 text-center py-1 bg-gray-50 uppercase tracking-tight text-[10px]">Tarefas/Materiais</th>
+                                            <th colSpan={4} className="bg-white border border-gray-900 font-bold border-l-2 text-center py-1 bg-gray-50 uppercase tracking-tight text-[10px]">Competências Socioemocionais</th>
+                                        </tr>
+                                        {/* Vertical Headers */}
+                                        <tr className="bg-gray-50">
+                                            <VerticalHeader text="Comportamento" />
+                                            <VerticalHeader text="Falta de Atenção" subtext="(Foco)" />
+
+                                            <VerticalHeader text="Tarefas" subtext="(Portal)" />
+                                            <VerticalHeader text="Ativ. de Classe" />
+                                            <VerticalHeader text="Material" />
+
+                                            <VerticalHeader text="Engajamento" />
+                                            <VerticalHeader text="Falta Autogestão" />
+                                            <VerticalHeader text="Participação" />
+                                            <VerticalHeader text="Abertura ao Novo" />
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {foaRows.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={11} className="p-8 text-center text-gray-500 italic border border-gray-900">
+                                                    Nenhuma aula registrada para este ano ({selectedYear}).
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            foaRows.map((row, index) => (
+                                                <tr key={index}>
+                                                    <td className="border border-gray-900 p-2 pl-3 bg-white font-bold text-gray-800 text-[11px] truncate uppercase">
+                                                        {row.subject.replace(/\s+\d+º.*$/, '').trim()}
+                                                    </td>
+                                                    <td className="border border-gray-900 p-2 pl-3 bg-white text-gray-700 text-[11px] truncate">
+                                                        {row.teacherName}
+                                                    </td>
+
+                                                    {/* Concepts */}
+                                                    <td className={getCellClass(row.comportamento)} style={{ backgroundColor: getConceptColor(row.comportamento), WebkitPrintColorAdjust: 'exact' }}>{row.comportamento}</td>
+                                                    <td className={getCellClass(row.atencao)} style={{ backgroundColor: getConceptColor(row.atencao), WebkitPrintColorAdjust: 'exact' }}>{row.atencao}</td>
+
+                                                    <td className={getCellClass(row.tarefas)} style={{ backgroundColor: getConceptColor(row.tarefas), WebkitPrintColorAdjust: 'exact' }}>{row.tarefas}</td>
+                                                    <td className={getCellClass(row.atividades)} style={{ backgroundColor: getConceptColor(row.atividades), WebkitPrintColorAdjust: 'exact' }}>{row.atividades}</td>
+                                                    <td className={getCellClass(row.material)} style={{ backgroundColor: getConceptColor(row.material), WebkitPrintColorAdjust: 'exact' }}>{row.material}</td>
+
+                                                    <td className={getCellClass(row.engajamento)} style={{ backgroundColor: getConceptColor(row.engajamento), WebkitPrintColorAdjust: 'exact' }}>{row.engajamento}</td>
+                                                    <td className={getCellClass(row.autogestao)} style={{ backgroundColor: getConceptColor(row.autogestao), WebkitPrintColorAdjust: 'exact' }}>{row.autogestao}</td>
+                                                    <td className={getCellClass(row.participacao)} style={{ backgroundColor: getConceptColor(row.participacao), WebkitPrintColorAdjust: 'exact' }}>{row.participacao}</td>
+                                                    <td className={getCellClass(row.abertura)} style={{ backgroundColor: getConceptColor(row.abertura), WebkitPrintColorAdjust: 'exact' }}>{row.abertura}</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Criteria Details Legend */}
+                            <div className="mt-4 border border-gray-900 rounded-lg p-3 bg-gray-50 print:break-inside-avoid">
+                                <h3 className="text-xs font-bold text-emerald-900 uppercase border-b border-gray-300 pb-1 mb-2 flex items-center gap-1">
+                                    <Info size={12} /> Critérios de Avaliação (Legenda)
+                                </h3>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-[10px] text-gray-700">
+                                    <div>
+                                        <span className="font-bold text-gray-900">Comportamento:</span>
+                                        <span className="ml-1">Média de ocorrências de 'Conversa' e 'Sono'.</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-bold text-gray-900">Falta de Atenção (Foco):</span>
+                                        <span className="ml-1">Frequência de saídas (Banheiro) e dispersão.</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-bold text-gray-900">Tarefas (Portal):</span>
+                                        <span className="ml-1">Entrega de atividades de casa/portal.</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-bold text-gray-900">Ativ. de Classe:</span>
+                                        <span className="ml-1">Desempenho e produtividade em sala.</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-bold text-gray-900">Material:</span>
+                                        <span className="ml-1">Registro de porte do material didático.</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-bold text-gray-900">Falta Autogestão:</span>
+                                        <span className="ml-1">Registro de uso não autorizado de celular (Nota -5,0).</span>
+                                    </div>
+                                    <div>
+                                        <span className="font-bold text-gray-900">Participação:</span>
+                                        <span className="ml-1">Interação positiva em sala (+0,5 na nota).</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Observations Section */}
+                            <div className="mt-6 border border-gray-900 rounded-lg overflow-hidden break-inside-avoid">
+                                <div className="bg-gray-100 p-2 border-b border-gray-900 flex items-center gap-2">
+                                    <MessageSquare size={16} className="text-gray-600" />
+                                    <h3 className="font-bold text-sm uppercase text-gray-800">Observações de Aula (Registro Diário)</h3>
+                                </div>
+                                <div className="min-h-[100px] bg-white p-4">
+                                    {observations.length === 0 ? (
+                                        <p className="text-xs text-gray-400 italic">Nenhuma observação registrada em aula até o momento.</p>
+                                    ) : (
+                                        <ul className="space-y-2">
+                                            {observations.map((obs, i) => (
+                                                <li key={i} className="text-xs text-gray-800 border-b border-gray-100 last:border-0 pb-1 flex flex-wrap gap-2 items-center">
+                                                    <span className="font-bold text-emerald-800">{format(new Date(obs.date), "dd/MM", { locale: ptBR })}</span>
+                                                    <span className="text-gray-400">|</span>
+                                                    <span className="font-bold text-gray-700">{obs.subject} ({obs.teacher}):</span>
+                                                    <span className="italic">{obs.note}</span>
+                                                    {obs.hasPhotos && (
+                                                        <span className="flex items-center gap-1 text-[9px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded border border-gray-300">
+                                                            <Camera size={10} />
+                                                            VER FOTO
+                                                        </span>
+                                                    )}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        renderDescriptiveReport()
+                    )}
 
                     {/* Considerations (Editable) */}
-                    <div className="mt-6 border border-gray-900 rounded-lg overflow-hidden break-inside-avoid">
+                    <div className={`mt-6 border border-gray-900 rounded-lg overflow-hidden break-inside-avoid ${viewMode === 'DESCRITIVO' ? 'print:hidden' : ''}`}>
                         <div className="bg-gray-100 p-2 border-b border-gray-900 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Edit3 size={16} className="text-gray-600" />
